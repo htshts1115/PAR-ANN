@@ -111,6 +111,7 @@ private:
 
 	void DoANNOptimization();
 	void init();
+	void initthreshold();
 
 	long trimIndex(int level, long index, bool isToroidal = FALSE) {
 		if (isToroidal) {
@@ -128,6 +129,13 @@ private:
 			}
 			return index;
 		}
+	}
+	long convertIndexANN(int level, long index){
+		int x, y, size;
+		size = TEXSIZE[level] - 2 * N[level];
+		x = index%size;
+		y = index / size;
+		return ((y + N[level])*TEXSIZE[level] + (x + N[level]));
 	}
 	
 	std::vector<std::vector<double> >  m_exemplar_x;		// [M] exemplar RGB image, size: NUM_CHANNEL * TEXSIZE^2
@@ -155,6 +163,9 @@ private:
 	std::vector<ANNkd_tree*          > mp_neighbor_kdTree_y;	// ANNkd_tree, 3 level
 	std::vector<ANNkd_tree*          > mp_neighbor_kdTree_z;
 	void calcNeighbor();
+
+	void initabsoluteneigh();
+	vector<vector<long>> absoluteneigh;
 
 	// global histogram
 	std::vector<std::vector<std::vector<double> > > m_histogram_exemplar;			// [M] size: NUM_CHANNEL x NUM_HISTOGRAM_BIN
@@ -209,7 +220,7 @@ private:
 	void InitGaussianKernel();
 
 	//discrete solver
-	int FindClosestColorIndex(int level, vector<double>& colorset, double referencecolor);	// return the index in colorset of the most similar color
+	int FindClosestColorIndex(int level, vector<double>& colorset, vector<double>& weightset, double referencecolor);	// return the index in colorset of the most similar color
 	vector<int> PredefinedL0idx, PredefinedL1idx, PredefinedL2idx, PredefinedL3idx;		//[3(ori)*D_NEIGHBOR[level]]
 
 	// upsampling
