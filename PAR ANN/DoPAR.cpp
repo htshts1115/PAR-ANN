@@ -1436,7 +1436,7 @@ void DoPAR::calcPositionHistogram_synthesis(int level){
 	m_positionhistogram_synthesis[level].clear();
 	m_positionhistogram_synthesis[level].resize(3 * (TEXSIZE[level] * TEXSIZE[level]), 0.0);	
 	double delta_histogram = 1.0 / (TEXSIZE[level] * TEXSIZE[level] * TEXSIZE[level]);
-	for (long i = 0; i < m_positionhistogram_synthesis[level].size(); i++){
+	for (long i = 0; i < TEXSIZE[level] * TEXSIZE[level] * TEXSIZE[level]; i++){
 		long bin = m_volume_position[level][i];
 		m_positionhistogram_synthesis[level][bin] += delta_histogram;
 	}
@@ -1459,13 +1459,13 @@ void DoPAR::showHistogram(vector<double> &hisvec, long rows, long cols, int leve
 		memcpy(hist.data, hisvec.data(), hisvec.size()*sizeof(double));	//float 32F, double 64F
 		hist *= TEXSIZE[level] * TEXSIZE[level] * TEXSIZE[level];
 		
-		hist.convertTo(hist, CV_8UC1);
+		hist.convertTo(hist, CV_8UC1);	//convertTo just copy the value, no scaling
 
 		imwrite("PositionHistogram.png", hist);
 		cout << endl << "histogram plotted.";
 	}
 	else{
-		cout << endl << "wrong size of hisvec";
+		cout << endl << "Error: wrong size of hisvec!";
 	}
 }
 
