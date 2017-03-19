@@ -105,6 +105,8 @@ private:
 	
 	double WEIGHT_HISTOGRAM;					// weight for histogram
 	vector<double> WEIGHT_POSITIONHISTOGRAM;
+	double PDF0[MULTIRES];
+
 	static const bool POSITIONHIS_ON = true;
 	std::vector<int> MAXITERATION;				//max iteration time	
 	std::vector<double> valuechangethreshold;	//mean value change per voxel
@@ -131,13 +133,20 @@ private:
 		}
 	}
 	long convertIndexANN(int level, long index){
+		//convert ANNSearch m_volume_nearest_x_index to m_volume index
 		int x, y, size;
 		size = TEXSIZE[level] - 2 * N[level];
 		x = index%size;
 		y = index / size;
 		return ((y + N[level])*TEXSIZE[level] + (x + N[level]));
 	}
-	
+	double gaussian_pdf(double x, double mean, double stddev)
+	{
+		static const double inv_sqrt_2pi = 0.398942280401432677939946;
+		double a = (x - mean) / stddev;
+		return inv_sqrt_2pi / stddev * std::exp(-0.5 * a * a);
+	}
+
 	std::vector<std::vector<double> >  m_exemplar_x;		// [M] exemplar RGB image, size: NUM_CHANNEL * TEXSIZE^2
 	std::vector<std::vector<double> >  m_exemplar_y;
 	std::vector<std::vector<double> >  m_exemplar_z;

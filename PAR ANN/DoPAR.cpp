@@ -758,7 +758,6 @@ void DoPAR::InitGaussianKernel(){
 		double scale = -0.5 / (gaussiansigma*gaussiansigma);
 		double cons = -scale / PI;
 		int size = 2 * N[level] + 1;
-
 		//compute kernel
 		for (int i = 0; i < size; i++)
 		{
@@ -775,15 +774,6 @@ void DoPAR::InitGaussianKernel(){
 		{
 			gaussiankernel[level][i] /= sum;
 		}
-
-		////TEST output
-		//cout << endl << "level " << level << ":";
-		//for (int j = 0; j < size; j++){
-		//	cout << endl;
-		//	for (int i = 0; i < size; i++){
-		//		cout << gaussiankernel[level][i]<<" ";
-		//	}
-		//}
 	}
 }
 
@@ -1116,16 +1106,30 @@ void DoPAR::searchVolume(int level) {
 		cvProjectPCA(current_neighbor_z, mp_neighbor_pca_average_z[level], mp_neighbor_pca_eigenvec_z[level], current_neighbor_z_projected);
 		// ANN search!
 		//!! error may occur if index > int
-		int ann_index_x;
-		int ann_index_y;
-		int ann_index_z;
-		double ann_dist_x;
-		double ann_dist_y;
-		double ann_dist_z;
+		
+		//==========multiple nearest index, position control=========
+		int k = 5;
+		ANNidxArray ann_index_x = new ANNidx[k];
+		ANNidxArray ann_index_y = new ANNidx[k];
+		ANNidxArray ann_index_z = new ANNidx[k];
+		ANNdistArray ann_dist_x = new ANNdist[k];
+		ANNdistArray ann_dist_y = new ANNdist[k];
+		ANNdistArray ann_dist_z = new ANNdist[k];
+		//int ann_index_x;
+		//int ann_index_y;
+		//int ann_index_z;
+		//double ann_dist_x;
+		//double ann_dist_y;
+		//double ann_dist_z;
+		
 		// ANN search. error bound = 2.0; Kopf used 2.0
-		mp_neighbor_kdTree_x[level]->annkSearch(current_neighbor_x_projected->data.db, 1, &ann_index_x, &ann_dist_x, ErrorBound);	
-		mp_neighbor_kdTree_y[level]->annkSearch(current_neighbor_y_projected->data.db, 1, &ann_index_y, &ann_dist_y, ErrorBound);
-		mp_neighbor_kdTree_z[level]->annkSearch(current_neighbor_z_projected->data.db, 1, &ann_index_z, &ann_dist_z, ErrorBound);
+		mp_neighbor_kdTree_x[level]->annkSearch(current_neighbor_x_projected->data.db, k, ann_index_x, ann_dist_x, ErrorBound);	
+		mp_neighbor_kdTree_y[level]->annkSearch(current_neighbor_y_projected->data.db, k, ann_index_y, ann_dist_y, ErrorBound);
+		mp_neighbor_kdTree_z[level]->annkSearch(current_neighbor_z_projected->data.db, k, ann_index_z, ann_dist_z, ErrorBound);
+		//mp_neighbor_kdTree_x[level]->annkSearch(current_neighbor_x_projected->data.db, 1, &ann_index_x, &ann_dist_x, ErrorBound);	
+		//mp_neighbor_kdTree_y[level]->annkSearch(current_neighbor_y_projected->data.db, 1, &ann_index_y, &ann_dist_y, ErrorBound);
+		//mp_neighbor_kdTree_z[level]->annkSearch(current_neighbor_z_projected->data.db, 1, &ann_index_z, &ann_dist_z, ErrorBound);
+		
 		// CV release
 		cvReleaseMat(&current_neighbor_x);
 		cvReleaseMat(&current_neighbor_y);
@@ -1133,27 +1137,43 @@ void DoPAR::searchVolume(int level) {
 		cvReleaseMat(&current_neighbor_x_projected);
 		cvReleaseMat(&current_neighbor_y_projected);
 		cvReleaseMat(&current_neighbor_z_projected);
+		//==========multiple nearest index, position control=========
+		int selected_index_x(0), selected_index_y(0), selected_index_z(0);
+		////index historgam matching
+		//if (POSITIONHIS_ON){
+		//	selected_index_x = indexhistmatching_ann_index(ann_index_x, ann_dist_x, 0, level);
+		//	selected_index_y = indexhistmatching_ann_index(ann_index_x, ann_dist_x, 1, level);
+		//	selected_index_z = indexhistmatching_ann_index(ann_index_x, ann_dist_x, 2, level);
+		//}
+
+		////update index histogram		
+		//if (POSITIONHIS_ON){
+
+		//	updateIndexHistogram(level, , );
+
+		//}
+
+		//update nearest_index, nearest_dist
+		m_volume_nearest_x_index[level][i] = ann_index_x[selected_index_x];
+		m_volume_nearest_y_index[level][i] = ann_index_y[selected_index_y];
+		m_volume_nearest_z_index[level][i] = ann_index_z[selected_index_z];
+		m_volume_nearest_x_dist[level][i] = ann_dist_x[selected_index_x] + min_dist;
+		m_volume_nearest_y_dist[level][i] = ann_dist_y[selected_index_y] + min_dist;
+		m_volume_nearest_z_dist[level][i] = ann_dist_z[selected_index_z] + min_dist;
+		//m_volume_nearest_x_index[level][i] = ann_index_x;
+		//m_volume_nearest_y_index[level][i] = ann_index_y;
+		//m_volume_nearest_z_index[level][i] = ann_index_z;
+		//m_volume_nearest_x_dist[level][i] = ann_dist_x + min_dist;
+		//m_volume_nearest_y_dist[level][i] = ann_dist_y + min_dist;
+		//m_volume_nearest_z_dist[level][i] = ann_dist_z + min_dist;
 
 		//search all points then optimize! Not search one point optimize one point!
-		m_volume_nearest_x_index[level][i] = ann_index_x;
-		m_volume_nearest_y_index[level][i] = ann_index_y;
-		m_volume_nearest_z_index[level][i] = ann_index_z;
-		m_volume_nearest_x_dist[level][i] = ann_dist_x + min_dist;
-		m_volume_nearest_y_dist[level][i] = ann_dist_y + min_dist;
-		m_volume_nearest_z_dist[level][i] = ann_dist_z + min_dist;
 		if (m_volume_nearest_x_index[level][i] != nearest_x_index_old[i]) ++cnt_nearest_index_new;	//just for illustration
 		if (m_volume_nearest_y_index[level][i] != nearest_y_index_old[i]) ++cnt_nearest_index_new;
 		if (m_volume_nearest_z_index[level][i] != nearest_z_index_old[i]) ++cnt_nearest_index_new;
 		global_energy_new += m_volume_nearest_x_dist[level][i];	//just for illustration
 		global_energy_new += m_volume_nearest_y_dist[level][i];
 		global_energy_new += m_volume_nearest_z_dist[level][i];
-
-
-		////ann_index range=[0,numData), corresponds to (x,y) where x/y range=[N[level],TEXSIZE[level]-N[level])!
-		//if (ann_index_x <0 || ann_index_x>=(TEXSIZE[level] - 2 * N[level])*(TEXSIZE[level] - 2 * N[level])){
-		//	cout << endl << ann_index_x;
-		//	_getch();
-		//}	
 	}
 	long time_end = clock();
 	cout << "done. clocks = " << (time_end - time_start) / CLOCKS_PER_SEC;
@@ -1236,11 +1256,6 @@ void DoPAR::optimizeVolume(int level) {
 							//relative index to centre:(NEIGHBORSIZE[level] - 1)/2 - m	absolute index:annconvert(nearest_index) + absolute[relative]
 							positionset[ori*NEIGHBORSIZE[level] + m] = ori*TEXSIZE[level] * TEXSIZE[level] 
 																	+ (convertIndexANN(level, nearest_index) + absoluteneigh[level][NEIGHBORSIZE[level] - 1 - m]);				
-							//if (positionset[ori*NEIGHBORSIZE[level] + m] < 0 || positionset[ori*NEIGHBORSIZE[level] + m] >= 3 * TEXSIZE[level] * TEXSIZE[level]) {
-							//	cout << endl << "Error: position=" << positionset[ori*NEIGHBORSIZE[level] + m] <<" m="<< m <<" ori="<<ori <<" x,y,z=" << x<<","<<y<<","<<z;
-							//	cout << endl << nearest_index << "," << absoluteneigh[level][NEIGHBORSIZE[level] - 1 - m];
-							//	_getch();
-							//}
 						}
 					}
 					// blending weight of this color according to matching distance
@@ -1264,8 +1279,13 @@ void DoPAR::optimizeVolume(int level) {
 						double positionhistogram_synthesis = m_positionhistogram_synthesis[level][positionset[ori*NEIGHBORSIZE[level] + m]];
 						positionfrequency[ori*NEIGHBORSIZE[level] + m] = positionhistogram_synthesis;
 
-						positionhistogram_matching += max(0.0, positionhistogram_synthesis - positionhistogram_exemplar);		// [0, 1]
-						weight *= 1.0 / (1.0 + WEIGHT_POSITIONHISTOGRAM[level] * positionhistogram_matching);	//additional weight to accelerate convergence
+						positionhistogram_matching = max(0.0, positionhistogram_synthesis - positionhistogram_exemplar);		// [0, 1]
+						//additional weight to accelerate convergence
+						//changed to gaussian distribution, std = averagef
+						double gaussianprob = gaussian_pdf(positionhistogram_matching, 0.0, 1.0 / m_positionhistogram_exemplar[level].size());
+						weight *= gaussianprob / PDF0[level];
+						//former used linear weight:
+						//weight *= 1.0 / (1.0 + WEIGHT_POSITIONHISTOGRAM[level] * positionhistogram_matching);	
 					}				
 
 					//========Gaussian fall-off===============
@@ -1343,6 +1363,7 @@ void DoPAR::upsampleVolume(int level) {
 				for (int dz = 0; dz < 2; ++dz) {
 					for (int dy = 0; dy < 2; ++dy) {
 						for (int dx = 0; dx < 2; ++dx) {
+							//index at level
 							index[4 * dz + 2 * dy + dx] = NUM_CHANNEL * (
 								TEXSIZE[level] * TEXSIZE[level] * min(z + dz, TEXSIZE[level] - 1) +
 								TEXSIZE[level] * trimIndex(level, y + dy) +
@@ -1353,6 +1374,7 @@ void DoPAR::upsampleVolume(int level) {
 				for (int dz = 0; dz < 2; ++dz) {
 					for (int dy = 0; dy < 2; ++dy) {
 						for (int dx = 0; dx < 2; ++dx) {
+							//index at level+1
 							int index2 = NUM_CHANNEL * (TEXSIZE[level + 1] * TEXSIZE[level + 1] * (2 * z + dz) + TEXSIZE[level + 1] * (2 * y + dy) + 2 * x + dx);
 							vector<double> color(NUM_CHANNEL, 0);
 							int cnt = 0;
@@ -1430,6 +1452,7 @@ void DoPAR::calcPositionHistogram_exemplar(int level){
 	}
 
 	WEIGHT_POSITIONHISTOGRAM[level] = 1.0* m_positionhistogram_exemplar[level].size();
+	PDF0[level] = gaussian_pdf(0.0, 0.0, 1.0 / m_positionhistogram_exemplar[level].size());
 }
 void DoPAR::calcPositionHistogram_synthesis(int level){
 	//initial uniform distribution
@@ -1442,11 +1465,6 @@ void DoPAR::calcPositionHistogram_synthesis(int level){
 	}
 }
 void DoPAR::updatePositionHistogram_synthesis(int level, const long position_old, const long position_new){
-	//if (position_new <0 || position_new >m_volume_position[level].size()) {
-	//	cout << endl << "Error: position_new=" << position_new;
-	//	_getch();
-	//}
-	
 	double delta_histogram = 1.0 / (TEXSIZE[level] * TEXSIZE[level] * TEXSIZE[level]);
 	m_positionhistogram_synthesis[level][position_old] -= delta_histogram;
 	m_positionhistogram_synthesis[level][position_new] += delta_histogram;
@@ -1459,6 +1477,8 @@ void DoPAR::showHistogram(vector<double> &hisvec, long rows, long cols, int leve
 		memcpy(hist.data, hisvec.data(), hisvec.size()*sizeof(double));	//float 32F, double 64F
 		hist *= TEXSIZE[level] * TEXSIZE[level] * TEXSIZE[level];
 		
+		//cv::normalize(hist, hist, 0, 255, NORM_MINMAX);
+
 		hist.convertTo(hist, CV_8UC1);	//convertTo just copy the value, no scaling
 
 		imwrite("PositionHistogram.png", hist);
