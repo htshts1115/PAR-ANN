@@ -102,10 +102,10 @@ private:
 	static std::vector<int> CHANNEL_MAXVALUE;	// for color histogram
 	static const double PCA_RATIO_VARIANCE;		//0.95
 	static const double ErrorBound;				//Kopf used 2.0
+	static const int ANNsearchk;			//search k nearest index
 	
 	double WEIGHT_HISTOGRAM;					// weight for histogram
 	vector<double> WEIGHT_POSITIONHISTOGRAM;
-	double PDF0[MULTIRES];
 
 	static const bool POSITIONHIS_ON = true;
 	std::vector<int> MAXITERATION;				//max iteration time	
@@ -189,6 +189,12 @@ private:
 	void calcPositionHistogram_synthesis(int level);
 	void updatePositionHistogram_synthesis(int level, const long position_old, const long position_new);
 	void showHistogram(vector<double> &histogram, long rows, long cols, int level);
+	// ===========index histogram ==============
+	std::vector<std::vector<double> >  m_indexhistogram_exemplar;
+	std::vector<std::vector<double> >  m_indexhistogram_synthesis;
+	void initialIndexHistogram(int level);
+	void updateIndexHistogram(int level, int orientation, const long annidx);
+	int indexhistmatching_ann_index(int level, int orientation, ANNidxArray idxarray, ANNdistArray distarry);
 
 	// synthesized volume
 	std::vector<std::vector<double > > m_volume;			// [M] size: NUM_CHANNEL * TEXSIZE^3

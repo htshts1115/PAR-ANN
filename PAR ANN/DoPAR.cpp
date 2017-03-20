@@ -600,6 +600,8 @@ const double DoPAR::PCA_RATIO_VARIANCE = 0.95;	//Kopf used 0.95
 
 const double DoPAR::ErrorBound = 2.0;			//Kopf used 2.0
 
+const int DoPAR::ANNsearchk = 5;	
+
 const double DoPAR::gaussiansigma = 6.0;		//gaussian fall-off function in optimization phase, higher sigma means more uniform
 
 
@@ -672,7 +674,7 @@ void DoPAR::outputmodel(int level){
 void DoPAR::initthreshold(){
 	if (MULTIRES == 1){
 		valuechangethreshold = { 0.5 };
-		MAXITERATION = { 15 };
+		MAXITERATION = { 10 };
 		//int maxl0 = 3 * NUM_CHANNEL*(2 * N[0] + 1)*(2 * N[0] + 1);
 		//for (int s = 0; s < maxl0; s++)	PredefinedL0idx.push_back(s);
 	}
@@ -1062,6 +1064,9 @@ void DoPAR::searchVolume(int level) {
 	vector<long> nearest_z_index_old = m_volume_nearest_z_index[level];
 	double global_energy_new = 0;
 	long cnt_nearest_index_new = 0;
+	//========For index histogram counting, shuffle the order. ========
+	initPermutation(level);	//shuffle m_permutation_xyz
+
 	int process = 0, displayprocess = -1;
 	for (long i = 0; i < TEXSIZE[level] * TEXSIZE[level] * TEXSIZE[level]; ++i) {
 		//for each point in volume	(the sequence doesnt matter, all the points are searched and then optimize)
@@ -1072,10 +1077,15 @@ void DoPAR::searchVolume(int level) {
 				cout << "\r" << displayprocess << "%..";
 			}
 		}
+		//========For index histogram counting, use shuffled index========
+		long i2 = m_permutation_xyz[level][i];	//x,y,z is random order
+		int x = i2 % TEXSIZE[level];
+		int y = (i2 / TEXSIZE[level]) % TEXSIZE[level];
+		int z = i2 / (TEXSIZE[level] * TEXSIZE[level]);
+		//int x = i %  TEXSIZE[level];
+		//int y = (i / TEXSIZE[level]) % TEXSIZE[level];
+		//int z = i / (TEXSIZE[level] * TEXSIZE[level]);
 
-		int x = i %  TEXSIZE[level];
-		int y = (i / TEXSIZE[level]) % TEXSIZE[level];
-		int z = i / (TEXSIZE[level] * TEXSIZE[level]);
 		// obtain current neighborhood_x from volume
 		CvMat* current_neighbor_x = cvCreateMat(1, D_NEIGHBOR[level], CV_64F); //rows = 1, cols = dimesnion
 		CvMat* current_neighbor_y = cvCreateMat(1, D_NEIGHBOR[level], CV_64F);
@@ -1108,13 +1118,12 @@ void DoPAR::searchVolume(int level) {
 		//!! error may occur if index > int
 		
 		//==========multiple nearest index, position control=========
-		int k = 5;
-		ANNidxArray ann_index_x = new ANNidx[k];
-		ANNidxArray ann_index_y = new ANNidx[k];
-		ANNidxArray ann_index_z = new ANNidx[k];
-		ANNdistArray ann_dist_x = new ANNdist[k];
-		ANNdistArray ann_dist_y = new ANNdist[k];
-		ANNdistArray ann_dist_z = new ANNdist[k];
+		ANNidxArray ann_index_x = new ANNidx[ANNsearchk];
+		ANNidxArray ann_index_y = new ANNidx[ANNsearchk];
+		ANNidxArray ann_index_z = new ANNidx[ANNsearchk];
+		ANNdistArray ann_dist_x = new ANNdist[ANNsearchk];
+		ANNdistArray ann_dist_y = new ANNdist[ANNsearchk];
+		ANNdistArray ann_dist_z = new ANNdist[ANNsearchk];
 		//int ann_index_x;
 		//int ann_index_y;
 		//int ann_index_z;
@@ -1123,9 +1132,9 @@ void DoPAR::searchVolume(int level) {
 		//double ann_dist_z;
 		
 		// ANN search. error bound = 2.0; Kopf used 2.0
-		mp_neighbor_kdTree_x[level]->annkSearch(current_neighbor_x_projected->data.db, k, ann_index_x, ann_dist_x, ErrorBound);	
-		mp_neighbor_kdTree_y[level]->annkSearch(current_neighbor_y_projected->data.db, k, ann_index_y, ann_dist_y, ErrorBound);
-		mp_neighbor_kdTree_z[level]->annkSearch(current_neighbor_z_projected->data.db, k, ann_index_z, ann_dist_z, ErrorBound);
+		mp_neighbor_kdTree_x[level]->annkSearch(current_neighbor_x_projected->data.db, ANNsearchk, ann_index_x, ann_dist_x, ErrorBound);	
+		mp_neighbor_kdTree_y[level]->annkSearch(current_neighbor_y_projected->data.db, ANNsearchk, ann_index_y, ann_dist_y, ErrorBound);
+		mp_neighbor_kdTree_z[level]->annkSearch(current_neighbor_z_projected->data.db, ANNsearchk, ann_index_z, ann_dist_z, ErrorBound);
 		//mp_neighbor_kdTree_x[level]->annkSearch(current_neighbor_x_projected->data.db, 1, &ann_index_x, &ann_dist_x, ErrorBound);	
 		//mp_neighbor_kdTree_y[level]->annkSearch(current_neighbor_y_projected->data.db, 1, &ann_index_y, &ann_dist_y, ErrorBound);
 		//mp_neighbor_kdTree_z[level]->annkSearch(current_neighbor_z_projected->data.db, 1, &ann_index_z, &ann_dist_z, ErrorBound);
@@ -1137,21 +1146,19 @@ void DoPAR::searchVolume(int level) {
 		cvReleaseMat(&current_neighbor_x_projected);
 		cvReleaseMat(&current_neighbor_y_projected);
 		cvReleaseMat(&current_neighbor_z_projected);
-		//==========multiple nearest index, position control=========
+		
 		int selected_index_x(0), selected_index_y(0), selected_index_z(0);
-		////index historgam matching
-		//if (POSITIONHIS_ON){
-		//	selected_index_x = indexhistmatching_ann_index(ann_index_x, ann_dist_x, 0, level);
-		//	selected_index_y = indexhistmatching_ann_index(ann_index_x, ann_dist_x, 1, level);
-		//	selected_index_z = indexhistmatching_ann_index(ann_index_x, ann_dist_x, 2, level);
-		//}
-
-		////update index histogram		
-		//if (POSITIONHIS_ON){
-
-		//	updateIndexHistogram(level, , );
-
-		//}
+		//==========multiple nearest index, Index Histogram matching=========
+		if (POSITIONHIS_ON){
+			selected_index_x = indexhistmatching_ann_index(level,0, ann_index_x, ann_dist_x);
+			selected_index_y = indexhistmatching_ann_index(level,1, ann_index_y, ann_dist_y);
+			selected_index_z = indexhistmatching_ann_index(level,2, ann_index_z, ann_dist_z);
+		
+			//update index histogram		
+			updateIndexHistogram(level, 0, ann_index_x[selected_index_x]);
+			updateIndexHistogram(level, 1 ,ann_index_y[selected_index_y]);
+			updateIndexHistogram(level, 2, ann_index_z[selected_index_z]);
+		}
 
 		//update nearest_index, nearest_dist
 		m_volume_nearest_x_index[level][i] = ann_index_x[selected_index_x];
@@ -1184,8 +1191,6 @@ void DoPAR::initPermutation(int level) {
 	for (long i = 0; i < TEXSIZE[level] * TEXSIZE[level] * TEXSIZE[level]; ++i) {
 		m_permutation_xyz[level][i] = i;
 	}
-	
-	//random_shuffle(m_permutation_xyz[level].begin(), m_permutation_xyz[level].end());
 	shuffle(m_permutation_xyz[level].begin(), m_permutation_xyz[level].end(), mersennetwistergenerator);
 }
 
@@ -1282,8 +1287,9 @@ void DoPAR::optimizeVolume(int level) {
 						positionhistogram_matching = max(0.0, positionhistogram_synthesis - positionhistogram_exemplar);		// [0, 1]
 						//additional weight to accelerate convergence
 						//changed to gaussian distribution, std = averagef
-						double gaussianprob = gaussian_pdf(positionhistogram_matching, 0.0, 1.0 / m_positionhistogram_exemplar[level].size());
-						weight *= gaussianprob / PDF0[level];
+						double stddev = 1.0 / m_positionhistogram_exemplar[level].size() /** 2.0/3.0*/;
+						double gaussianprob = gaussian_pdf(positionhistogram_matching, 0.0, stddev);
+						weight *= gaussianprob / gaussian_pdf(0.0, 0.0, stddev);
 						//former used linear weight:
 						//weight *= 1.0 / (1.0 + WEIGHT_POSITIONHISTOGRAM[level] * positionhistogram_matching);	
 					}				
@@ -1435,7 +1441,7 @@ void DoPAR::calcHistogram_exemplar(int level) {
 	}
 }
 
-//============Position Histogram=================
+//============Position Histogram for optimize step====
 void DoPAR::InitRandomVolumePosition(int level){
 	long maxsize = 3 * (TEXSIZE[level]*TEXSIZE[level]);
 	for (long xyz = 0; xyz < TEXSIZE[level] * TEXSIZE[level] * TEXSIZE[level]; ++xyz) {
@@ -1452,7 +1458,6 @@ void DoPAR::calcPositionHistogram_exemplar(int level){
 	}
 
 	WEIGHT_POSITIONHISTOGRAM[level] = 1.0* m_positionhistogram_exemplar[level].size();
-	PDF0[level] = gaussian_pdf(0.0, 0.0, 1.0 / m_positionhistogram_exemplar[level].size());
 }
 void DoPAR::calcPositionHistogram_synthesis(int level){
 	//initial uniform distribution
@@ -1468,6 +1473,47 @@ void DoPAR::updatePositionHistogram_synthesis(int level, const long position_old
 	double delta_histogram = 1.0 / (TEXSIZE[level] * TEXSIZE[level] * TEXSIZE[level]);
 	m_positionhistogram_synthesis[level][position_old] -= delta_histogram;
 	m_positionhistogram_synthesis[level][position_new] += delta_histogram;
+}
+//============Index Histogram for search step========
+void DoPAR::initialIndexHistogram(int level){
+	long numData = 3*(TEXSIZE[level] - 2 * N[level]) * (TEXSIZE[level] - 2 * N[level]);
+	m_indexhistogram_exemplar[level].resize(numData, 3.0 / numData);	// 3/3*Area = 1/Area
+	m_indexhistogram_synthesis[level].resize(numData, 0.0);				
+}
+void DoPAR::updateIndexHistogram(int level, int orientation, const long annidx){
+	long idx = annidx + orientation*(TEXSIZE[level] - 2 * N[level]) * (TEXSIZE[level] - 2 * N[level]);
+	double delta_histogram = 1.0 / (TEXSIZE[level] * TEXSIZE[level] * TEXSIZE[level]);
+	m_indexhistogram_synthesis[level][idx] += delta_histogram;
+}
+int DoPAR::indexhistmatching_ann_index(int level, int orientation, ANNidxArray idxarray, ANNdistArray distarry){
+	long  size = (TEXSIZE[level] - 2 * N[level]) * (TEXSIZE[level] - 2 * N[level]);
+	double difference(0.0), gaussianprob(0.0);
+	double stddev = 1.0 / size;
+	double probzero = gaussian_pdf(0.0, 0.0, stddev);
+	double distvalue_acc(0.0), weight_acc(0.0); 
+
+	for (int i = 0; i < ANNsearchk; i++){
+		double weight = pow(distarry[i], -0.6); 
+	
+		long idx = idxarray[i] + orientation*size;
+		difference = max(0.0 , m_indexhistogram_synthesis[level][idx] - m_indexhistogram_exemplar[level][idx]);
+		gaussianprob = gaussian_pdf(difference, 0.0, stddev);
+		weight *= gaussianprob / probzero;
+
+		distvalue_acc += distarry[i]*weight;
+		weight_acc += weight;
+	}
+
+	double refdist = distvalue_acc / weight_acc;
+
+	vector<double> copydistarray(distarry, distarry + ANNsearchk);
+	auto i = min_element(begin(copydistarray), end(copydistarray), [=](double x, double y)
+	{
+		return abs(x - refdist) < abs(y - refdist);
+	});
+	int closestindex = distance(begin(copydistarray), i);
+
+	return closestindex;
 }
 
 void DoPAR::showHistogram(vector<double> &hisvec, long rows, long cols, int level){
