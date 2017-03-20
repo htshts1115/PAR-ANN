@@ -188,7 +188,7 @@ private:
 	void calcPositionHistogram_exemplar(int level);
 	void calcPositionHistogram_synthesis(int level);
 	void updatePositionHistogram_synthesis(int level, const long position_old, const long position_new);
-	void showHistogram(vector<double> &histogram, long rows, long cols, int level);
+	void writeHistogram(int level, vector<double> &histogram, long rows, long cols, const string filename);
 	// ===========index histogram ==============
 	std::vector<std::vector<double> >  m_indexhistogram_exemplar;
 	std::vector<std::vector<double> >  m_indexhistogram_synthesis;

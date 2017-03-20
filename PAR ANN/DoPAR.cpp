@@ -50,6 +50,8 @@ DoPAR::DoPAR()
 	valuechangethreshold.resize(MULTIRES);
 	gaussiankernel.resize(MULTIRES);
 	absoluteneigh.resize(MULTIRES);
+	m_indexhistogram_exemplar.resize(MULTIRES);
+	m_indexhistogram_synthesis.resize(MULTIRES);
 	// [end] multi-res memory allocation---------------
 }
 
@@ -633,11 +635,13 @@ void DoPAR::DoANNOptimization(){
 			if (!POSITIONHIS_ON){
 				calcHistogram_exemplar(curlevel + 1);
 				calcHistogram_synthesis(curlevel + 1);
+				initialIndexHistogram(curlevel + 1);
 			}
 			if (POSITIONHIS_ON){
 				InitRandomVolumePosition(curlevel + 1);
 				calcPositionHistogram_exemplar(curlevel + 1);
 				calcPositionHistogram_synthesis(curlevel + 1);		
+				initialIndexHistogram(curlevel + 1);
 			}
 		}
 	}
@@ -652,7 +656,8 @@ void DoPAR::DoANNOptimization(){
 		//show position histogram	vector->mat
 		long rows = TEXSIZE[MULTIRES-1];
 		long cols = 3 * rows;
-		showHistogram(m_positionhistogram_synthesis[MULTIRES - 1], rows, cols, MULTIRES - 1);
+		writeHistogram(MULTIRES - 1, m_positionhistogram_synthesis[MULTIRES - 1], rows, cols, "PosHis.png");
+		writeHistogram(MULTIRES - 1, m_indexhistogram_synthesis[MULTIRES - 1], rows - 2 * N[MULTIRES-1], 3 * (rows - 2 * N[MULTIRES-1]), "IndexHis.png");
 	}
 }
 
@@ -746,6 +751,7 @@ void DoPAR::init() {
 		cout << endl << "Init Random PositionIndex Done.";
 		calcPositionHistogram_exemplar(0);
 		calcPositionHistogram_synthesis(0);
+		initialIndexHistogram(0);
 		cout << endl << "Position Histogram Initialized.";
 	}
 }
@@ -1068,20 +1074,20 @@ void DoPAR::searchVolume(int level) {
 	initPermutation(level);	//shuffle m_permutation_xyz
 
 	int process = 0, displayprocess = -1;
-	for (long i = 0; i < TEXSIZE[level] * TEXSIZE[level] * TEXSIZE[level]; ++i) {
+	for (long i2 = 0; i2 < TEXSIZE[level] * TEXSIZE[level] * TEXSIZE[level]; ++i2) {
 		//for each point in volume	(the sequence doesnt matter, all the points are searched and then optimize)
 		if (level == MULTIRES - 1){
-			process = i * 100 / (TEXSIZE[level] * TEXSIZE[level] * TEXSIZE[level]);
+			process = i2 * 10 / (TEXSIZE[level] * TEXSIZE[level] * TEXSIZE[level]);
 			if (process > displayprocess){
 				displayprocess = process;
-				cout << "\r" << displayprocess << "%..";
+				cout << "\r" << displayprocess*10 << "%..";
 			}
 		}
 		//========For index histogram counting, use shuffled index========
-		long i2 = m_permutation_xyz[level][i];	//x,y,z is random order
-		int x = i2 % TEXSIZE[level];
-		int y = (i2 / TEXSIZE[level]) % TEXSIZE[level];
-		int z = i2 / (TEXSIZE[level] * TEXSIZE[level]);
+		long i = m_permutation_xyz[level][i2];	//x,y,z is random order
+		int x = i % TEXSIZE[level];
+		int y = (i / TEXSIZE[level]) % TEXSIZE[level];
+		int z = i / (TEXSIZE[level] * TEXSIZE[level]);
 		//int x = i %  TEXSIZE[level];
 		//int y = (i / TEXSIZE[level]) % TEXSIZE[level];
 		//int z = i / (TEXSIZE[level] * TEXSIZE[level]);
@@ -1208,10 +1214,10 @@ void DoPAR::optimizeVolume(int level) {
 		vector<double> color_acc(NUM_CHANNEL, 0.0);
 
 		if (level == MULTIRES - 1){
-			process = i2 * 100 / (TEXSIZE[level] * TEXSIZE[level] * TEXSIZE[level]);
+			process = i2 * 10 / (TEXSIZE[level] * TEXSIZE[level] * TEXSIZE[level]);
 			if (process > displayprocess){
 				displayprocess = process;
-				cout << "\r" << displayprocess << "%..";
+				cout << "\r" << displayprocess*10 << "%..";
 			}
 		}
 
@@ -1287,7 +1293,7 @@ void DoPAR::optimizeVolume(int level) {
 						positionhistogram_matching = max(0.0, positionhistogram_synthesis - positionhistogram_exemplar);		// [0, 1]
 						//additional weight to accelerate convergence
 						//changed to gaussian distribution, std = averagef
-						double stddev = 1.0 / m_positionhistogram_exemplar[level].size() /** 2.0/3.0*/;
+						double stddev = 1.0 / m_positionhistogram_exemplar[level].size();	/** 2.0/3.0*/
 						double gaussianprob = gaussian_pdf(positionhistogram_matching, 0.0, stddev);
 						weight *= gaussianprob / gaussian_pdf(0.0, 0.0, stddev);
 						//former used linear weight:
@@ -1513,26 +1519,22 @@ int DoPAR::indexhistmatching_ann_index(int level, int orientation, ANNidxArray i
 	});
 	int closestindex = distance(begin(copydistarray), i);
 
-	return closestindex;
+	return closestindex;	
 }
 
-void DoPAR::showHistogram(vector<double> &hisvec, long rows, long cols, int level){
-	if (hisvec.size() == rows*cols) // check that the rows and cols match the size of your vector
-	{		
-		Mat hist = Mat(rows, cols, CV_64FC1);
-		memcpy(hist.data, hisvec.data(), hisvec.size()*sizeof(double));	//float 32F, double 64F
-		hist *= TEXSIZE[level] * TEXSIZE[level] * TEXSIZE[level];
+void DoPAR::writeHistogram(int level, vector<double> &hisvec, long rows, long cols, const string filename){
+	if (filename.size() == 0) { cout << endl << "writeHistogram Error: empty filename"; return; };
+	if (hisvec.size() != rows*cols) { cout << endl << "writeHistogram Error: wrong size of hisvec"; return; };
+			
+	Mat hist = Mat(rows, cols, CV_64FC1);
+	memcpy(hist.data, hisvec.data(), hisvec.size()*sizeof(double));	//float 32F, double 64F
+	hist *= TEXSIZE[level] * TEXSIZE[level] * TEXSIZE[level];
 		
-		//cv::normalize(hist, hist, 0, 255, NORM_MINMAX);
+	//cv::normalize(hist, hist, 0, 255, NORM_MINMAX);
+	hist.convertTo(hist, CV_8UC1);	//convertTo just copy the value, no scaling
 
-		hist.convertTo(hist, CV_8UC1);	//convertTo just copy the value, no scaling
-
-		imwrite("PositionHistogram.png", hist);
-		cout << endl << "histogram plotted.";
-	}
-	else{
-		cout << endl << "Error: wrong size of hisvec!";
-	}
+	imwrite(filename, hist);
+	cout << endl << "histogram plotted.";
 }
 
 int DoPAR::FindClosestColorIndex(int level, vector<double> &color, vector<double> &weight, double referencecolor){
