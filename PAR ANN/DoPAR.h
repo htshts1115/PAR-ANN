@@ -185,22 +185,22 @@ private:
 	// ===========position histogram=============
 	std::vector<std::vector<double> >  m_positionhistogram_exemplar;				//  multires * binsize(exemplar area)
 	std::vector<std::vector<double> >  m_positionhistogram_synthesis;				//  multires * binsize(exmeplar area)
-	void calcPositionHistogram_exemplar(int level);
-	void calcPositionHistogram_synthesis(int level);
+	void initPositionHistogram_exemplar(int level);
+	void initPositionHistogram_synthesis(int level);
 	void updatePositionHistogram_synthesis(int level, const long position_old, const long position_new);
 	void writeHistogram(int level, vector<double> &histogram, long rows, long cols, const string filename);
+	// volume_position record
+	std::vector<std::vector<long> > m_volume_position;		// [M] size: TEXSIZE^3
 	// ===========index histogram ==============
 	std::vector<std::vector<double> >  m_indexhistogram_exemplar;
 	std::vector<std::vector<double> >  m_indexhistogram_synthesis;
-	void initialIndexHistogram(int level);
-	void updateIndexHistogram(int level, int orientation, const long annidx);
-	int indexhistmatching_ann_index(int level, int orientation, ANNidxArray idxarray, ANNdistArray distarry);
+	void initIndexHistogram(int level);
+	void updateIndexHistogram(int level, int orientation, const ANNidx oldannidx, const ANNidx newannidx);
+	ANNidx indexhistmatching_ann_index(int level, int orientation, ANNidxArray idxarray, ANNdistArray distarry);
+	std::vector<std::vector<ANNidx> > m_volume_index_x, m_volume_index_y, m_volume_index_z;		// [M] size: TEXSIZE^3
 
 	// synthesized volume
 	std::vector<std::vector<double > > m_volume;			// [M] size: NUM_CHANNEL * TEXSIZE^3
-	// volume_position record
-	std::vector<std::vector<long> > m_volume_position;		// [M] size: TEXSIZE^3
-	void InitRandomVolumePosition(int level);				//initialize uniform position distribution at 1st run for each level
 
 	// pseudocode-----------------------------------------------------------------
 	// volume[0] := initVolume(0);                                        % initialization
