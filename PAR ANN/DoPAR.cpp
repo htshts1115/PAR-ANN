@@ -605,7 +605,7 @@ const double DoPAR::PCA_RATIO_VARIANCE = 0.95;	//Kopf used 0.95
 
 const double DoPAR::ErrorBound = 2.0;			//Kopf used 2.0
 
-const int DoPAR::ANNsearchk = 5;	
+const int DoPAR::ANNsearchk = 10;	
 
 const double DoPAR::gaussiansigma = 6.0;		//gaussian fall-off function in optimization phase, higher sigma means more uniform
 
@@ -683,7 +683,7 @@ void DoPAR::outputmodel(int level){
 void DoPAR::initthreshold(){
 	if (MULTIRES == 1){
 		valuechangethreshold = { 0.5 };
-		MAXITERATION = { 15 };
+		MAXITERATION = { 10 };
 		//int maxl0 = 3 * NUM_CHANNEL*(2 * N[0] + 1)*(2 * N[0] + 1);
 		//for (int s = 0; s < maxl0; s++)	PredefinedL0idx.push_back(s);
 	}
@@ -1549,33 +1549,48 @@ ANNidx DoPAR::indexhistmatching_ann_index(int level, int orientation, ANNidxArra
 	double stddev = 1.0 / ((TEXSIZE[level] - 2 * N[level]) * (TEXSIZE[level] - 2 * N[level]));
 	double probzero = gaussian_pdf(0.0, 0.0, stddev);
 	double dist_acc(0.0), weight_acc(0.0); 
+	double idx_acc(0.0);
 
+	//for (int i = 0; i < ANNsearchk; i++){
+	//	double weight = pow(distarry[i], -0.6); 
+	//	long idx = idxarray[i] + orientation*size;
+	//	double gaussianprob(0.0);
+	//	double difference = m_indexhistogram_synthesis[level][idx] - m_indexhistogram_exemplar[level][idx];
+	//	//increase weight when (positionhistogram_synthesis - positionhistogram_exemplar)<0	
+	//	if (difference >= 0) gaussianprob = gaussian_pdf(difference, 0.0, stddev);
+	//	else gaussianprob = 2 * probzero - gaussian_pdf(-difference, 0.0, stddev);
+	//	
+	//	//difference = max(0.0 , difference);
+	//	//gaussianprob = gaussian_pdf(difference, 0.0, stddev);
+	//	weight *= gaussianprob / probzero;
+	//
+	//	//dist_acc += distarry[i]*weight;	
+	//	idx_acc += idxarray[i] * weight;
+	//	weight_acc += weight;
+	//}
+	////double refdist = dist_acc / weight_acc;
+	////vector<double> copydistarray(distarry, distarry + ANNsearchk);
+	////auto i = min_element(begin(copydistarray), end(copydistarray), [=](double x, double y)
+	////{
+	////	return abs(x - refdist) < abs(y - refdist);
+	////});
+	////ANNidx closestindex = distance(begin(copydistarray), i);
+	//double refidx = idx_acc / weight_acc;
+	//vector<ANNidx> copyidxarray(idxarray, idxarray + ANNsearchk);
+	//auto i = min_element(begin(copyidxarray), end(copyidxarray), [=](ANNidx x, ANNidx y)
+	//{
+	//	return abs(x - refidx) < abs(y - refidx);
+	//});
+	//ANNidx closestindex = distance(begin(copyidxarray), i);
+
+	//test simple form: just select minimum frequency
+	vector<double> frequecyarray(ANNsearchk, 0.0);
 	for (int i = 0; i < ANNsearchk; i++){
-		double weight = pow(distarry[i], -0.6); 
-	
 		long idx = idxarray[i] + orientation*size;
-		double gaussianprob(0.0);
-		double difference = m_indexhistogram_synthesis[level][idx] - m_indexhistogram_exemplar[level][idx];
-		//increase weight when (positionhistogram_synthesis - positionhistogram_exemplar)<0	
-		if (difference >= 0) gaussianprob = gaussian_pdf(difference, 0.0, stddev);
-		else gaussianprob = 2 * probzero - gaussian_pdf(-difference, 0.0, stddev);
-		
-		//difference = max(0.0 , difference);
-		//gaussianprob = gaussian_pdf(difference, 0.0, stddev);
-		weight *= gaussianprob / probzero;
-
-		dist_acc += distarry[i]*weight;
-		weight_acc += weight;
+		frequecyarray[i] = m_indexhistogram_synthesis[level][idx];
 	}
-
-	double refdist = dist_acc / weight_acc;
-
-	vector<double> copydistarray(distarry, distarry + ANNsearchk);
-	auto i = min_element(begin(copydistarray), end(copydistarray), [=](double x, double y)
-	{
-		return abs(x - refdist) < abs(y - refdist);
-	});
-	ANNidx closestindex = distance(begin(copydistarray), i);
+	auto i = min_element(begin(frequecyarray), end(frequecyarray));
+	int closestindex = distance(begin(frequecyarray), i);
 
 	return closestindex;	
 }
