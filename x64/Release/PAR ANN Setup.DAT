@@ -1,30 +1,29 @@
-/* PAR ANN
 /* &&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&
-/* &&&&&&&&&       20 02 17                       &&&&&&
+/* &&&&&&&&&       22 03 17   PAR ANN             &&&&&&
 /* &&&&&&&&&       Tianshen Huang                 &&&&&&
 /* &&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&
-/*
 /* Specify working directory (e.g. d:\test\)
 /* Note: last character is '\' !!
 /*=============================================
-/*C:\Users\Tianshen Huang\Documents\PRM\PAR_images\berea\
-C:\Users\Tianshen Huang\Documents\PRM\PAR\PAR ANN\x64\Release\
-/*C:\Users\Tianshen Huang\Documents\PRM\PAR\PAR ANN\x64\Release\Kopftest_zebra\
+C:\Users\Tianshen Huang\Documents\PRM\PAR_images\berea\
+/*C:\Users\Tianshen Huang\Documents\PRM\PAR\PAR ANN\x64\Release\
 /*=============================================
 /* Specify training images in XY, XZ and YZ-plane
 /*=============================================
 /*Berea200_xy101_64.png,Berea200_xz101_64.png,Berea200_yz101_64.png
 /*Berea200_xy101_64_bin.png,Berea200_xz101_64_bin.png,Berea200_yz101_64_bin.png
+Berea200_xy101_s25_128.png, Berea200_xz101_s25_128.png, Berea200_yz101_s25_128.png
 /*Berea200_xy101_scale025_binary.png, Berea200_xz101_scale025_binary.png, Berea200_yz101_scale025_binary.png
 /*Berea200_xy101_scale025.png, Berea200_xz101_scale025.png, Berea200_yz101_scale025.png
-/*Berea200_xy101_scale05_binary.png, Berea200_xz101_scale05_binary.png, Berea200_yz101_scale05_binary.png
+/*Berea200_xy101_scale05.png, Berea200_xz101_scale05.png, Berea200_yz101_scale05.png
 /*Berea200_xy101.png, Berea200_xz101.png, Berea200_yz101.png
-/*caustic64.png,caustic64.png,caustic64.png
-/*zebra_s2.png, zebra_s2_y.png, zebra_s2_z.png
-/*zebra.png, zebra_y.png, zebra_z.png
-/*zebra_binary.png, zebra_binary_y.png, zebra_binary_z.png
-/*Berea200_1_bin_64_D1_xy.png, Berea200_1_bin_64_D1_xz.png, Berea200_1_bin_64_D1_yz.png
-Berea200_1_bin_64_D2_xy.png, Berea200_1_bin_64_D2_xz.png, Berea200_1_bin_64_D2_yz.png
+/*Berea200_1_D4s025_xy.png, Berea200_1_D4s025_xz.png, Berea200_1_D4s025_yz.png
+/*Berea200_1_D4s025_bin_xy.png, Berea200_1_D4s025_bin_xz.png, Berea200_1_D4s025_bin_yz.png
+/*Berea200_1_bin_64_D2_xy.png, Berea200_1_bin_64_D2_xz.png, Berea200_1_bin_64_D2_yz.png
+/*=============================================
+/* Output directory, by default empty meaning in working directory; with parameters
+/*=============================================
+C:\Users\Tianshen Huang\Documents\PRM\PAR\PAR ANN\x64\Release\
 /*=============================================
 /* Specify 3D model 
 /*=============================================
@@ -32,22 +31,17 @@ Berea200_1_bin_64_D2_xy.png, Berea200_1_bin_64_D2_xz.png, Berea200_1_bin_64_D2_y
 /*Berea200_1_bin_64.RAW
 /*Berea200_1_64_s025.RAW
 /*Berea200_1_bin_64_PAR.RAW
-Berea200_1_bin_64_rand.RAW
-/*Berea200_1_bin_64_PAR_s025.RAW
-/*Berea200_xy101_T40OL8Sp7cl2_gray_scale025.RAW
+Berea200_gray_s25_128.RAW
+/*Berea200_1_bin_64_D2.RAW
+/*Berea200_xy101_PAR_gray_scale025.RAW
 /*Berea200_xy101_T40OL8Sp7cl2_gray_scale025_binary.RAW
 /*Berea200_xy101_T40OL8Sp7cl2_gray_scale05.RAW
-/*caustic64_234H.RAW
-/*Berea200_xy101_T40OL8Sp7cl2_gray.RAW
+/*zebra64_4GDP.RAW
+/*Berea200_xy101_gray.RAW
 /*Berea200_xy101_gray-16.RAW
 /*Berea200_xy101_gray-16_scale025.RAW
-/*Berea200_gray_scale025.RAW
 /*Berea200_gray_scale025_binary.raw
-/*Berea200_gray_scale05.RAW
+/*Berea200_gray_s25.RAW
+/*Berea200_gray_s50.RAW
 /*Berea200_gray_scale05_binary.RAW
-/*=============================================
-/* Specify the dimension of resultant model
-/* (1) Output directory, by default empty meaning in working directory; with parameters
-/*=============================================
-C:\Users\Tianshen Huang\Documents\PRM\PAR\PAR ANN\x64\Release\
 /*=============================================

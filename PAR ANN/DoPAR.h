@@ -115,7 +115,7 @@ private:
 	void init();
 	void initthreshold();
 
-	long trimIndex(int level, long index, bool isToroidal = FALSE) {
+	ANNidx trimIndex(int level, ANNidx index, bool isToroidal = FALSE) {
 		if (isToroidal) {
 			while (index < 0) index += TEXSIZE[level];
 			return index % TEXSIZE[level];
@@ -132,7 +132,7 @@ private:
 			return index;
 		}
 	}
-	long convertIndexANN(int level, long index){
+	ANNidx convertIndexANN(int level, ANNidx index){
 		//convert ANNSearch m_volume_nearest_x_index to m_volume index
 		int x, y, size;
 		size = TEXSIZE[level] - 2 * N[level];
@@ -174,7 +174,7 @@ private:
 	void calcNeighbor();
 
 	void initabsoluteneigh();
-	vector<vector<long>> absoluteneigh;
+	vector<vector<ANNidx>> absoluteneigh;
 
 	// global histogram
 	std::vector<std::vector<std::vector<double> > > m_histogram_exemplar;			// [M] size: NUM_CHANNEL x NUM_HISTOGRAM_BIN
@@ -187,10 +187,10 @@ private:
 	std::vector<std::vector<double> >  m_positionhistogram_synthesis;				//  multires * binsize(exmeplar area)
 	void initPositionHistogram_exemplar(int level);
 	void initPositionHistogram_synthesis(int level);
-	void updatePositionHistogram_synthesis(int level, const long position_old, const long position_new);
-	void writeHistogram(int level, vector<double> &histogram, long rows, long cols, const string filename);
+	void updatePositionHistogram_synthesis(int level, const ANNidx position_old, const ANNidx position_new);
+	void writeHistogram(int level, vector<double> &histogram, int rows, int cols, const string filename);
 	// volume_position record
-	std::vector<std::vector<long> > m_volume_position;		// [M] size: TEXSIZE^3
+	std::vector<std::vector<ANNidx> > m_volume_position;		// [M] size: TEXSIZE^3
 	// ===========index histogram ==============
 	std::vector<std::vector<double> >  m_indexhistogram_exemplar;
 	std::vector<std::vector<double> >  m_indexhistogram_synthesis;
@@ -219,9 +219,9 @@ private:
 	double globalenergy_new, globalenergy_old;
 
 	// phase 1: nearest neighbor search
-	std::vector<std::vector<long   > > m_volume_nearest_x_index;		// [M] size: TEXSIZE^3
-	std::vector<std::vector<long   > > m_volume_nearest_y_index;		// [M] size: TEXSIZE^3
-	std::vector<std::vector<long   > > m_volume_nearest_z_index;		// [M] size: TEXSIZE^3
+	std::vector<std::vector<ANNidx> > m_volume_nearest_x_index;		// [M] size: TEXSIZE^3
+	std::vector<std::vector<ANNidx> > m_volume_nearest_y_index;		// [M] size: TEXSIZE^3
+	std::vector<std::vector<ANNidx> > m_volume_nearest_z_index;		// [M] size: TEXSIZE^3
 	std::vector<std::vector<double> > m_volume_nearest_x_dist;		// [M] size: TEXSIZE^3
 	std::vector<std::vector<double> > m_volume_nearest_y_dist;		// [M] size: TEXSIZE^3
 	std::vector<std::vector<double> > m_volume_nearest_z_dist;		// [M] size: TEXSIZE^3
@@ -230,7 +230,7 @@ private:
 	// phase 2: optimization
 	void optimizeVolume(int level);
 	// random permutation (precomputed)
-	std::vector<std::vector<long> > m_permutation_xyz;				// [M] size: TEXSIZE^3
+	std::vector<std::vector<ANNidx> > m_permutation_xyz;				// [M] size: TEXSIZE^3
 	void initPermutation(int level);
 	// Gaussian fall-off function
 	static const double gaussiansigma;
