@@ -43,8 +43,8 @@ DoPAR::DoPAR()
 	m_volume_nearest_y_dist.resize(MULTIRES);
 	m_volume_nearest_z_dist.resize(MULTIRES);
 	m_permutation_xyz.resize(MULTIRES);
-	valuechange.resize(MULTIRES);
 	
+	valuechange.resize(MULTIRES);
 	WEIGHT_POSITIONHISTOGRAM.resize(MULTIRES);
 	MAXITERATION.resize(MULTIRES);
 	valuechangethreshold.resize(MULTIRES);
@@ -619,7 +619,8 @@ void DoPAR::DoANNOptimization(){
 
 	for (int curlevel = 0; curlevel < MULTIRES; curlevel++){
 		cout << endl << "=============level: " << curlevel << "===============";
-	
+		globalenergy_new = 0.0; globalenergy_old = 10e-9;
+		
 		for (int loop = 0; loop < MAXITERATION[curlevel]; loop++){
 			cout << endl << "---------iteration: " << loop+1<<"------------";
 			valuechange[curlevel] = 0.0;
@@ -628,8 +629,10 @@ void DoPAR::DoANNOptimization(){
 			optimizeVolume(curlevel);
 
 			//if converge break;
-			if (valuechange[curlevel] < valuechangethreshold[curlevel]) break;		//David Turner used 1.0e-3
-			
+			//if (valuechange[curlevel] < valuechangethreshold[curlevel]) break;		//David Turner used 1.0e-3
+			if (abs(globalenergy_old - globalenergy_new) / globalenergy_old < 0.005) break;
+			globalenergy_old = globalenergy_new;
+
 			//outputmodel(curlevel);
 			//_getch();
 		}
@@ -683,7 +686,7 @@ void DoPAR::outputmodel(int level){
 void DoPAR::initthreshold(){
 	if (MULTIRES == 1){
 		valuechangethreshold = { 0.5 };
-		MAXITERATION = { 10 };
+		MAXITERATION = { 15 };
 		//int maxl0 = 3 * NUM_CHANNEL*(2 * N[0] + 1)*(2 * N[0] + 1);
 		//for (int s = 0; s < maxl0; s++)	PredefinedL0idx.push_back(s);
 	}
@@ -1205,6 +1208,8 @@ void DoPAR::searchVolume(int level) {
 	cout << "done. clocks = " << (time_end - time_start) / CLOCKS_PER_SEC;
 	cout << " updated NN: " << cnt_nearest_index_new <<", global energy: " << global_energy_new;
 
+	globalenergy_new = global_energy_new;
+
 	//writeHistogram(level, m_indexhistogram_synthesis[level], TEXSIZE[level] - 2 * N[level], 3 * (TEXSIZE[level] - 2 * N[level]), "IndexHis.png");
 	//_getch();
 }
@@ -1312,10 +1317,10 @@ void DoPAR::optimizeVolume(int level) {
 						double gaussianprob(0.0);
 						double difference = positionhistogram_synthesis - positionhistogram_exemplar;
 						//increase weight when (positionhistogram_synthesis - positionhistogram_exemplar)<0	
-						if (difference >= 0) gaussianprob = gaussian_pdf(difference, 0.0, stddev);
-						else gaussianprob = 2 * gaussian_pdf(0.0, 0.0, stddev) - gaussian_pdf(-difference, 0.0, stddev);
-						//positionhistogram_matching = max(0.0, difference);		// [0, 1]
-						//gaussianprob = gaussian_pdf(positionhistogram_matching, 0.0, stddev);
+						//if (difference >= 0) gaussianprob = gaussian_pdf(difference, 0.0, stddev);
+						//else gaussianprob = 2 * gaussian_pdf(0.0, 0.0, stddev) - gaussian_pdf(-difference, 0.0, stddev);
+						positionhistogram_matching = max(0.0, difference);		// [0, 1]
+						gaussianprob = gaussian_pdf(positionhistogram_matching, 0.0, stddev);
 						weight *= gaussianprob / gaussian_pdf(0.0, 0.0, stddev);
 						//former used linear weight:
 						//weight *= 1.0 / (1.0 + WEIGHT_POSITIONHISTOGRAM[level] * positionhistogram_matching);	
@@ -1583,7 +1588,7 @@ ANNidx DoPAR::indexhistmatching_ann_index(int level, int orientation, ANNidxArra
 	//});
 	//ANNidx closestindex = distance(begin(copyidxarray), i);
 
-	//test simple form: just select minimum frequency
+	//simple form works better: just select minimum frequency
 	vector<double> frequecyarray(ANNsearchk, 0.0);
 	for (int i = 0; i < ANNsearchk; i++){
 		long idx = idxarray[i] + orientation*size;

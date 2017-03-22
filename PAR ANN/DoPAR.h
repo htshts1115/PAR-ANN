@@ -109,7 +109,7 @@ private:
 
 	static const bool POSITIONHIS_ON = true;
 	std::vector<int> MAXITERATION;				//max iteration time	
-	std::vector<double> valuechangethreshold;	//mean value change per voxel
+	
 
 	void DoANNOptimization();
 	void init();
@@ -213,7 +213,10 @@ private:
 	// end for
 	//----------------------------------------------------------------------------
 
+	//check convergence
 	std::vector<double> valuechange;
+	std::vector<double> valuechangethreshold;	//mean value change per voxel
+	double globalenergy_new, globalenergy_old;
 
 	// phase 1: nearest neighbor search
 	std::vector<std::vector<long   > > m_volume_nearest_x_index;		// [M] size: TEXSIZE^3
