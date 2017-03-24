@@ -107,9 +107,9 @@ private:
 	double WEIGHT_HISTOGRAM;					// weight for histogram
 	vector<double> WEIGHT_POSITIONHISTOGRAM;
 
-	static const bool POSITIONHIS_ON = true;
-	std::vector<int> MAXITERATION;				//max iteration time	
-	
+	static const bool POSITIONHIS_ON = true;	// Using Index/Position Histogram
+	static const bool COLOURHIS_ON = true;		// Using Colour Histogram
+
 
 	void DoANNOptimization();
 	void init();
@@ -218,6 +218,7 @@ private:
 	std::vector<double> valuechange;
 	std::vector<double> valuechangethreshold;	//mean value change per voxel
 	double globalenergy_new, globalenergy_old;
+	std::vector<int> MAXITERATION;				//max iteration time
 
 	// phase 1: nearest neighbor search
 	std::vector<std::vector<ANNidx> > m_volume_nearest_x_index;		// [M] size: TEXSIZE^3

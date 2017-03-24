@@ -595,7 +595,7 @@ int DoPAR::TEXSIZE[MULTIRES];
 int DoPAR::D_NEIGHBOR[MULTIRES];
 int DoPAR::NEIGHBORSIZE[MULTIRES];
 
-const int DoPAR::NUM_HISTOGRAM_BIN = 16;	//for color histogram	Kopf used 16
+const int DoPAR::NUM_HISTOGRAM_BIN = 64;	//for color histogram	Kopf used 16
 vector<int> DoPAR::CHANNEL_MAXVALUE;		//for color histogram
 
 //const double DoPAR::WEIGHT_HISTOGRAM = NUM_HISTOGRAM_BIN;		//for accelerate convergence original 10.0
@@ -606,7 +606,7 @@ const double DoPAR::PCA_RATIO_VARIANCE = 0.95;	//Kopf used 0.95
 
 const double DoPAR::ErrorBound = 2.0;			//Kopf used 2.0
 
-const int DoPAR::ANNsearchk = 10;	
+const int DoPAR::ANNsearchk = 15;	
 
 const double DoPAR::gaussiansigma = 7.0;		//gaussian fall-off function in optimization phase, higher sigma means more uniform
 
@@ -646,12 +646,12 @@ void DoPAR::DoANNOptimization(){
 
 		if (curlevel < MULTIRES - 1) {
 			upsampleVolume(curlevel);
-			if (!POSITIONHIS_ON){
+			if (/*!POSITIONHIS_ON*/ TRUE){
 				FIRSTRUN = true;
 				calcHistogram_exemplar(curlevel + 1);
 				calcHistogram_synthesis(curlevel + 1);
 			}
-			if (POSITIONHIS_ON){
+			if (/*POSITIONHIS_ON*/ TRUE){
 				FIRSTRUN = true;
 				initPositionHistogram_exemplar(curlevel + 1);
 				initPositionHistogram_synthesis(curlevel + 1);		
@@ -665,7 +665,7 @@ void DoPAR::DoANNOptimization(){
 	cout << endl << "Total reconstruction time: " << long(NewTime - StartTime);
 
 
-	if (POSITIONHIS_ON){
+	if (/*POSITIONHIS_ON*/ TRUE){
 		//show position histogram	vector->mat	
 		int cols = TEXSIZE[MULTIRES - 1];
 		int rows = 3*cols;
@@ -753,17 +753,17 @@ void DoPAR::init() {
 	InitGaussianKernel();
 	initabsoluteneigh();
 
-	if (!POSITIONHIS_ON){
+	if (/*!POSITIONHIS_ON*/ TRUE){
 		WEIGHT_HISTOGRAM = double(NUM_HISTOGRAM_BIN);
 		calcHistogram_exemplar(0);
 		calcHistogram_synthesis(0);
-		cout << endl << "Color Histogram Initialized.";
+		//cout << endl << "Color Histogram Initialized.";
 	}
-	if (POSITIONHIS_ON){		
+	if (/*POSITIONHIS_ON*/ TRUE){		
 		initPositionHistogram_exemplar(0);
 		initPositionHistogram_synthesis(0);
 		initIndexHistogram(0);
-		cout << endl << "Position Histogram Initialized.";
+		//cout << endl << "Position Histogram Initialized.";
 	}
 }
 
@@ -910,6 +910,13 @@ void DoPAR::InitRandomVolume(int level) {
 			m_volume[level][NUM_CHANNEL * xyz + ch] = p[ori]->operator[](index2 + ch);
 		}
 	}
+
+	//for (int xyz = 0; xyz < TEXSIZE[level] * TEXSIZE[level] * TEXSIZE[level]; ++xyz) {		
+	//	int test = rand() % 10000;
+	//	if (test < 5676) m_volume[level][xyz] = 0;
+	//	else if (test < 7786) m_volume[level][xyz] = 250;
+	//	else m_volume[level][xyz] = 255;
+	//}
 }
 
 void DoPAR::calcNeighbor() {
@@ -1288,7 +1295,7 @@ void DoPAR::optimizeVolume(int level) {
 						//========discrete solver=================
 						//record each color and its position
 						colorset[ori*NEIGHBORSIZE[level] + m] = color[ch];
-						if (POSITIONHIS_ON){
+						if (/*POSITIONHIS_ON*/ TRUE){
 							//relative index to centre:(NEIGHBORSIZE[level] - 1)/2 - m	absolute index:annconvert(nearest_index) + absolute[relative]
 							positionset[ori*NEIGHBORSIZE[level] + m] = ori*(TEXSIZE[level] * TEXSIZE[level] )
 																	+ (convertIndexANN(level, nearest_index) + absoluteneigh[level][NEIGHBORSIZE[level] - 1 - m]);				
@@ -1298,7 +1305,7 @@ void DoPAR::optimizeVolume(int level) {
 					double weight = pow(nearest_dist, -0.6);	//L2norm(i.e.2)*-0.6 = -1.2 = 0.8(i.e.r)-2	
 					
 					// modify weight according to histogram matching
-					if (!POSITIONHIS_ON){
+					if (COLOURHIS_ON){
 						double histogram_matching = 0.0;
 						for (int ch = 0; ch < NUM_CHANNEL; ++ch) {
 							int bin = (int)(color[ch] * NUM_HISTOGRAM_BIN / CHANNEL_MAXVALUE[ch]);
@@ -1306,8 +1313,13 @@ void DoPAR::optimizeVolume(int level) {
 							double histogram_synthesis = m_histogram_synthesis[level][ch][bin];		// [0, 1]
 							histogram_matching += max(0.0, histogram_synthesis - histogram_exemplar);		// [0, 1]
 						}
-						weight *= 1.0 / (1.0 + WEIGHT_HISTOGRAM * histogram_matching);	//additional weight to accelerate convergence
-					}				
+						//weight *= 1.0 / (1.0 + WEIGHT_HISTOGRAM * histogram_matching);	//additional weight to accelerate convergence
+						////changed to gaussian distribution, std = accepted error
+						double ColourHisstddev = 0.02;  	// accept maximum 2%*3 error
+						double ColourHisgaussianprob(0.0);
+						ColourHisgaussianprob = gaussian_pdf(histogram_matching, 0.0, ColourHisstddev);
+						weight *= ColourHisgaussianprob / gaussian_pdf(0.0, 0.0, ColourHisstddev);
+					}
 					//// modify weight according to Position Histogram matching
 					if (POSITIONHIS_ON){
 						double positionhistogram_matching = 0.0;
@@ -1320,7 +1332,7 @@ void DoPAR::optimizeVolume(int level) {
 						double stddev = 1.0 / m_positionhistogram_exemplar[level].size();  	/** 2.0/3.0*/
 						double gaussianprob(0.0);
 						double difference = positionhistogram_synthesis - positionhistogram_exemplar;
-						//increase weight when (positionhistogram_synthesis - positionhistogram_exemplar)<0	
+						////increase weight when (positionhistogram_synthesis - positionhistogram_exemplar)<0	
 						//if (difference >= 0) gaussianprob = gaussian_pdf(difference, 0.0, stddev);
 						//else gaussianprob = 2 * gaussian_pdf(0.0, 0.0, stddev) - gaussian_pdf(-difference, 0.0, stddev);
 						positionhistogram_matching = max(0.0, difference);		// [0, 1]
@@ -1363,11 +1375,11 @@ void DoPAR::optimizeVolume(int level) {
 		}
 
 		////histogram update
-		if (!POSITIONHIS_ON){
+		if (/*!POSITIONHIS_ON*/ TRUE){
 			updateHistogram_synthesis(level, color_old, color_new);
 		}	
 		//Position histogram update
-		if (POSITIONHIS_ON){
+		if (/*POSITIONHIS_ON*/ TRUE){
 			position_new = positionset[closestindex];
 			position_old = m_volume_position[level][i];
 			updatePositionHistogram_synthesis(level, position_old, position_new);
@@ -1660,12 +1672,20 @@ void DoPAR::writeHistogram(int level, vector<double> &hisvec, int rows, int cols
 int DoPAR::FindClosestColorIndex(int level, vector<double> &color, vector<double> &weight, double referencecolor){
 	//find nearest color value, then compare weight for all closest values
 	//return the final index
+	
+	//if (true){
+	//	if (referencecolor > 85 && referencecolor < 170) referencecolor = 128;
+	//	else if (referencecolor >= 170) referencecolor = 255;
+	//	else if (referencecolor <= 85) referencecolor = 0;
+	//}
+
 	auto i = min_element(begin(color), end(color), [=](double x, double y)
 	{
 		return abs(x - referencecolor) < abs(y - referencecolor);
 	});
 	int closestindex = distance(begin(color), i);
 
+	//after choosing closest color value, filter again in these value positions, choose minimum frequency
 	vector<int> filteredidx;
 	vector<double> filteredweight;
 	for (int j = 0; j < color.size(); j++){
@@ -1674,7 +1694,6 @@ int DoPAR::FindClosestColorIndex(int level, vector<double> &color, vector<double
 			filteredweight.push_back(weight[j]);
 		}
 	}
-
 	auto k = min_element(begin(filteredweight), end(filteredweight));
 	int weightedindex = distance(begin(filteredweight), k);
 
