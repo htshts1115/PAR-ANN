@@ -1180,7 +1180,7 @@ void DoPAR::searchVolume(int level) {
 		
 		int selected_index_x(0), selected_index_y(0), selected_index_z(0);
 		//==========multiple nearest index, Index Histogram matching=========
-		if (POSITIONHIS_ON){
+		if (/*POSITIONHIS_ON*/ INDEXHIS_ON){
 			selected_index_x = indexhistmatching_ann_index(level, 0, ann_index_x, ann_dist_x);
 			selected_index_y = indexhistmatching_ann_index(level, 1, ann_index_y, ann_dist_y);
 			selected_index_z = indexhistmatching_ann_index(level, 2, ann_index_z, ann_dist_z);
@@ -1299,6 +1299,8 @@ void DoPAR::optimizeVolume(int level) {
 							//relative index to centre:(NEIGHBORSIZE[level] - 1)/2 - m	absolute index:annconvert(nearest_index) + absolute[relative]
 							positionset[ori*NEIGHBORSIZE[level] + m] = ori*(TEXSIZE[level] * TEXSIZE[level] )
 																	+ (convertIndexANN(level, nearest_index) + absoluteneigh[level][NEIGHBORSIZE[level] - 1 - m]);				
+							
+							positionfrequency[ori*NEIGHBORSIZE[level] + m] = m_positionhistogram_synthesis[level][positionset[ori*NEIGHBORSIZE[level] + m]];;
 						}
 					}
 					// blending weight of this color according to matching distance
@@ -1309,38 +1311,35 @@ void DoPAR::optimizeVolume(int level) {
 						double histogram_matching = 0.0;
 						for (int ch = 0; ch < NUM_CHANNEL; ++ch) {
 							int bin = (int)(color[ch] * NUM_HISTOGRAM_BIN / CHANNEL_MAXVALUE[ch]);
-							double histogram_exemplar = m_histogram_exemplar[level][ch][bin];		// [0, 1]
-							double histogram_synthesis = m_histogram_synthesis[level][ch][bin];		// [0, 1]
-							histogram_matching += max(0.0, histogram_synthesis - histogram_exemplar);		// [0, 1]
+							double histogram_exemplar = m_histogram_exemplar[level][ch][bin];		
+							double histogram_synthesis = m_histogram_synthesis[level][ch][bin];		
+							histogram_matching += max(0.0, histogram_synthesis - histogram_exemplar);		
 						}
 						//weight *= 1.0 / (1.0 + WEIGHT_HISTOGRAM * histogram_matching);	//additional weight to accelerate convergence
 						////changed to gaussian distribution, std = accepted error
 						double ColourHisstddev = 0.02;  	// accept maximum 2%*3 error
 						double ColourHisgaussianprob(0.0);
 						ColourHisgaussianprob = gaussian_pdf(histogram_matching, 0.0, ColourHisstddev);
-						weight *= ColourHisgaussianprob / gaussian_pdf(0.0, 0.0, ColourHisstddev);
+						weight *= ColourHisgaussianprob / gaussian_pdf(0.0, 0.0, ColourHisstddev);		//(0,1]
 					}
 					//// modify weight according to Position Histogram matching
 					if (POSITIONHIS_ON){
 						double positionhistogram_matching = 0.0;
 						double positionhistogram_exemplar = m_positionhistogram_exemplar[level][positionset[ori*NEIGHBORSIZE[level] + m]];
-						double positionhistogram_synthesis = m_positionhistogram_synthesis[level][positionset[ori*NEIGHBORSIZE[level] + m]];
-						positionfrequency[ori*NEIGHBORSIZE[level] + m] = positionhistogram_synthesis;
-
-						////additional weight to accelerate convergence
-						////changed to gaussian distribution, std = averagef
-						double stddev = 1.0 / m_positionhistogram_exemplar[level].size();  	/** 2.0/3.0*/
+						double positionhistogram_synthesis = positionfrequency[ori*NEIGHBORSIZE[level] + m];
+						//changed to gaussian distribution, std = averagef. for better influence
+						double stddev = 1.0 / m_positionhistogram_exemplar[level].size();  	
 						double gaussianprob(0.0);
 						double difference = positionhistogram_synthesis - positionhistogram_exemplar;
 						////increase weight when (positionhistogram_synthesis - positionhistogram_exemplar)<0	
 						//if (difference >= 0) gaussianprob = gaussian_pdf(difference, 0.0, stddev);
 						//else gaussianprob = 2 * gaussian_pdf(0.0, 0.0, stddev) - gaussian_pdf(-difference, 0.0, stddev);
-						positionhistogram_matching = max(0.0, difference);		// [0, 1]
+						positionhistogram_matching = max(0.0, difference);	
 						gaussianprob = gaussian_pdf(positionhistogram_matching, 0.0, stddev);
-						weight *= gaussianprob / gaussian_pdf(0.0, 0.0, stddev);
+						weight *= gaussianprob / gaussian_pdf(0.0, 0.0, stddev);		//(0,1]
 						//former used linear weight:
 						//weight *= 1.0 / (1.0 + WEIGHT_POSITIONHISTOGRAM[level] * positionhistogram_matching);	
-					}				
+					}
 
 					//========Gaussian fall-off===============
 					weight *= gaussiankernel[level][m] * (gaussiankernel[level].size());		//or NEIGHBORSIZE[level] - 1 - m
@@ -1674,9 +1673,9 @@ int DoPAR::FindClosestColorIndex(int level, vector<double> &color, vector<double
 	//return the final index
 	
 	//if (true){
-	//	if (referencecolor > 85 && referencecolor < 170) referencecolor = 128;
-	//	else if (referencecolor >= 170) referencecolor = 255;
-	//	else if (referencecolor <= 85) referencecolor = 0;
+	//	if (referencecolor > 160 && referencecolor < 246) referencecolor = 240;
+	//	else if (referencecolor >= 246) referencecolor = 255;
+	//	else if (referencecolor <= 160) referencecolor = 0;
 	//}
 
 	auto i = min_element(begin(color), end(color), [=](double x, double y)

@@ -107,8 +107,9 @@ private:
 	double WEIGHT_HISTOGRAM;					// weight for histogram
 	vector<double> WEIGHT_POSITIONHISTOGRAM;
 
-	static const bool POSITIONHIS_ON = true;	// Using Index/Position Histogram
-	static const bool COLOURHIS_ON = true;		// Using Colour Histogram
+	static const bool INDEXHIS_ON = true;		// Using Index Histogram in search step
+	static const bool POSITIONHIS_ON = false;	// Using Position Histogram	in optimize step
+	static const bool COLOURHIS_ON = true;		// Using Colour Histogram in optimize step
 
 
 	void DoANNOptimization();
