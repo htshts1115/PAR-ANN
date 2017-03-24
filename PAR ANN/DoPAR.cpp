@@ -617,22 +617,26 @@ void DoPAR::DoANNOptimization(){
 	
 	time_t StartTime;
 	time(&StartTime);
-
+	
 	for (int curlevel = 0; curlevel < MULTIRES; curlevel++){
 		cout << endl << "=============level: " << curlevel << "===============";
 		globalenergy_new = 0.0; globalenergy_old = 10e-9;
 		
+		int convergencecount(0);
 		for (int loop = 0; loop < MAXITERATION[curlevel]; loop++){
 			cout << endl << "---------iteration: " << loop+1<<"------------";
 			valuechange[curlevel] = 0.0;
 			
+			if (loop == 0) FIRSTRUN = true;
+			else FIRSTRUN = false;
+			
 			searchVolume(curlevel);
 			optimizeVolume(curlevel);
 
-			//if converge break;
 			//if (valuechange[curlevel] < valuechangethreshold[curlevel]) break;		//David Turner used 1.0e-3
-			if (abs(globalenergy_old - globalenergy_new) / globalenergy_old < 0.005) break;
+			if (abs(globalenergy_old - globalenergy_new) / globalenergy_old < 0.01) convergencecount++;
 			globalenergy_old = globalenergy_new;
+			if (convergencecount >1) break;
 
 			//outputmodel(curlevel);
 			//_getch();
@@ -643,10 +647,12 @@ void DoPAR::DoANNOptimization(){
 		if (curlevel < MULTIRES - 1) {
 			upsampleVolume(curlevel);
 			if (!POSITIONHIS_ON){
+				FIRSTRUN = true;
 				calcHistogram_exemplar(curlevel + 1);
 				calcHistogram_synthesis(curlevel + 1);
 			}
 			if (POSITIONHIS_ON){
+				FIRSTRUN = true;
 				initPositionHistogram_exemplar(curlevel + 1);
 				initPositionHistogram_synthesis(curlevel + 1);		
 				initIndexHistogram(curlevel + 1);
@@ -658,14 +664,13 @@ void DoPAR::DoANNOptimization(){
 	time(&NewTime);
 	cout << endl << "Total reconstruction time: " << long(NewTime - StartTime);
 
-	//outputmodel(MULTIRES-1);
 
 	if (POSITIONHIS_ON){
-		//show position histogram	vector->mat
-		int rows = TEXSIZE[MULTIRES-1];
-		int cols = 3 * rows;
+		//show position histogram	vector->mat	
+		int cols = TEXSIZE[MULTIRES - 1];
+		int rows = 3*cols;
 		writeHistogram(MULTIRES - 1, m_positionhistogram_synthesis[MULTIRES - 1], rows, cols, "PosHis.png");
-		writeHistogram(MULTIRES - 1, m_indexhistogram_synthesis[MULTIRES - 1], rows - 2 * N[MULTIRES-1], 3 * (rows - 2 * N[MULTIRES-1]), "IndexHis.png");
+		writeHistogram(MULTIRES - 1, m_indexhistogram_synthesis[MULTIRES - 1], 3 * (cols - 2 * N[MULTIRES - 1]), cols - 2 * N[MULTIRES - 1], "IndexHis.png");
 	}
 }
 
@@ -1211,8 +1216,6 @@ void DoPAR::searchVolume(int level) {
 
 	globalenergy_new = global_energy_new;
 
-	//writeHistogram(level, m_indexhistogram_synthesis[level], TEXSIZE[level] - 2 * N[level], 3 * (TEXSIZE[level] - 2 * N[level]), "IndexHis.png");
-	//_getch();
 }
 
 void DoPAR::initPermutation(int level) {
@@ -1250,7 +1253,7 @@ void DoPAR::optimizeVolume(int level) {
 		vector<double> positionfrequency(3 * NEIGHBORSIZE[level], 10e2);
 
 		int m = 0;	
-		//for every voxel's neighbourhood, in 3 orientation
+		//for every voxel's neighbourhood, in 3 orientations
 		for (int dv = -N[level]; dv <= N[level]; ++dv) {
 			for (int du = -N[level]; du <= N[level]; ++du) {
 				////==========Tahmasebi algorithm: just consider center=========
@@ -1272,7 +1275,7 @@ void DoPAR::optimizeVolume(int level) {
 				vector<ANNidx>* volume_nearest_index[3] = { &m_volume_nearest_x_index[level], &m_volume_nearest_y_index[level], &m_volume_nearest_z_index[level] };
 				vector<double>* volume_nearest_dist[3] = { &m_volume_nearest_x_dist[level], &m_volume_nearest_y_dist[level], &m_volume_nearest_z_dist[level] };
 				vector<double>* neighbor[3] = { &m_neighbor_x[level], &m_neighbor_y[level], &m_neighbor_z[level] };
-				for (int ori = 0; ori < 3; ++ori) {//3 orientation
+				for (int ori = 0; ori < 3; ++ori) {//3 orientations
 					ANNidx   nearest_index = (*volume_nearest_index[ori])[index2[ori]];
 					double nearest_dist = (*volume_nearest_dist[ori])[index2[ori]];
 					double* p_neighbor = &(*neighbor[ori])[D_NEIGHBOR[level] * nearest_index];
@@ -1335,10 +1338,10 @@ void DoPAR::optimizeVolume(int level) {
 						color_acc[ch] += weight * color[ch];										
 					}
 					weight_acc += weight;
-				}//3 orientation
+				}//3 orientations
 				++m;
 			}
-		}//for every voxel's neighbourhood, in 3 orientation
+		}//for every voxel's neighbourhood, in 3 orientations
 
 		// old & new colors for this voxel
 		vector<double> color_old(NUM_CHANNEL);
@@ -1383,8 +1386,6 @@ void DoPAR::optimizeVolume(int level) {
 	long time_end = clock();
 	cout << "done. clocks = " << (time_end - time_start) / CLOCKS_PER_SEC << " Mean change in voxel value = " << valuechange[level];
 
-	//writeHistogram(level, m_positionhistogram_synthesis[level], TEXSIZE[level], 3 * TEXSIZE[level], "PosHis.png");
-	//_getch();
 }
 
 void DoPAR::upsampleVolume(int level) {	
@@ -1489,16 +1490,25 @@ void DoPAR::initPositionHistogram_exemplar(int level){
 	WEIGHT_POSITIONHISTOGRAM[level] = 1.0* m_positionhistogram_exemplar[level].size();
 }
 void DoPAR::initPositionHistogram_synthesis(int level){
+	if (FIRSTRUN){
+		for (ANNidx xyz = 0; xyz < TEXSIZE[level] * TEXSIZE[level] * TEXSIZE[level]; ++xyz) {
+			m_volume_position[level][xyz] = 10000000;
+		}
+		m_positionhistogram_synthesis[level].resize(3 * (TEXSIZE[level] * TEXSIZE[level]));
+		m_positionhistogram_synthesis[level].assign(3 * (TEXSIZE[level] * TEXSIZE[level]), 0.0);
+
+		return;
+	}
+
 	//initial uniform distribution
 	long maxsize = 3 * (TEXSIZE[level] * TEXSIZE[level]);
 	for (ANNidx xyz = 0; xyz < TEXSIZE[level] * TEXSIZE[level] * TEXSIZE[level]; ++xyz) {
 		m_volume_position[level][xyz] = xyz%maxsize;
 	}
 	shuffle(m_volume_position[level].begin(), m_volume_position[level].end(), mersennetwistergenerator);
-
 	//count each volume
 	m_positionhistogram_synthesis[level].resize(3 * (TEXSIZE[level] * TEXSIZE[level]));
-	m_positionhistogram_synthesis[level].assign(3 * (TEXSIZE[level] * TEXSIZE[level]), 0.0);	
+	m_positionhistogram_synthesis[level].assign(3 * (TEXSIZE[level] * TEXSIZE[level]), 0.0);
 	double delta_histogram = 1.0 / (TEXSIZE[level] * TEXSIZE[level] * TEXSIZE[level]);
 	for (ANNidx i = 0; i < TEXSIZE[level] * TEXSIZE[level] * TEXSIZE[level]; i++){
 		ANNidx bin = m_volume_position[level][i];
@@ -1506,12 +1516,36 @@ void DoPAR::initPositionHistogram_synthesis(int level){
 	}
 }
 void DoPAR::updatePositionHistogram_synthesis(int level, const ANNidx position_old, const ANNidx position_new){
+	if (FIRSTRUN){
+		double delta_histogram = 1.0 / (TEXSIZE[level] * TEXSIZE[level] * TEXSIZE[level]);
+		m_positionhistogram_synthesis[level][position_new] += delta_histogram;
+
+		return;
+	}
+	
 	double delta_histogram = 1.0 / (TEXSIZE[level] * TEXSIZE[level] * TEXSIZE[level]);
 	m_positionhistogram_synthesis[level][position_old] -= delta_histogram;
 	m_positionhistogram_synthesis[level][position_new] += delta_histogram;
 }
 //============Index Histogram for search step========
 void DoPAR::initIndexHistogram(int level){
+	if (FIRSTRUN){
+		long numData = 3 * (TEXSIZE[level] - 2 * N[level]) * (TEXSIZE[level] - 2 * N[level]);
+		//init examplarhistogram
+		m_indexhistogram_exemplar[level].resize(numData);
+		m_indexhistogram_exemplar[level].assign(numData, 0.0);	
+		for (ANNidx xyz = 0; xyz < TEXSIZE[level] * TEXSIZE[level] * TEXSIZE[level]; ++xyz) {
+			m_volume_index_x[level][xyz] = 10000000;
+			m_volume_index_y[level][xyz] = 10000000;
+			m_volume_index_z[level][xyz] = 10000000;
+		}
+		m_indexhistogram_synthesis[level].resize(numData);
+		m_indexhistogram_synthesis[level].assign(numData, 0.0);
+
+		return;
+	}
+
+	
 	long numData = 3* (TEXSIZE[level] - 2 * N[level]) * (TEXSIZE[level] - 2 * N[level]);
 	//init examplarhistogram
 	m_indexhistogram_exemplar[level].resize(numData);
@@ -1530,7 +1564,6 @@ void DoPAR::initIndexHistogram(int level){
 	//count each volume
 	m_indexhistogram_synthesis[level].resize(numData);
 	m_indexhistogram_synthesis[level].assign(numData, 0.0);
-	//m_indexhistogram_synthesis[level].assign(numData, 1.0 / ((TEXSIZE[level] - 2 * N[level]) * (TEXSIZE[level] - 2 * N[level])));
 	double delta_histogram = 1.0 / (TEXSIZE[level] * TEXSIZE[level] * TEXSIZE[level]);
 	for (ANNidx i = 0; i < TEXSIZE[level] * TEXSIZE[level] * TEXSIZE[level]; i++){
 		ANNidx binx = m_volume_index_x[level][i];
@@ -1544,6 +1577,14 @@ void DoPAR::initIndexHistogram(int level){
 	//writeHistogram(level, m_indexhistogram_synthesis[level], TEXSIZE[level] - 2 * N[level], 3 * (TEXSIZE[level] - 2 * N[level]), "IndexHis.png");
 }
 void DoPAR::updateIndexHistogram(int level, int orientation, const ANNidx oldannidx, const ANNidx newannidx){
+	if (FIRSTRUN){
+		ANNidx newidx = newannidx + orientation*(TEXSIZE[level] - 2 * N[level]) * (TEXSIZE[level] - 2 * N[level]);
+		double delta_histogram = 1.0 / (TEXSIZE[level] * TEXSIZE[level] * TEXSIZE[level]);
+		m_indexhistogram_synthesis[level][newidx] += delta_histogram;
+
+		return;
+	}
+	
 	ANNidx newidx = newannidx + orientation*(TEXSIZE[level] - 2 * N[level]) * (TEXSIZE[level] - 2 * N[level]);
 	ANNidx oldidx = oldannidx + orientation*(TEXSIZE[level] - 2 * N[level]) * (TEXSIZE[level] - 2 * N[level]);
 	double delta_histogram = 1.0 / (TEXSIZE[level] * TEXSIZE[level] * TEXSIZE[level]);

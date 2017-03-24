@@ -115,7 +115,7 @@ private:
 	void init();
 	void initthreshold();
 
-	ANNidx trimIndex(int level, ANNidx index, bool isToroidal = FALSE) {
+	inline ANNidx trimIndex(int level, ANNidx index, bool isToroidal = FALSE) {
 		if (isToroidal) {
 			while (index < 0) index += TEXSIZE[level];
 			return index % TEXSIZE[level];
@@ -132,7 +132,7 @@ private:
 			return index;
 		}
 	}
-	ANNidx convertIndexANN(int level, ANNidx index){
+	inline ANNidx convertIndexANN(int level, ANNidx index){
 		//convert ANNSearch m_volume_nearest_x_index to m_volume index
 		int x, y, size;
 		size = TEXSIZE[level] - 2 * N[level];
@@ -140,7 +140,7 @@ private:
 		y = index / size;
 		return ((y + N[level])*TEXSIZE[level] + (x + N[level]));
 	}
-	double gaussian_pdf(double x, double mean, double stddev)
+	inline double gaussian_pdf(double x, double mean, double stddev)
 	{
 		static const double inv_sqrt_2pi = 0.398942280401432677939946;
 		double a = (x - mean) / stddev;
@@ -176,7 +176,7 @@ private:
 	void initabsoluteneigh();
 	vector<vector<ANNidx>> absoluteneigh;
 
-	// global histogram
+	// color histogram
 	std::vector<std::vector<std::vector<double> > > m_histogram_exemplar;			// [M] size: NUM_CHANNEL x NUM_HISTOGRAM_BIN
 	std::vector<std::vector<std::vector<double> > > m_histogram_synthesis;			// m_histogram[level][ch][bin]
 	void calcHistogram_exemplar(int level);
@@ -189,8 +189,7 @@ private:
 	void initPositionHistogram_synthesis(int level);
 	void updatePositionHistogram_synthesis(int level, const ANNidx position_old, const ANNidx position_new);
 	void writeHistogram(int level, vector<double> &histogram, int rows, int cols, const string filename);
-	// volume_position record
-	std::vector<std::vector<ANNidx> > m_volume_position;		// [M] size: TEXSIZE^3
+	std::vector<std::vector<ANNidx> > m_volume_position;		// volume_position record // [M] size: TEXSIZE^3
 	// ===========index histogram ==============
 	std::vector<std::vector<double> >  m_indexhistogram_exemplar;
 	std::vector<std::vector<double> >  m_indexhistogram_synthesis;
@@ -198,6 +197,8 @@ private:
 	void updateIndexHistogram(int level, int orientation, const ANNidx oldannidx, const ANNidx newannidx);
 	ANNidx indexhistmatching_ann_index(int level, int orientation, ANNidxArray idxarray, ANNdistArray distarry);
 	std::vector<std::vector<ANNidx> > m_volume_index_x, m_volume_index_y, m_volume_index_z;		// [M] size: TEXSIZE^3
+	// dont use random initial histogram. start counting from 0 for the first run.
+	bool FIRSTRUN = true;
 
 	// synthesized volume
 	std::vector<std::vector<double > > m_volume;			// [M] size: NUM_CHANNEL * TEXSIZE^3
