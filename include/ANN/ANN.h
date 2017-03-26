@@ -155,8 +155,7 @@ enum ANNbool {ANNfalse = 0, ANNtrue = 1}; // ANN boolean type (non ANSI C++)
 //		not occur in distance calculation.
 //----------------------------------------------------------------------
 
-//============hts changed to int. changed back
-typedef double 	ANNcoord;				// coordinate data type
+typedef double	ANNcoord;				// coordinate data type
 typedef double	ANNdist;				// distance data type
 
 //----------------------------------------------------------------------
@@ -173,7 +172,8 @@ typedef double	ANNdist;				// distance data type
 //		It should be distinguishable from any valid array index.
 //----------------------------------------------------------------------
 
-typedef int		ANNidx;					// point index
+//=============hts changed to long======================
+typedef long		ANNidx;				// point index
 const ANNidx	ANN_NULL_IDX = -1;		// a NULL point index
 
 //----------------------------------------------------------------------

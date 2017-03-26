@@ -107,11 +107,11 @@ private:
 	double WEIGHT_HISTOGRAM;					// weight for histogram
 	vector<double> WEIGHT_POSITIONHISTOGRAM;
 
-	static const bool INDEXHIS_ON = true;		// Using Index Histogram in search step
-	static const bool POSITIONHIS_ON = false;	// Using Position Histogram	in optimize step
-	static const bool COLORHIS_ON = true;		// Using Colour Histogram in optimize step
-	static const bool DISCRETE_ON = false;		//discrete solver in optimize step
-	static const bool GAUSSIANFALLOFF_ON = false;//gaussian fall off weight in optimize step
+	static const bool INDEXHIS_ON = true;				// Using Index Histogram in search step
+	static const bool POSITIONHIS_ON = false;			// Using Position Histogram	in optimize step
+	static const bool COLORHIS_ON = true;				// Using Colour Histogram in optimize step
+	static const bool DISCRETE_ON = false;				//discrete solver in optimize step
+	static const bool GAUSSIANFALLOFF_ON = false;		//gaussian fall off weight in optimize step
 
 	void DoANNOptimization();
 	void init();
@@ -203,7 +203,7 @@ private:
 	bool FIRSTRUN = true;
 
 	//test reassign values based on TI colorhis after optimize step
-	void DoPAR::RedistributeColorHistogram(int level);
+	void DoPAR::DynamicThresholding(int level);
 	void DoPAR::calcaccHistogram(vector<double> &inputhis, vector<double> &acchis);
 
 	//test weighted average value distribution
@@ -224,8 +224,6 @@ private:
 	//----------------------------------------------------------------------------
 
 	//check convergence
-	std::vector<double> valuechange;
-	std::vector<double> valuechangethreshold;	//mean value change per voxel
 	double globalenergy_new, globalenergy_old;
 	std::vector<int> MAXITERATION;				//max iteration time
 

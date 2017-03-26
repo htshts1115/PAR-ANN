@@ -6,6 +6,7 @@
 
 int main(int argc, const char* argv[])
 {
+	
 	string CurWorkExeFile = argv[0];
 
 	DoPAR DoItNow;

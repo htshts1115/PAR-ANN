@@ -35,9 +35,6 @@
 #include "opencv2/opencv.hpp"
 
 #include <ANN/ANN.h>
-//#include <cstdlib>
-//#include <KLIB/KUtil.h>	//A standalone and lightweight C library
-//#include <KLIB/KMath.h>
 
 using namespace std;
 using namespace cv;

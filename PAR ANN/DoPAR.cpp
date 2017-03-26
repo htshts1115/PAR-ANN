@@ -44,10 +44,8 @@ DoPAR::DoPAR()
 	m_volume_nearest_z_dist.resize(MULTIRES);
 	m_permutation_xyz.resize(MULTIRES);
 	
-	valuechange.resize(MULTIRES);
 	WEIGHT_POSITIONHISTOGRAM.resize(MULTIRES);
 	MAXITERATION.resize(MULTIRES);
-	valuechangethreshold.resize(MULTIRES);
 	gaussiankernel.resize(MULTIRES);
 	absoluteneigh.resize(MULTIRES);
 	m_indexhistogram_exemplar.resize(MULTIRES);
@@ -627,7 +625,6 @@ void DoPAR::DoANNOptimization(){
 		int convergencecount(0);
 		for (int loop = 0; loop < MAXITERATION[curlevel]; loop++){
 			cout << endl << "---------iteration: " << loop+1<<"------------";
-			valuechange[curlevel] = 0.0;
 			
 			if (loop == 0) FIRSTRUN = true;
 			else FIRSTRUN = false;
@@ -638,18 +635,16 @@ void DoPAR::DoANNOptimization(){
 			searchVolume(curlevel);
 			optimizeVolume(curlevel);
 
-			//if (valuechange[curlevel] < valuechangethreshold[curlevel]) break;		//David Turner used 1.0e-3
-			if (abs(globalenergy_old - globalenergy_new) / globalenergy_old < 0.01) convergencecount++;
-			globalenergy_old = globalenergy_new;
-			if (convergencecount >1) break;
 
-			//outputmodel(curlevel);
-			//_getch();
+			if (abs(globalenergy_old - globalenergy_new) / globalenergy_old < 0.015) convergencecount++;	
+			globalenergy_old = globalenergy_new;
+			if (convergencecount >1) break;	//if change <1.5% for twice, then mark as converge
+
 		}
 		outputmodel(curlevel);
 		//_getch();
 
-		if (curlevel < MULTIRES - 1) {
+		if (curlevel < MULTIRES - 1) {//level up
 			upsampleVolume(curlevel);
 			FIRSTRUN = true;
 			
@@ -694,40 +689,16 @@ void DoPAR::outputmodel(int level){
 
 void DoPAR::initthreshold(){
 	if (MULTIRES == 1){
-		valuechangethreshold = { 0.5 };
-		MAXITERATION = { 15 };
-		//int maxl0 = 3 * NUM_CHANNEL*(2 * N[0] + 1)*(2 * N[0] + 1);
-		//for (int s = 0; s < maxl0; s++)	PredefinedL0idx.push_back(s);
+		MAXITERATION = { 20 };
 	}
 	else if (MULTIRES == 2){
-		valuechangethreshold = { 0.5, 0.1 }; //higher threshold means faster convergence, coarser accuracy
-		MAXITERATION = { 15, 10 };
-		//int maxl0 = 3 * NUM_CHANNEL*(2 * N[0] + 1)*(2 * N[0] + 1);
-		//for (int s = 0; s < maxl0; s++)	PredefinedL0idx.push_back(s);
-		//int maxl1 = 3 * NUM_CHANNEL*(2 * N[1] + 1)*(2 * N[1] + 1);
-		//for (int s = 0; s < maxl1; s++)	PredefinedL1idx.push_back(s);
+		MAXITERATION = { 20, 10 };
 	}
 	else if (MULTIRES == 3){
-		valuechangethreshold = { 0.5, 0.1, 0.1 }; //higher threshold means faster convergence, coarser accuracy
-		MAXITERATION = { 15, 10, 10 };
-		//int maxl0 = 3 * NUM_CHANNEL*(2 * N[0] + 1)*(2 * N[0] + 1);
-		//for (int s = 0; s < maxl0; s++)	PredefinedL0idx.push_back(s);
-		//int maxl1 = 3 * NUM_CHANNEL*(2 * N[1] + 1)*(2 * N[1] + 1);
-		//for (int s = 0; s < maxl1; s++)	PredefinedL1idx.push_back(s);
-		//int maxl2 = 3 * NUM_CHANNEL*(2 * N[2] + 1)*(2 * N[2] + 1);
-		//for (int s = 0; s < maxl2; s++)	PredefinedL2idx.push_back(s);
+		MAXITERATION = { 20, 15, 10 };
 	}
 	else if (MULTIRES == 4){
-		valuechangethreshold = { 0.5, 0.5, 0.25, 0.1 }; //higher threshold means faster convergence, coarser accuracy
-		MAXITERATION = { 15, 10, 10, 5 };
-		//int maxl0 = 3 * NUM_CHANNEL*(2 * N[0] + 1)*(2 * N[0] + 1);
-		//for (int s = 0; s < maxl0; s++)	PredefinedL0idx.push_back(s);
-		//int maxl1 = 3 * NUM_CHANNEL*(2 * N[1] + 1)*(2 * N[1] + 1);
-		//for (int s = 0; s < maxl1; s++)	PredefinedL1idx.push_back(s);
-		//int maxl2 = 3 * NUM_CHANNEL*(2 * N[2] + 1)*(2 * N[2] + 1);
-		//for (int s = 0; s < maxl2; s++)	PredefinedL2idx.push_back(s);
-		//int maxl3 = 3 * NUM_CHANNEL*(2 * N[3] + 1)*(2 * N[3] + 1);
-		//for (int s = 0; s < maxl3; s++)	PredefinedL3idx.push_back(s);
+		MAXITERATION = { 20, 15, 10, 10 };
 	}
 }
 
@@ -1261,19 +1232,10 @@ void DoPAR::optimizeVolume(int level) {
 		vector<ANNidx> positionset(3 * NEIGHBORSIZE[level], 10000000);
 		vector<double> positionfrequency(3 * NEIGHBORSIZE[level], 10e2);
 
-		////test prob dis
-		//vector<double> probsum(2,0.0);	//for testing: 0,240,255
-		//vector<double> weightset(3 * NEIGHBORSIZE[level], 0.0);
-
-
 		int m = 0;	
 		//for every voxel's neighbourhood, in 3 orientations
 		for (int dv = -N[level]; dv <= N[level]; ++dv) {
 			for (int du = -N[level]; du <= N[level]; ++du) {
-				////==========Tahmasebi algorithm: just consider center=========
-				////He use PCA=100%, high histogram weight, 1/10 template size, discrete, only centre
-				//if (dv != 0 || du != 0) { ++m; continue; }
-
 				if ((z + dv <0 || z + dv>TEXSIZE[level] - 1) || (y + du <0 || y + du >TEXSIZE[level] - 1)
 					|| (z + du <0 || z + du >TEXSIZE[level] - 1) || (x + dv <0 || x + dv >TEXSIZE[level] - 1)
 					|| (y + dv <0 || y + dv >TEXSIZE[level] - 1) || (x + du <0 || x + du >TEXSIZE[level] - 1))
@@ -1312,9 +1274,6 @@ void DoPAR::optimizeVolume(int level) {
 					}
 					// blending weight of this color according to matching distance
 					double weight = pow(nearest_dist, -0.6);	//L2norm(i.e.2)*-0.6 = -1.2 = 0.8(i.e.r)-2	
-					
-					////test prob dis
-					//weightset[ori*NEIGHBORSIZE[level] + m] = weight;
 
 					// modify weight according to histogram matching
 					if (TRUE){
@@ -1331,7 +1290,7 @@ void DoPAR::optimizeVolume(int level) {
 						}
 						//weight *= 1.0 / (1.0 + WEIGHT_HISTOGRAM * histogram_matching);	//additional weight to accelerate convergence
 						////changed to gaussian distribution, std = accepted error
-						double ColourHisstddev = 0.02;  	// accept maximum stddev*3 error
+						double ColourHisstddev = 0.01;  	// accept maximum stddev*3 error
 						double ColourHisgaussianprob(0.0);
 						////increase weight when (positionhistogram_synthesis - positionhistogram_exemplar)<0	
 						//if (difference >= 0) ColourHisgaussianprob = gaussian_pdf(difference, 0.0, ColourHisstddev);
@@ -1366,9 +1325,6 @@ void DoPAR::optimizeVolume(int level) {
 						color_acc[ch] += weight * color[ch];						
 					}
 					weight_acc += weight;
-
-					////test prob dis
-					//weightset[ori*NEIGHBORSIZE[level] + m] = weight;
 
 				}//3 orientations
 				++m;
@@ -1405,19 +1361,11 @@ void DoPAR::optimizeVolume(int level) {
 				//first calculate the weighted average color, then find the most similar color existed in exemplar, each color corresponds to a m_volume_nearest_index
 				closestindex = FindClosestColorIndex(level, colorset, positionfrequency, color_new[ch]);			
 				color_new[ch] = colorset[closestindex];		//update with the existed most similar color		
-			}
-			
-			////test prob dis
-			//double dice = probabilitydistribution(mersennetwistergenerator);
-			//if (dice < probsum[0]) color_new[ch] = 0.0;
-			////else if (dice > probsum[0] && dice < probsum[0]+probsum[1]) color_new[ch] = 240.0;
-			//else  color_new[ch] = 255.0;
-
-			valuechange[level] += abs(color_new[ch] - color_old[ch]);			//mean absolute voxel change, show convergence
+			}					
 		}
 
 		////histogram update
-		if (/*COLORHIS_ON*/ TRUE){
+		if (TRUE){
 			updateHistogram_synthesis(level, color_old, color_new);
 		}	
 		//Position histogram update
@@ -1433,15 +1381,12 @@ void DoPAR::optimizeVolume(int level) {
 		}		
 	}//for every voxel
 	
-	valuechange[level] /= TEXSIZE[level] * TEXSIZE[level] * TEXSIZE[level];		//mean absolute voxel change, show convergence
 
-
-	//test rethreshold based on TI colorhis
-	RedistributeColorHistogram(level);
-
+	//test DynamicThresholding based on TI colorhis
+	DynamicThresholding(level);
 
 	long time_end = clock();
-	cout << "done. clocks = " << (time_end - time_start) / CLOCKS_PER_SEC << " Mean change in voxel value = " << valuechange[level];
+	cout << "done. clocks = " << (time_end - time_start) / CLOCKS_PER_SEC;
 }
 
 void DoPAR::upsampleVolume(int level) {	
@@ -1725,7 +1670,7 @@ void DoPAR::calcaccHistogram(vector<double> &inputhis, vector<double> &acchis){
 	}
 	if (acchis[acchis.size() - 1] > 1.0001 || acchis[acchis.size() - 1] < 0.9999) { cout << endl << "Error: acchis max=" << acchis[acchis.size() - 1]; _getch(); }
 }
-void DoPAR::RedistributeColorHistogram(int level){
+void DoPAR::DynamicThresholding(int level){
 	//first calculate accumulate histogram
 	vector<double> acchis_synthesis(NUM_HISTOGRAM_BIN, 0.0);
 	calcaccHistogram(m_histogram_synthesis[level][0], acchis_synthesis);
@@ -1738,9 +1683,9 @@ void DoPAR::RedistributeColorHistogram(int level){
 	//cout << endl << "acchis_exemplar[240/4=" << 240 * NUM_HISTOGRAM_BIN / CHANNEL_MAXVALUE[0] << "]=" << acchis_exemplar[240 * NUM_HISTOGRAM_BIN / CHANNEL_MAXVALUE[0]];
 	//cout << endl << "acchis_exemplar[255/4=" << 255 * NUM_HISTOGRAM_BIN / CHANNEL_MAXVALUE[0] << "]=" << acchis_exemplar[255 * NUM_HISTOGRAM_BIN / CHANNEL_MAXVALUE[0]];	
 
-	cout << endl << "0~120: " << acchis_synthesis[120 / hisbin];
-	cout << endl << "120~248: " << acchis_synthesis[248 / hisbin] - acchis_synthesis[120 / hisbin];
-	cout << endl << "248~255: " << acchis_synthesis[255 / hisbin] - acchis_synthesis[248 / hisbin];
+	//cout << endl << "0~120: " << acchis_synthesis[120 / hisbin];
+	//cout << endl << "120~248: " << acchis_synthesis[248 / hisbin] - acchis_synthesis[120 / hisbin];
+	//cout << endl << "248~255: " << acchis_synthesis[255 / hisbin] - acchis_synthesis[248 / hisbin];
 
 	//just for test. directly check 0,240,255 fraction
 	int redistributecolor[2];
@@ -1749,9 +1694,8 @@ void DoPAR::RedistributeColorHistogram(int level){
 	redistributecolor[0] = i1 - acchis_synthesis.begin() - 1;
 	auto i2 = upper_bound(acchis_synthesis.begin(), acchis_synthesis.end(), acchis_exemplar[240 / hisbin]);
 	redistributecolor[1] = i2 - acchis_synthesis.begin() - 1;
-
-	cout << endl << "120--> " << redistributecolor[0]*hisbin << "   248--> " << redistributecolor[1]*hisbin <<endl;
-
+	
+	//cout << endl << "120--> " << redistributecolor[0]*hisbin << "   248--> " << redistributecolor[1]*hisbin <<endl;
 	
 	//thresholding
 	vector<double> color_old(NUM_CHANNEL);

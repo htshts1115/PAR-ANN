@@ -6,20 +6,17 @@
 /* Note: last character is '\' !!
 /*=============================================
 C:\Users\Tianshen Huang\Documents\PRM\PAR_images\berea\
+/*C:\Users\Tianshen Huang\Documents\PRM\PAR\PAR ANN\x64\Release\Berea200_gray_scale025\TIs\
 /*C:\Users\Tianshen Huang\Documents\PRM\PAR\PAR ANN\x64\Release\
 /*=============================================
 /* Specify training images in XY, XZ and YZ-plane
 /*=============================================
-/*Berea200_xy101_64.png,Berea200_xz101_64.png,Berea200_yz101_64.png
-/*Berea200_xy101_64_bin.png,Berea200_xz101_64_bin.png,Berea200_yz101_64_bin.png
-Berea200_xy101_s25_128.png, Berea200_xz101_s25_128.png, Berea200_yz101_s25_128.png
+Berea200_xy101_s25_240.png, Berea200_xz101_s25_240.png, Berea200_yz101_s25_240.png
 /*Berea200_xy101_scale025_binary.png, Berea200_xz101_scale025_binary.png, Berea200_yz101_scale025_binary.png
 /*Berea200_xy101_scale025.png, Berea200_xz101_scale025.png, Berea200_yz101_scale025.png
 /*Berea200_xy101_scale05.png, Berea200_xz101_scale05.png, Berea200_yz101_scale05.png
-/*Berea200_xy101.png, Berea200_xz101.png, Berea200_yz101.png
 /*Berea200_1_D4s025_xy.png, Berea200_1_D4s025_xz.png, Berea200_1_D4s025_yz.png
 /*Berea200_1_D4s025_bin_xy.png, Berea200_1_D4s025_bin_xz.png, Berea200_1_D4s025_bin_yz.png
-/*Berea200_1_bin_64_D2_xy.png, Berea200_1_bin_64_D2_xz.png, Berea200_1_bin_64_D2_yz.png
 /*=============================================
 /* Output directory, by default empty meaning in working directory; with parameters
 /*=============================================
@@ -27,21 +24,11 @@ C:\Users\Tianshen Huang\Documents\PRM\PAR\PAR ANN\x64\Release\
 /*=============================================
 /* Specify 3D model 
 /*=============================================
-/*Berea200_1_gray_64.RAW
-/*Berea200_1_bin_64.RAW
-/*Berea200_1_64_s025.RAW
-/*Berea200_1_bin_64_PAR.RAW
-Berea200_gray_s25_128.RAW
-/*Berea200_1_bin_64_D2.RAW
+/*s25bin_nrwprobdis.raw
+s25_240_4ich_thr_ng.RAW
+/*s50_240_4ihthre.RAW
 /*Berea200_xy101_PAR_gray_scale025.RAW
-/*Berea200_xy101_T40OL8Sp7cl2_gray_scale025_binary.RAW
-/*Berea200_xy101_T40OL8Sp7cl2_gray_scale05.RAW
-/*zebra64_4GDP.RAW
-/*Berea200_xy101_gray.RAW
-/*Berea200_xy101_gray-16.RAW
-/*Berea200_xy101_gray-16_scale025.RAW
+/*Berea200_xy101_PAR_gray_scale05.RAW
 /*Berea200_gray_scale025_binary.raw
-/*Berea200_gray_s25.RAW
-/*Berea200_gray_s50.RAW
-/*Berea200_gray_scale05_binary.RAW
+/*Berea200_1_D4s025_4ichgw.RAW
 /*=============================================
