@@ -56,7 +56,8 @@ DoPAR::DoPAR()
 	acchis_exemplar.resize(MULTIRES);
 	existedcolorset.resize(MULTIRES);
 
-	weightedaverageset.resize(256, 0);
+	//weightedaverageset.resize(256, 0);
+
 	// [end] multi-res memory allocation---------------
 }
 
@@ -535,40 +536,6 @@ void DoPAR::GetStarted(string CurExeFile)
 
 ///========================== 190217 Kopf. optimization based =====================
 
-//load 3D model raw file
-vector<uchar> DoPAR::load3Dmodel(const char* filename)
-{
-	// open the file:
-	std::streampos fileSize;
-	std::ifstream file(filename, std::ios::binary);
-
-	// get its size:
-	file.seekg(0, std::ios::end);
-	fileSize = file.tellg();
-	file.seekg(0, std::ios::beg);
-
-	// read the data:
-	std::vector<uchar> fileData(fileSize);
-	file.read((char*)&fileData[0], fileSize);
-
-	if (fileData.size() != TEXSIZE[0] * TEXSIZE[0] * TEXSIZE[0]) {
-		cout << endl << "Error: Model size = " << fileData.size() << " SHOULD BE:" << TEXSIZE[0] * TEXSIZE[0] * TEXSIZE[0];
-		_getch(); exit(1);
-	}
-
-	return fileData;
-}
-
-// Show a Mat object quickly. For testing purposes only.
-void DoPAR::showMat(const cv::String& winname, const cv::Mat& mat)
-{
-	assert(!mat.empty());
-	cv::namedWindow(winname);
-	cv::imshow(winname, mat);
-	cv::waitKey(0);
-	cv::destroyWindow(winname);
-}
-
 
 //MULTIRES: larger number means finner level
 const int DoPAR::N[MULTIRES] = {4};		//Kopf{ 3, 4, 4 }; Chen{3,4,4}; Turner{5,5,5}	// neighborhood size: (2 * N + 1)^2
@@ -578,9 +545,6 @@ int DoPAR::NEIGHBORSIZE[MULTIRES];
 
 const int DoPAR::NUM_HISTOGRAM_BIN = 256;	//for color histogram	Kopf used 16
 vector<int> DoPAR::CHANNEL_MAXVALUE;		//for color histogram
-
-//const double DoPAR::WEIGHT_HISTOGRAM = NUM_HISTOGRAM_BIN;		//for accelerate convergence original 10.0
-
 int DoPAR::NUM_CHANNEL = 1;
 
 const double DoPAR::PCA_RATIO_VARIANCE = 0.95;	//Kopf used 0.95
@@ -660,42 +624,6 @@ void DoPAR::DoANNOptimization(){
 	}
 }
 
-void DoPAR::outputmodel(int level){
-	vector<int> tempvec = vector<int>(m_volume[level].begin(), m_volume[level].end());
-	Model = vector<uchar>(tempvec.begin(), tempvec.end());
-
-	Write(outputpath + outputfilename, Model);
-	cout << endl << "output done.";
-}
-
-void DoPAR::initthreshold(){
-	if (MULTIRES == 1){
-		MAXITERATION = { 20 };
-	}
-	else if (MULTIRES == 2){
-		MAXITERATION = { 20, 10 };
-	}
-	else if (MULTIRES == 3){
-		MAXITERATION = { 20, 15, 10 };
-	}
-	else if (MULTIRES == 4){
-		MAXITERATION = { 20, 15, 10, 10 };
-	}
-}
-
-void DoPAR::initabsoluteneigh(){
-	int n;
-	for (int level = 0; level < MULTIRES; level++){
-		absoluteneigh[level].resize(NEIGHBORSIZE[level]);
-		n = 0;
-		for (int y = -N[level]; y <= N[level]; y++){
-			for (int x = -N[level]; x <= N[level]; x++){
-				absoluteneigh[level][n] = y*TEXSIZE[level] + x;
-				n++;
-			}
-		}	
-	}
-}
 
 void DoPAR::init() {
 	if (!loadExemplar()) return;
@@ -720,7 +648,33 @@ void DoPAR::init() {
 		initPositionHistogram_synthesis(0);
 	}
 }
-
+void DoPAR::initthreshold(){
+	if (MULTIRES == 1){
+		MAXITERATION = { 20 };
+	}
+	else if (MULTIRES == 2){
+		MAXITERATION = { 20, 10 };
+	}
+	else if (MULTIRES == 3){
+		MAXITERATION = { 20, 15, 10 };
+	}
+	else if (MULTIRES == 4){
+		MAXITERATION = { 20, 15, 10, 10 };
+	}
+}
+void DoPAR::initabsoluteneigh(){
+	int n;
+	for (int level = 0; level < MULTIRES; level++){
+		absoluteneigh[level].resize(NEIGHBORSIZE[level]);
+		n = 0;
+		for (int y = -N[level]; y <= N[level]; y++){
+			for (int x = -N[level]; x <= N[level]; x++){
+				absoluteneigh[level][n] = y*TEXSIZE[level] + x;
+				n++;
+			}
+		}	
+	}
+}
 void DoPAR::InitGaussianKernel(){
 	const double PI = 4.0*atan(1.0);
 	
@@ -829,56 +783,12 @@ bool DoPAR::loadExemplar() {
 	cout << endl << "load TIs done.";
 	return true;
 }
-
-bool DoPAR::loadVolume(){
-	//----------------convert Model(vector<uchar>) to m_volume (vector<vector<int>> (multires,ch*x*y*z))		
-	if (FALSE){//for comparing, use random initial model
-		InitRandomVolume(0);
-		cout << endl << "Init Random Volume.";
-	}	
-	else{//load from Model, later can also load from file
-		if (fileExists(modelFilename3D.c_str()) == true){
-			Model = load3Dmodel(modelFilename3D.c_str());
-			
-			vector<int> tempvec = vector<int>(Model.begin(), Model.end());
-			m_volume[0] = vector<double>(tempvec.begin(), tempvec.end());
-
-			cout << endl << "load 3D model done.";
-		}
-		else{
-			cout << endl << "3D initial model doesn't exist. Use Random initial.";
-			InitRandomVolume(0);
-			cout << endl << "Init Random Volume Done.";
-		}
-	}
-
-	return true;
-}
-
-void DoPAR::InitRandomVolume(int level) {
-	vector<double>* p[3] = { &m_exemplar_x[level], &m_exemplar_y[level], &m_exemplar_z[level] };
-	for (int xyz = 0; xyz < TEXSIZE[level] * TEXSIZE[level] * TEXSIZE[level]; ++xyz) {
-		ANNidx index2 = NUM_CHANNEL * (rand() % (TEXSIZE[level] * TEXSIZE[level]));
-		int ori = rand() % 3;
-		for (int ch = 0; ch < NUM_CHANNEL; ++ch) {
-			m_volume[level][NUM_CHANNEL * xyz + ch] = p[ori]->operator[](index2 + ch);
-		}
-	}
-
-	//for (int xyz = 0; xyz < TEXSIZE[level] * TEXSIZE[level] * TEXSIZE[level]; ++xyz) {		
-	//	int test = rand() % 10000;
-	//	if (test < 5676) m_volume[level][xyz] = 0;
-	//	else if (test < 7786) m_volume[level][xyz] = 250;
-	//	else m_volume[level][xyz] = 255;
-	//}
-}
-
 void DoPAR::calcNeighbor() {
 	//initialize kdtree for certain template/neighbourhood
 
 	cout << endl << "calcNeighbor...";
 	for (int level = 0; level < MULTIRES; ++level) {
-		cout <<endl<< "level:" << level;
+		cout << endl << "level:" << level;
 		int numData = (TEXSIZE[level] - 2 * N[level]) * (TEXSIZE[level] - 2 * N[level]);
 		//ann_index range=[0,numData), corresponds to (x,y) where x/y range=[N[level],TEXSIZE[level]-N[level])!
 		CvMat* p_source_x = cvCreateMat(numData, D_NEIGHBOR[level], CV_64F);	//rows='area' numData, cols=dimension (Neighbour size)
@@ -966,7 +876,7 @@ void DoPAR::calcNeighbor() {
 			}
 			if (PCA_RATIO_VARIANCE <= ratio_x && PCA_RATIO_VARIANCE <= ratio_y && PCA_RATIO_VARIANCE <= ratio_z) break;
 		}
-		
+
 		cout << endl;
 		printf("PCA reduction (x): %d -> %d\n", D_NEIGHBOR[level], dimPCA_x);
 		printf("PCA reduction (y): %d -> %d\n", D_NEIGHBOR[level], dimPCA_y);
@@ -1036,6 +946,160 @@ void DoPAR::calcNeighbor() {
 	cout << endl << "calcNeighbor done.";
 }
 
+bool DoPAR::loadVolume(){
+	//----------------convert Model(vector<uchar>) to m_volume (vector<vector<int>> (multires,ch*x*y*z))		
+	if (FALSE){//for comparing, use random initial model
+		InitRandomVolume(0);
+		cout << endl << "Init Random Volume.";
+	}	
+	else{//load from Model, later can also load from file
+		if (fileExists(modelFilename3D.c_str()) == true){
+			Model = load3Dmodel(modelFilename3D.c_str());
+			
+			vector<int> tempvec = vector<int>(Model.begin(), Model.end());
+			m_volume[0] = vector<double>(tempvec.begin(), tempvec.end());
+
+			cout << endl << "load 3D model done.";
+		}
+		else{
+			cout << endl << "3D initial model doesn't exist. Use Random initial.";
+			InitRandomVolume(0);
+			cout << endl << "Init Random Volume Done.";
+		}
+	}
+
+	return true;
+}
+void DoPAR::InitRandomVolume(int level) {
+	vector<double>* p[3] = { &m_exemplar_x[level], &m_exemplar_y[level], &m_exemplar_z[level] };
+	for (int xyz = 0; xyz < TEXSIZE[level] * TEXSIZE[level] * TEXSIZE[level]; ++xyz) {
+		ANNidx index2 = NUM_CHANNEL * (rand() % (TEXSIZE[level] * TEXSIZE[level]));
+		int ori = rand() % 3;
+		for (int ch = 0; ch < NUM_CHANNEL; ++ch) {
+			m_volume[level][NUM_CHANNEL * xyz + ch] = p[ori]->operator[](index2 + ch);
+		}
+	}
+
+	//for (int xyz = 0; xyz < TEXSIZE[level] * TEXSIZE[level] * TEXSIZE[level]; ++xyz) {		
+	//	int test = rand() % 10000;
+	//	if (test < 5676) m_volume[level][xyz] = 0;
+	//	else if (test < 7786) m_volume[level][xyz] = 250;
+	//	else m_volume[level][xyz] = 255;
+	//}
+}
+vector<uchar> DoPAR::load3Dmodel(const char* filename)
+{//load 3D model raw file
+	// open the file:
+	std::streampos fileSize;
+	std::ifstream file(filename, std::ios::binary);
+
+	// get its size:
+	file.seekg(0, std::ios::end);
+	fileSize = file.tellg();
+	file.seekg(0, std::ios::beg);
+
+	// read the data:
+	std::vector<uchar> fileData(fileSize);
+	file.read((char*)&fileData[0], fileSize);
+
+	if (fileData.size() != TEXSIZE[0] * TEXSIZE[0] * TEXSIZE[0]) {
+		cout << endl << "Error: Model size = " << fileData.size() << " SHOULD BE:" << TEXSIZE[0] * TEXSIZE[0] * TEXSIZE[0];
+		_getch(); exit(1);
+	}
+
+	return fileData;
+}
+
+void DoPAR::upsampleVolume(int level) {
+	cout << endl << endl << "Upsample from level " << level << " to level " << level + 1;
+	static const bool flag[8][8] = {
+		{ true, false, false, false, false, false, false, false },
+		{ true, true, false, false, false, false, false, false },
+		{ true, false, true, false, false, false, false, false },
+		{ true, true, true, true, false, false, false, false },
+		{ true, false, false, false, true, false, false, false },
+		{ true, true, false, false, true, true, false, false },
+		{ true, false, true, false, true, false, true, false },
+		{ true, true, true, true, true, true, true, true } };
+	for (int z = 0; z < TEXSIZE[level]; ++z) {
+		for (int y = 0; y < TEXSIZE[level]; ++y) {
+			for (int x = 0; x < TEXSIZE[level]; ++x) {
+				int index[8];
+				for (int dz = 0; dz < 2; ++dz) {
+					for (int dy = 0; dy < 2; ++dy) {
+						for (int dx = 0; dx < 2; ++dx) {
+							//index at level
+							index[4 * dz + 2 * dy + dx] = NUM_CHANNEL * (
+								TEXSIZE[level] * TEXSIZE[level] * min(z + dz, TEXSIZE[level] - 1) +
+								TEXSIZE[level] * trimIndex(level, y + dy) +
+								trimIndex(level, x + dx));
+						}
+					}
+				}
+				for (int dz = 0; dz < 2; ++dz) {
+					for (int dy = 0; dy < 2; ++dy) {
+						for (int dx = 0; dx < 2; ++dx) {
+							//index at level+1
+							int index2 = NUM_CHANNEL * (TEXSIZE[level + 1] * TEXSIZE[level + 1] * (2 * z + dz) + TEXSIZE[level + 1] * (2 * y + dy) + 2 * x + dx);
+							vector<double> color(NUM_CHANNEL, 0);
+							int cnt = 0;
+							for (int i = 0; i < 8; ++i) {
+								if (flag[4 * dz + 2 * dy + dx][i]) {
+									for (int ch = 0; ch < NUM_CHANNEL; ++ch) {
+										color[ch] += m_volume[level][index[i] + ch];
+									}
+									++cnt;
+								}
+							}
+							for (int ch = 0; ch < NUM_CHANNEL; ++ch) {
+								color[ch] /= cnt;
+								m_volume[level + 1][index2 + ch] = color[ch];
+							}
+						}
+					}
+				}
+			}
+		}
+	}
+}
+
+void DoPAR::outputmodel(int level){
+	vector<int> tempvec = vector<int>(m_volume[level].begin(), m_volume[level].end());
+	Model = vector<uchar>(tempvec.begin(), tempvec.end());
+
+	Write(outputpath + outputfilename, Model);
+	cout << endl << "output done.";
+}
+void DoPAR::writeHistogram(int level, vector<double> &hisvec, int rows, int cols, const string filename){
+	if (filename.size() == 0) { cout << endl << "writeHistogram Error: empty filename"; return; };
+	if (hisvec.size() != rows*cols) { cout << endl << "writeHistogram Error: wrong size of hisvec"; return; };
+
+	Mat hist = Mat(rows, cols, CV_64FC1);
+	memcpy(hist.data, hisvec.data(), hisvec.size()*sizeof(double));	//float 32F, double 64F
+	hist *= TEXSIZE[level] * TEXSIZE[level] * TEXSIZE[level];
+	hist.convertTo(hist, CV_8UC1);	//convertTo just copy the value, no scaling
+
+	short i(0);
+	string tempFPathName = filename;
+	while (fileExists(tempFPathName) == true){
+		tempFPathName = filename.substr(0, filename.find('.')) + "_" + to_string(i) + ".png";
+		i++;
+	}//rename, not overwrite
+
+	imwrite(tempFPathName, hist);
+	cout << endl << "histogram plotted.";
+}
+void DoPAR::showMat(const cv::String& winname, const cv::Mat& mat)
+{// Show a Mat object quickly. For testing purposes only.
+	assert(!mat.empty());
+	cv::namedWindow(winname);
+	cv::imshow(winname, mat);
+	cv::waitKey(0);
+	cv::destroyWindow(winname);
+}
+
+
+//================= phase 1: search ===========================
 void DoPAR::searchVolume(int level) {
 	long time_start = clock();
 	const double min_dist = 0.00000000001;
@@ -1155,13 +1219,91 @@ void DoPAR::searchVolume(int level) {
 
 }
 
-void DoPAR::initPermutation(int level) {
-	for (ANNidx i = 0; i < TEXSIZE[level] * TEXSIZE[level] * TEXSIZE[level]; ++i) {
-		m_permutation_xyz[level][i] = i;
+//---------- Index Histogram for search step ---------
+void DoPAR::initIndexHistogram(int level){
+	if (FIRSTRUN){
+		long numData = 3 * (TEXSIZE[level] - 2 * N[level]) * (TEXSIZE[level] - 2 * N[level]);
+		//init examplarhistogram
+		m_indexhistogram_exemplar[level].resize(numData);
+		m_indexhistogram_exemplar[level].assign(numData, 0.0);	
+		for (ANNidx xyz = 0; xyz < TEXSIZE[level] * TEXSIZE[level] * TEXSIZE[level]; ++xyz) {
+			m_volume_index_x[level][xyz] = 10000000;
+			m_volume_index_y[level][xyz] = 10000000;
+			m_volume_index_z[level][xyz] = 10000000;
+		}
+		m_indexhistogram_synthesis[level].resize(numData);
+		m_indexhistogram_synthesis[level].assign(numData, 0.0);
+
+		return;
 	}
-	shuffle(m_permutation_xyz[level].begin(), m_permutation_xyz[level].end(), mersennetwistergenerator);
+
+	
+	long numData = 3* (TEXSIZE[level] - 2 * N[level]) * (TEXSIZE[level] - 2 * N[level]);
+	//init examplarhistogram
+	m_indexhistogram_exemplar[level].resize(numData);
+	m_indexhistogram_exemplar[level].assign(numData, 1.0 / ((TEXSIZE[level] - 2 * N[level]) * (TEXSIZE[level] - 2 * N[level])));
+				
+	//initial uniform distribution
+	ANNidx size = (TEXSIZE[level] - 2 * N[level]) * (TEXSIZE[level] - 2 * N[level]);
+	for (ANNidx xyz = 0; xyz < TEXSIZE[level] * TEXSIZE[level] * TEXSIZE[level]; ++xyz) {
+		m_volume_index_x[level][xyz] = xyz%size;
+		m_volume_index_y[level][xyz] = xyz%size;
+		m_volume_index_z[level][xyz] = xyz%size;
+	}
+	shuffle(m_volume_index_x[level].begin(), m_volume_index_x[level].end(), mersennetwistergenerator);
+	shuffle(m_volume_index_y[level].begin(), m_volume_index_y[level].end(), mersennetwistergenerator);
+	shuffle(m_volume_index_z[level].begin(), m_volume_index_z[level].end(), mersennetwistergenerator);
+	//count each volume
+	m_indexhistogram_synthesis[level].resize(numData);
+	m_indexhistogram_synthesis[level].assign(numData, 0.0);
+	double delta_histogram = 1.0 / (TEXSIZE[level] * TEXSIZE[level] * TEXSIZE[level]);
+	for (ANNidx i = 0; i < TEXSIZE[level] * TEXSIZE[level] * TEXSIZE[level]; i++){
+		ANNidx binx = m_volume_index_x[level][i];
+		m_indexhistogram_synthesis[level][binx] += delta_histogram;
+		ANNidx biny = m_volume_index_y[level][i] + size;
+		m_indexhistogram_synthesis[level][biny] += delta_histogram;
+		ANNidx binz = m_volume_index_z[level][i] + 2*size;
+		m_indexhistogram_synthesis[level][binz] += delta_histogram;
+	}
+
+	//writeHistogram(level, m_indexhistogram_synthesis[level], TEXSIZE[level] - 2 * N[level], 3 * (TEXSIZE[level] - 2 * N[level]), "IndexHis.png");
+}
+void DoPAR::updateIndexHistogram(int level, int orientation, const ANNidx oldannidx, const ANNidx newannidx){
+	if (FIRSTRUN){
+		ANNidx newidx = newannidx + orientation*(TEXSIZE[level] - 2 * N[level]) * (TEXSIZE[level] - 2 * N[level]);
+		double delta_histogram = 1.0 / (TEXSIZE[level] * TEXSIZE[level] * TEXSIZE[level]);
+		m_indexhistogram_synthesis[level][newidx] += delta_histogram;
+
+		return;
+	}
+	
+	ANNidx newidx = newannidx + orientation*(TEXSIZE[level] - 2 * N[level]) * (TEXSIZE[level] - 2 * N[level]);
+	ANNidx oldidx = oldannidx + orientation*(TEXSIZE[level] - 2 * N[level]) * (TEXSIZE[level] - 2 * N[level]);
+	double delta_histogram = 1.0 / (TEXSIZE[level] * TEXSIZE[level] * TEXSIZE[level]);
+	m_indexhistogram_synthesis[level][oldidx] -= delta_histogram;
+	m_indexhistogram_synthesis[level][newidx] += delta_histogram;	
+}
+ANNidx DoPAR::indexhistmatching_ann_index(int level, int orientation, ANNidxArray idxarray, ANNdistArray distarry){
+	ANNidx size = (TEXSIZE[level] - 2 * N[level]) * (TEXSIZE[level] - 2 * N[level]);
+	double stddev = 1.0 / ((TEXSIZE[level] - 2 * N[level]) * (TEXSIZE[level] - 2 * N[level]));
+	double probzero = gaussian_pdf(0.0, 0.0, stddev);
+	double dist_acc(0.0), weight_acc(0.0); 
+	double idx_acc(0.0);
+
+	//simple form works better: just select minimum frequency
+	vector<double> frequecyarray(ANNsearchk, 0.0);
+	for (int i = 0; i < ANNsearchk; i++){
+		ANNidx idx = idxarray[i] + orientation*size;
+		frequecyarray[i] = m_indexhistogram_synthesis[level][idx];
+	}
+	auto i = min_element(begin(frequecyarray), end(frequecyarray));
+	int closestindex = distance(begin(frequecyarray), i);
+
+	return closestindex;	
 }
 
+
+//================= phase 2: optimization =====================
 void DoPAR::optimizeVolume(int level) {
 	long time_start = clock();
 	initPermutation(level);	//shuffle m_permutation_xyz
@@ -1335,59 +1477,13 @@ void DoPAR::optimizeVolume(int level) {
 	cout << "done. clocks = " << (time_end - time_start) / CLOCKS_PER_SEC;
 }
 
-void DoPAR::upsampleVolume(int level) {	
-	cout << endl << endl << "Upsample from level "<< level <<" to level " << level + 1;
-	static const bool flag[8][8] = {
-		{ true, false, false, false, false, false, false, false },
-		{ true, true, false, false, false, false, false, false },
-		{ true, false, true, false, false, false, false, false },
-		{ true, true, true, true, false, false, false, false },
-		{ true, false, false, false, true, false, false, false },
-		{ true, true, false, false, true, true, false, false },
-		{ true, false, true, false, true, false, true, false },
-		{ true, true, true, true, true, true, true, true } };
-	for (int z = 0; z < TEXSIZE[level]; ++z) {
-		for (int y = 0; y < TEXSIZE[level]; ++y) {
-			for (int x = 0; x < TEXSIZE[level]; ++x) {
-				int index[8];
-				for (int dz = 0; dz < 2; ++dz) {
-					for (int dy = 0; dy < 2; ++dy) {
-						for (int dx = 0; dx < 2; ++dx) {
-							//index at level
-							index[4 * dz + 2 * dy + dx] = NUM_CHANNEL * (
-								TEXSIZE[level] * TEXSIZE[level] * min(z + dz, TEXSIZE[level] - 1) +
-								TEXSIZE[level] * trimIndex(level, y + dy) +
-								trimIndex(level, x + dx));
-						}
-					}
-				}
-				for (int dz = 0; dz < 2; ++dz) {
-					for (int dy = 0; dy < 2; ++dy) {
-						for (int dx = 0; dx < 2; ++dx) {
-							//index at level+1
-							int index2 = NUM_CHANNEL * (TEXSIZE[level + 1] * TEXSIZE[level + 1] * (2 * z + dz) + TEXSIZE[level + 1] * (2 * y + dy) + 2 * x + dx);
-							vector<double> color(NUM_CHANNEL, 0);
-							int cnt = 0;
-							for (int i = 0; i < 8; ++i) {
-								if (flag[4 * dz + 2 * dy + dx][i]) {
-									for (int ch = 0; ch < NUM_CHANNEL; ++ch) {
-										color[ch] += m_volume[level][index[i] + ch];
-									}
-									++cnt;
-								}
-							}
-							for (int ch = 0; ch < NUM_CHANNEL; ++ch) {
-								color[ch] /= cnt;
-								m_volume[level + 1][index2 + ch] = color[ch];
-							}
-						}
-					}
-				}
-			}
-		}
+void DoPAR::initPermutation(int level) {// random permutation (precomputed)
+	for (ANNidx i = 0; i < TEXSIZE[level] * TEXSIZE[level] * TEXSIZE[level]; ++i) {
+		m_permutation_xyz[level][i] = i;
 	}
+	shuffle(m_permutation_xyz[level].begin(), m_permutation_xyz[level].end(), mersennetwistergenerator);
 }
-
+//---------- Color histogram ---------------
 void DoPAR::calcHistogram_synthesis(int level) {
 	m_histogram_synthesis[level].clear();
 	m_histogram_synthesis[level].resize(NUM_CHANNEL, vector<double>(NUM_HISTOGRAM_BIN, 0.0));
@@ -1433,8 +1529,7 @@ void DoPAR::calcHistogram_exemplar(int level) {
 		if (m_histogram_exemplar[level][0][c] > 0.0) existedcolorset[level].push_back(c);
 	}
 }
-
-//============Position Histogram for optimize step====
+//----------- Position Histogram -----------
 void DoPAR::initPositionHistogram_exemplar(int level){
 	//initial uniform distribution
 	m_positionhistogram_exemplar[level].resize(3 * (TEXSIZE[level] * TEXSIZE[level]));
@@ -1483,109 +1578,6 @@ void DoPAR::updatePositionHistogram_synthesis(int level, const ANNidx position_o
 	m_positionhistogram_synthesis[level][position_old] -= delta_histogram;
 	m_positionhistogram_synthesis[level][position_new] += delta_histogram;
 }
-//============Index Histogram for search step========
-void DoPAR::initIndexHistogram(int level){
-	if (FIRSTRUN){
-		long numData = 3 * (TEXSIZE[level] - 2 * N[level]) * (TEXSIZE[level] - 2 * N[level]);
-		//init examplarhistogram
-		m_indexhistogram_exemplar[level].resize(numData);
-		m_indexhistogram_exemplar[level].assign(numData, 0.0);	
-		for (ANNidx xyz = 0; xyz < TEXSIZE[level] * TEXSIZE[level] * TEXSIZE[level]; ++xyz) {
-			m_volume_index_x[level][xyz] = 10000000;
-			m_volume_index_y[level][xyz] = 10000000;
-			m_volume_index_z[level][xyz] = 10000000;
-		}
-		m_indexhistogram_synthesis[level].resize(numData);
-		m_indexhistogram_synthesis[level].assign(numData, 0.0);
-
-		return;
-	}
-
-	
-	long numData = 3* (TEXSIZE[level] - 2 * N[level]) * (TEXSIZE[level] - 2 * N[level]);
-	//init examplarhistogram
-	m_indexhistogram_exemplar[level].resize(numData);
-	m_indexhistogram_exemplar[level].assign(numData, 1.0 / ((TEXSIZE[level] - 2 * N[level]) * (TEXSIZE[level] - 2 * N[level])));
-				
-	//initial uniform distribution
-	ANNidx size = (TEXSIZE[level] - 2 * N[level]) * (TEXSIZE[level] - 2 * N[level]);
-	for (ANNidx xyz = 0; xyz < TEXSIZE[level] * TEXSIZE[level] * TEXSIZE[level]; ++xyz) {
-		m_volume_index_x[level][xyz] = xyz%size;
-		m_volume_index_y[level][xyz] = xyz%size;
-		m_volume_index_z[level][xyz] = xyz%size;
-	}
-	shuffle(m_volume_index_x[level].begin(), m_volume_index_x[level].end(), mersennetwistergenerator);
-	shuffle(m_volume_index_y[level].begin(), m_volume_index_y[level].end(), mersennetwistergenerator);
-	shuffle(m_volume_index_z[level].begin(), m_volume_index_z[level].end(), mersennetwistergenerator);
-	//count each volume
-	m_indexhistogram_synthesis[level].resize(numData);
-	m_indexhistogram_synthesis[level].assign(numData, 0.0);
-	double delta_histogram = 1.0 / (TEXSIZE[level] * TEXSIZE[level] * TEXSIZE[level]);
-	for (ANNidx i = 0; i < TEXSIZE[level] * TEXSIZE[level] * TEXSIZE[level]; i++){
-		ANNidx binx = m_volume_index_x[level][i];
-		m_indexhistogram_synthesis[level][binx] += delta_histogram;
-		ANNidx biny = m_volume_index_y[level][i] + size;
-		m_indexhistogram_synthesis[level][biny] += delta_histogram;
-		ANNidx binz = m_volume_index_z[level][i] + 2*size;
-		m_indexhistogram_synthesis[level][binz] += delta_histogram;
-	}
-
-	//writeHistogram(level, m_indexhistogram_synthesis[level], TEXSIZE[level] - 2 * N[level], 3 * (TEXSIZE[level] - 2 * N[level]), "IndexHis.png");
-}
-void DoPAR::updateIndexHistogram(int level, int orientation, const ANNidx oldannidx, const ANNidx newannidx){
-	if (FIRSTRUN){
-		ANNidx newidx = newannidx + orientation*(TEXSIZE[level] - 2 * N[level]) * (TEXSIZE[level] - 2 * N[level]);
-		double delta_histogram = 1.0 / (TEXSIZE[level] * TEXSIZE[level] * TEXSIZE[level]);
-		m_indexhistogram_synthesis[level][newidx] += delta_histogram;
-
-		return;
-	}
-	
-	ANNidx newidx = newannidx + orientation*(TEXSIZE[level] - 2 * N[level]) * (TEXSIZE[level] - 2 * N[level]);
-	ANNidx oldidx = oldannidx + orientation*(TEXSIZE[level] - 2 * N[level]) * (TEXSIZE[level] - 2 * N[level]);
-	double delta_histogram = 1.0 / (TEXSIZE[level] * TEXSIZE[level] * TEXSIZE[level]);
-	m_indexhistogram_synthesis[level][oldidx] -= delta_histogram;
-	m_indexhistogram_synthesis[level][newidx] += delta_histogram;	
-}
-ANNidx DoPAR::indexhistmatching_ann_index(int level, int orientation, ANNidxArray idxarray, ANNdistArray distarry){
-	ANNidx size = (TEXSIZE[level] - 2 * N[level]) * (TEXSIZE[level] - 2 * N[level]);
-	double stddev = 1.0 / ((TEXSIZE[level] - 2 * N[level]) * (TEXSIZE[level] - 2 * N[level]));
-	double probzero = gaussian_pdf(0.0, 0.0, stddev);
-	double dist_acc(0.0), weight_acc(0.0); 
-	double idx_acc(0.0);
-
-	//simple form works better: just select minimum frequency
-	vector<double> frequecyarray(ANNsearchk, 0.0);
-	for (int i = 0; i < ANNsearchk; i++){
-		ANNidx idx = idxarray[i] + orientation*size;
-		frequecyarray[i] = m_indexhistogram_synthesis[level][idx];
-	}
-	auto i = min_element(begin(frequecyarray), end(frequecyarray));
-	int closestindex = distance(begin(frequecyarray), i);
-
-	return closestindex;	
-}
-
-void DoPAR::writeHistogram(int level, vector<double> &hisvec, int rows, int cols, const string filename){
-	if (filename.size() == 0) { cout << endl << "writeHistogram Error: empty filename"; return; };
-	if (hisvec.size() != rows*cols) { cout << endl << "writeHistogram Error: wrong size of hisvec"; return; };
-			
-	Mat hist = Mat(rows, cols, CV_64FC1);
-	memcpy(hist.data, hisvec.data(), hisvec.size()*sizeof(double));	//float 32F, double 64F
-	hist *= TEXSIZE[level] * TEXSIZE[level] * TEXSIZE[level];		
-	hist.convertTo(hist, CV_8UC1);	//convertTo just copy the value, no scaling
-
-	short i(0);
-	string tempFPathName = filename;
-	while (fileExists(tempFPathName) == true){
-		tempFPathName = filename.substr(0, filename.find('.')) + "_" + to_string(i) + ".png";
-		i++;
-	}//rename, not overwrite
-
-	imwrite(tempFPathName, hist);
-	cout << endl << "histogram plotted.";
-}
-
 int DoPAR::FindClosestColorIndex(int level, vector<double> &color, vector<double> &weight, double referencecolor){
 	//find nearest color value, then compare weight for all closest values
 	//return the final index
@@ -1612,7 +1604,7 @@ int DoPAR::FindClosestColorIndex(int level, vector<double> &color, vector<double
 
 	return closestindex;
 }
-
+//----------- Dynamic thresholding ---------
 void DoPAR::calcaccHistogram(vector<double> &inputhis, vector<double> &acchis){
 	if (inputhis.size() != acchis.size()) { cout << endl << "accHistogram size " << acchis.size() << " not match " << inputhis.size(); _getch(); }
 	acchis = inputhis;
@@ -1666,4 +1658,265 @@ void DoPAR::DynamicThresholding(int level){
 	
 	//update color histogram after changing value
 	calcHistogram_synthesis(level);
+}
+
+// ========= Distance Map ===========
+vector<unsigned short> DoPAR::BarDMap(short tSx, short tSy, short tSz, vector<char>& OImg)
+{	//(1) tSx, tSy, tSz: 3 dimensions of image OImg
+	//       tSz = 1 - for a 2D image, otherwise tSz >=3
+	//(2) OImg is a binary image, <= 0 for solid, > 0 for pores
+
+	int Sx(3), Sy(3), Sz(3), SizeXY, Size;
+
+	if (tSx > 3) Sx = tSx;
+	if (tSy > 3) Sy = tSy;
+	if (tSz > 0) Sz = tSz;
+
+	SizeXY = Sx*Sy;
+	Size = SizeXY*Sz;
+
+	vector<unsigned short> DMap;
+
+	if (OImg.size() != Size) {
+		cout << "Distance Transfromation Error: The size of original image is wrong !" << endl;
+		cout << OImg.size() << " != " << Size << endl;
+		cout << "Dimensions: (8) " << Sx << "x" << Sy << "x" << Sz << endl;
+		return DMap;
+	}
+
+	vector<long> ForeIdxV(27, 0);
+	vector<long> Gx(27, 0), G2x(27, 0), AbsGx(27, 0), AbsVal(27);
+	vector<long> Gy(27, 0), G2y(27, 0), AbsGy(27, 0);
+	vector<long> Gz(27, 0), G2z(29, 0), AbsGz(27, 0);
+	//The difference of relative coordination of current voxel and its 26-neighbours
+
+	{  //Initialize constant parameters
+		for (long CNum = 0, k = -1; k<2; ++k) {
+			for (long j = -1; j<2; ++j) {
+				for (long i = -1; i<2; ++i) {
+					Gx[CNum] = -i; G2x[CNum] = 2 * Gx[CNum];
+					Gy[CNum] = -j; G2y[CNum] = 2 * Gy[CNum];
+					Gz[CNum] = -k; G2z[CNum] = 2 * Gz[CNum];
+					AbsGx[CNum] = abs(Gx[CNum]);
+					AbsGy[CNum] = abs(Gy[CNum]);
+					AbsGz[CNum] = abs(Gz[CNum]);
+					AbsVal[CNum] = AbsGx[CNum] + AbsGy[CNum] + AbsGz[CNum];
+					ForeIdxV[CNum++] = i + j*Sx + k*SizeXY;
+				}
+			}
+		}
+	}  //Initialize constant parameters	
+
+	DMap.resize(Size, 0);
+
+	unsigned short MaxDistV = 65500;
+
+	{ //Initialize DMap and clear up OImg	
+		for (long idx = 0; idx<Size; ++idx)
+		if (OImg[idx] > 0)
+			DMap[idx] = MaxDistV;
+	} //Initialize DMap and clear up OImg			
+
+	vector<_XyzStrType> TgtImg(Size);  //coordinates (x,y,z) ///@~@
+
+	short x, y, z, i, j, k, CNum;
+	long idx, NIdx, CurVal;
+	_XyzStrType TVal;
+
+	TVal.x = 0; TVal.y = 0; TVal.z = 0;
+
+	//cout<<" scanning forwards...";
+	for (idx = -1, z = 0; z<Sz; ++z) {
+		if (z % 100 == 0) cout << "*";
+		for (y = 0; y<Sy; ++y) {
+			for (x = 0; x<Sx; ++x) { 	//if(++JCnt >= JStepNum) {JCnt=0; cout<<".";}
+				if (DMap[++idx] < 1) {
+					TgtImg[idx] = TVal;
+				}
+				else {
+					for (CNum = -1, k = z - 1; k<z + 2; ++k) {
+						if (k < 0 || k >= Sz) { CNum += 9; continue; }
+						for (j = y - 1; j<y + 2; ++j) {
+							if (j < 0 || j >= Sy) { CNum += 3; continue; }
+							for (i = x - 1; i<x + 2; ++i) {
+								++CNum; if (i < 0 || i >= Sx) continue;
+								if (CNum > 12) goto BarJump1;
+
+								NIdx = idx + ForeIdxV[CNum];
+
+								if (DMap[NIdx] == MaxDistV) continue;
+
+								CurVal = AbsVal[CNum] + G2x[CNum] * TgtImg[NIdx].x
+									+ G2y[CNum] * TgtImg[NIdx].y
+									+ G2z[CNum] * TgtImg[NIdx].z
+									+ DMap[NIdx];
+
+								if (CurVal < DMap[idx]) {
+									DMap[idx] = CurVal;
+									TgtImg[idx].x = TgtImg[NIdx].x + Gx[CNum];
+									TgtImg[idx].y = TgtImg[NIdx].y + Gy[CNum];
+									TgtImg[idx].z = TgtImg[NIdx].z + Gz[CNum];
+								} //if(CurVal < DMap[idx]) 				
+							}
+						}
+					}
+				BarJump1:;
+				}
+			}
+		}
+	}
+
+	//cout<<"  scanning backwards...";
+	for (idx = Size, z = Sz - 1; z >= 0; --z) {
+		if (z % 100 == 0) cout << ".";
+		for (y = Sy - 1; y >= 0; --y) {
+			for (x = Sx - 1; x >= 0; --x) { //if(++JCnt >= JStepNum) {JCnt=0; cout<<".";}
+				if (DMap[--idx] <= 0) continue;
+				for (CNum = 27, k = z + 1; k>z - 2; --k) {
+					if (k < 0 || k >= Sz) { CNum -= 9; continue; }
+					for (j = y + 1; j>y - 2; --j) {
+						if (j < 0 || j >= Sy) { CNum -= 3; continue; }
+						for (i = x + 1; i>x - 2; --i) {
+							--CNum;  if (i < 0 || i >= Sx) continue;
+							if (CNum < 14) goto BarJump2;
+
+							NIdx = idx + ForeIdxV[CNum];
+							CurVal = AbsVal[CNum] + G2x[CNum] * TgtImg[NIdx].x
+								+ G2y[CNum] * TgtImg[NIdx].y
+								+ G2z[CNum] * TgtImg[NIdx].z
+								+ DMap[NIdx];
+
+							if (CurVal < DMap[idx]) {
+								DMap[idx] = CurVal;
+								TgtImg[idx].x = TgtImg[NIdx].x + Gx[CNum];
+								TgtImg[idx].y = TgtImg[NIdx].y + Gy[CNum];
+								TgtImg[idx].z = TgtImg[NIdx].z + Gz[CNum];
+							}
+						}
+					}
+				}
+			BarJump2:;
+			}
+		}
+	}
+
+	return DMap;
+}
+
+vector<short> DoPAR::GetDMap(short Sx, short Sy, short Sz, vector<char>& OImg, char DM_Type, bool DisValYN)
+{	////(0) Sz = 1: for 2D image
+	////(1) OImg: <= 0 for solid, > 0 for pores
+	////(2) DM_Type = 0: for solid phase, 
+	////    DM_Type = 1: for pore phase, 
+	////    DM_Type = 2: for both solid and pore phase, 
+	////(3) DisValYN: Reture type - distance value if DisValYN = ture, otherwise return sequence number
+
+	if (DM_Type != 0 && DM_Type != 1) DM_Type = 2;
+
+	vector<short> DMap;
+
+	if (DM_Type == 1 || DM_Type == 2) {
+
+		vector<unsigned short> tDMap;
+
+		tDMap = BarDMap(Sx, Sy, Sz, OImg);
+
+		DMap.resize(tDMap.size(), 0);
+
+		unsigned short MaxDis(1);
+		for (long idx = 0; idx < tDMap.size(); ++idx) {
+			if (tDMap[idx] < 1) continue;
+			if (tDMap[idx] > 32760L)
+				DMap[idx] = 32761L;
+			else
+				DMap[idx] = tDMap[idx];
+
+			if (tDMap[idx] > MaxDis)
+				MaxDis = tDMap[idx];
+		}
+
+		if (!DisValYN) {
+			vector<bool> UsedYN(MaxDis + 1, false);
+			for (long idx = 0; idx < tDMap.size(); ++idx) {
+				if (tDMap[idx] > 0) {
+					UsedYN[tDMap[idx]] = true;
+				}
+			}
+
+			tDMap.clear();
+
+			vector<long> DisSeq(MaxDis + 1, -1);
+
+			long ID(0);
+			for (long ij = 1; ij < UsedYN.size(); ++ij) {
+				if (UsedYN[ij])
+					DisSeq[ij] = ++ID;
+			}
+
+			for (long idx = 0; idx < DMap.size(); ++idx) {
+				if (DMap[idx] > 0) {
+					DMap[idx] = DisSeq[DMap[idx]];
+				}
+			}
+		}
+	}//DM_Type == 1 || DM_Type == 2
+
+	if (DM_Type == 0 || DM_Type == 2) {
+
+		vector<char> OD;
+
+		OD.resize(OImg.size(), 0);
+		for (long idx = 0; idx < OImg.size(); ++idx) {
+			if (OImg[idx] <= 0) {
+				OD[idx] = 1;
+			}
+		}
+
+		vector<unsigned short> tDMap;
+
+		tDMap = BarDMap(Sx, Sy, Sz, OD);
+
+		if (DMap.size() == 0) {
+			DMap.resize(tDMap.size(), 0);
+		}
+
+		unsigned short MaxDis(1);
+		for (long idx = 0; idx < tDMap.size(); ++idx) {
+			if (tDMap[idx] < 1) continue;
+			if (tDMap[idx] > 32760L)
+				DMap[idx] = -32761L;
+			else
+				DMap[idx] = -1L * tDMap[idx];
+
+			if (tDMap[idx] > MaxDis)
+				MaxDis = tDMap[idx];
+		}
+
+		if (!DisValYN) {
+			vector<bool> UsedYN(MaxDis + 1, false);
+			for (long idx = 0; idx < tDMap.size(); ++idx) {
+				if (tDMap[idx] > 0) {
+					UsedYN[tDMap[idx]] = true;
+				}
+			}
+
+			tDMap.clear();
+
+			vector<long> DisSeq(MaxDis + 1, -1);
+
+			long ID(0);
+			for (long ij = 1; ij < UsedYN.size(); ++ij) {
+				if (UsedYN[ij])
+					DisSeq[ij] = ++ID;
+			}
+
+			for (long idx = 0; idx < DMap.size(); ++idx) {
+				if (DMap[idx] < 0) {
+					DMap[idx] = -DisSeq[-DMap[idx]];
+				}
+			}
+		}
+	}//DM_Type == 1 || DM_Type == 2
+
+	return DMap;
 }
