@@ -49,15 +49,6 @@ private:
 	//       otherwise a single image for three direction 
 	//UpPro: upper porosity, 0.5 for default. 
 	
-	double porelppercentage, grainlppercentage;
-	double minEAsamplerate;
-	long totalsamplenum, Egdesamplecount;
-	int edgewidth = 0;
-	int maxinterval = 40;
-	int patchtemplate = 50, overlap = 10/*, cotemplate = 100*/;
-	//double scanprop = 0.05/*, Tweight = 1.0*/;
-	//int ConditionCandidate = 50;
-	int patchcandidate = 20;
 	//=============================================================
 	bool Identical3DYN;  //wether or not three training images are identical
 	vector<uchar> Model;
@@ -70,7 +61,6 @@ private:
 	int PARx, PARy, PARz; //Resultant model
 	int TIx, TIy; 
 	long PARxy;
-	double computeporo(vector<uchar>& model);
 	double PorosityXY, PorosityXZ, PorosityYZ, AverPoro; //Original porosities from 3 training images
 
 	//=============================================================
@@ -78,18 +68,19 @@ private:
 	std::mt19937 mersennetwistergenerator;
 	std::uniform_real_distribution<double> probabilitydistribution;
 
-	//=============================================================
 	
+
+	//=============================================================
 	vector<Mat> matTIs; 	
 	vector<int> TIsID;
-
-
 	void showMat(const cv::String& winname, const cv::Mat& mat);
 	///========================== 190217 Kopf. optimization based =====================
 
-	string modelFilename3D;					//load 3D model as initial
+	string modelFilename3D;							//load 3D model as initial
 	vector<uchar> load3Dmodel(const char* filename);
 	bool loadVolume();
+	// synthesized volume
+	std::vector<std::vector<double > > m_volume;	// [M] size: NUM_CHANNEL * TEXSIZE^3
 	void InitRandomVolume(int level);
 
 	static const int MULTIRES = 1;			// # of multi-resolution (0 -> MULTIRES - 1 :: coarsest -> finest)
@@ -178,7 +169,7 @@ private:
 	void initabsoluteneigh();
 	vector<vector<ANNidx>> absoluteneigh;
 
-	// color histogram
+	// ===========color histogram===============
 	std::vector<std::vector<std::vector<double> > > m_histogram_exemplar;			// [M] size: NUM_CHANNEL x NUM_HISTOGRAM_BIN
 	std::vector<std::vector<std::vector<double> > > m_histogram_synthesis;			// m_histogram[level][ch][bin]
 	void calcHistogram_exemplar(int level);
@@ -199,18 +190,16 @@ private:
 	void updateIndexHistogram(int level, int orientation, const ANNidx oldannidx, const ANNidx newannidx);
 	ANNidx indexhistmatching_ann_index(int level, int orientation, ANNidxArray idxarray, ANNdistArray distarry);
 	std::vector<std::vector<ANNidx> > m_volume_index_x, m_volume_index_y, m_volume_index_z;		// [M] size: TEXSIZE^3
-	// dont use random initial histogram. start counting from 0 for the first run.
-	bool FIRSTRUN = true;
-
-	//test reassign values based on TI colorhis after optimize step
-	void DoPAR::DynamicThresholding(int level);
+	bool FIRSTRUN = true;					// dont use random initial histogram. start counting from 0 for the first run.
+	// ============Dynamic thresholding =================
+	void DoPAR::DynamicThresholding(int level);//reassign values based on TI colorhis after optimize step
 	void DoPAR::calcaccHistogram(vector<double> &inputhis, vector<double> &acchis);
+	vector<vector<int>> existedcolorset;		//[level][<256]
+	vector<vector<double>> acchis_exemplar;		//[level][256]
+
 
 	//test weighted average value distribution
 	vector<long> weightedaverageset;		//size=0~255
-
-	// synthesized volume
-	std::vector<std::vector<double > > m_volume;			// [M] size: NUM_CHANNEL * TEXSIZE^3
 
 	// pseudocode-----------------------------------------------------------------
 	// volume[0] := initVolume(0);                                        % initialization

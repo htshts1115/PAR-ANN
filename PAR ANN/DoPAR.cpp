@@ -53,6 +53,8 @@ DoPAR::DoPAR()
 	m_volume_index_x.resize(MULTIRES);
 	m_volume_index_y.resize(MULTIRES);
 	m_volume_index_z.resize(MULTIRES);
+	acchis_exemplar.resize(MULTIRES);
+	existedcolorset.resize(MULTIRES);
 
 	weightedaverageset.resize(256, 0);
 	// [end] multi-res memory allocation---------------
@@ -157,65 +159,44 @@ bool DoPAR::Write(const string FPathName, vector<uchar> Data)
 	if (FPathName.size() == 0) return false;
 	if (Data.size() == 0) return false;
 
-	//if (PARz == 1) {
-	//	string tempFPathName2D = FPathName;
-	//	//tempFPathName2D.substr(0, tempFPathName2D.rfind('.') == std::string::npos ? tempFPathName2D.length() : tempFPathName2D.rfind('.'));
-	//	tempFPathName2D = tempFPathName2D.substr(0, tempFPathName2D.find('.')) + ".pbm";
-	//	ofstream OFile(tempFPathName2D.c_str(), ios::ate);
-	//	if (!OFile) { cout << endl << "!OFile"; return false; }
-	//
-	//	OFile << "P1" << endl;
-	//	//OFile << "# Created by Paint Shop Pro" << endl;
-	//	OFile << PARx << " " << PARy << endl;
-	//
-	//	for (long i = 0; i < Data.size(); ++i){
-	//		if ((Data[i] - 0) == -2) OFile << 2 << ' ';
-	//		else OFile << Data[i] - 0 << ' ';
-	//	}
-	//
-	//	OFile.close();
-	//	return true;
-	//}
-	//else {
-		int i(1);
-		string tempFPathName2D = FPathName;
-		while (fileExists(tempFPathName2D) == true){
-			tempFPathName2D = FPathName.substr(0, FPathName.find('.')) + "_" + to_string(i) + ".RAW";
-			i++;
+	int i(1);
+	string tempFPathName2D = FPathName;
+	while (fileExists(tempFPathName2D) == true){
+		tempFPathName2D = FPathName.substr(0, FPathName.find('.')) + "_" + to_string(i) + ".RAW";
+		i++;
+	}
+	ofstream OFile(tempFPathName2D.c_str(), ios::binary | ios::ate);
+	if (!OFile) { cout << endl << "!OFile"; return false; }
+
+	unsigned __int64 FSize = Data.size();
+	const long BlockSize = sizeof(char)*iSTEPLENGTH;
+
+	char* Buffer = new char[sizeof(char)*iSTEPLENGTH];
+	long Steps = FSize / iSTEPLENGTH;
+	long RemainNum = FSize % iSTEPLENGTH;
+
+	long idx, DataIdx = 0;
+	for (idx = 0; idx<Steps; ++idx) {
+		for (int i = 0; i<iSTEPLENGTH; ++i) Buffer[i] = Data[DataIdx++];
+		if (!OFile.write(reinterpret_cast<char *>(Buffer), BlockSize)) {
+			delete[] Buffer; return false;
 		}
-		ofstream OFile(tempFPathName2D.c_str(), ios::binary | ios::ate);
-		if (!OFile) { cout << endl << "!OFile"; return false; }
+	}
 
-		unsigned __int64 FSize = Data.size();
-		const long BlockSize = sizeof(char)*iSTEPLENGTH;
+	delete[] Buffer;
 
-		char* Buffer = new char[sizeof(char)*iSTEPLENGTH];
-		long Steps = FSize / iSTEPLENGTH;
-		long RemainNum = FSize % iSTEPLENGTH;
-
-		long idx, DataIdx = 0;
-		for (idx = 0; idx<Steps; ++idx) {
-			for (int i = 0; i<iSTEPLENGTH; ++i) Buffer[i] = Data[DataIdx++];
-			if (!OFile.write(reinterpret_cast<char *>(Buffer), BlockSize)) {
-				delete[] Buffer; return false;
-			}
+	if (RemainNum>0) {
+		char* Buff = new char[sizeof(char)*RemainNum];
+		for (int i = 0; i<RemainNum; ++i) Buff[i] = Data[DataIdx++];
+		if (!OFile.write(reinterpret_cast<char *>(Buff), sizeof(char)*RemainNum)) {
+			delete[] Buff; return false;
 		}
+		delete[] Buff;
+	}
 
-		delete[] Buffer;
+	OFile.close();
 
-		if (RemainNum>0) {
-			char* Buff = new char[sizeof(char)*RemainNum];
-			for (int i = 0; i<RemainNum; ++i) Buff[i] = Data[DataIdx++];
-			if (!OFile.write(reinterpret_cast<char *>(Buff), sizeof(char)*RemainNum)) {
-				delete[] Buff; return false;
-			}
-			delete[] Buff;
-		}
-
-		OFile.close();
-
-		return true;
-	//}//else
+	return true;
 }
 
 bool DoPAR::GetNextRowParameters(short Cno, vector<string>& ValidParStr, vector<string>& ParV)
@@ -595,7 +576,7 @@ int DoPAR::TEXSIZE[MULTIRES];
 int DoPAR::D_NEIGHBOR[MULTIRES];
 int DoPAR::NEIGHBORSIZE[MULTIRES];
 
-const int DoPAR::NUM_HISTOGRAM_BIN = 128;	//for color histogram	Kopf used 16
+const int DoPAR::NUM_HISTOGRAM_BIN = 256;	//for color histogram	Kopf used 16
 vector<int> DoPAR::CHANNEL_MAXVALUE;		//for color histogram
 
 //const double DoPAR::WEIGHT_HISTOGRAM = NUM_HISTOGRAM_BIN;		//for accelerate convergence original 10.0
@@ -1066,7 +1047,6 @@ void DoPAR::searchVolume(int level) {
 	long cnt_nearest_index_new = 0;
 	//========For index histogram counting, shuffle the order. ========
 	initPermutation(level);	//shuffle m_permutation_xyz
-	//ANNidx annTIsize = (TEXSIZE[level] - 2 * N[level])*(TEXSIZE[level] - 2 * N[level]);
 
 	int process = 0, displayprocess = -1;
 	for (ANNidx i2 = 0; i2 < TEXSIZE[level] * TEXSIZE[level] * TEXSIZE[level]; ++i2) {
@@ -1083,9 +1063,6 @@ void DoPAR::searchVolume(int level) {
 		int x = i % TEXSIZE[level];
 		int y = (i / TEXSIZE[level]) % TEXSIZE[level];
 		int z = i / (TEXSIZE[level] * TEXSIZE[level]);
-		//int x = i %  TEXSIZE[level];
-		//int y = (i / TEXSIZE[level]) % TEXSIZE[level];
-		//int z = i / (TEXSIZE[level] * TEXSIZE[level]);
 
 		// obtain current neighborhood_x from volume
 		CvMat* current_neighbor_x = cvCreateMat(1, D_NEIGHBOR[level], CV_64F); //rows = 1, cols = dimesnion
@@ -1116,8 +1093,6 @@ void DoPAR::searchVolume(int level) {
 		cvProjectPCA(current_neighbor_y, mp_neighbor_pca_average_y[level], mp_neighbor_pca_eigenvec_y[level], current_neighbor_y_projected);
 		cvProjectPCA(current_neighbor_z, mp_neighbor_pca_average_z[level], mp_neighbor_pca_eigenvec_z[level], current_neighbor_z_projected);
 		// ANN search!
-		//!! error may occur if index > int
-		
 		//==========multiple nearest index, position control=========
 		ANNidxArray ann_index_x = new ANNidx[ANNsearchk];
 		ANNidxArray ann_index_y = new ANNidx[ANNsearchk];
@@ -1125,24 +1100,12 @@ void DoPAR::searchVolume(int level) {
 		ANNdistArray ann_dist_x = new ANNdist[ANNsearchk];
 		ANNdistArray ann_dist_y = new ANNdist[ANNsearchk];
 		ANNdistArray ann_dist_z = new ANNdist[ANNsearchk];
-		//int ann_index_x;
-		//int ann_index_y;
-		//int ann_index_z;
-		//double ann_dist_x;
-		//double ann_dist_y;
-		//double ann_dist_z;
 		
 		// ANN search. error bound = 2.0; Kopf used 2.0
 		mp_neighbor_kdTree_x[level]->annkSearch(current_neighbor_x_projected->data.db, ANNsearchk, ann_index_x, ann_dist_x, ErrorBound);	
 		mp_neighbor_kdTree_y[level]->annkSearch(current_neighbor_y_projected->data.db, ANNsearchk, ann_index_y, ann_dist_y, ErrorBound);
 		mp_neighbor_kdTree_z[level]->annkSearch(current_neighbor_z_projected->data.db, ANNsearchk, ann_index_z, ann_dist_z, ErrorBound);
-		//mp_neighbor_kdTree_x[level]->annkSearch(current_neighbor_x_projected->data.db, ANNsearchk, ann_index_x, ann_dist_x);
-		//mp_neighbor_kdTree_y[level]->annkSearch(current_neighbor_y_projected->data.db, ANNsearchk, ann_index_y, ann_dist_y);
-		//mp_neighbor_kdTree_z[level]->annkSearch(current_neighbor_z_projected->data.db, ANNsearchk, ann_index_z, ann_dist_z);	//index his change wrongly not because of approximation
-		//mp_neighbor_kdTree_x[level]->annkSearch(current_neighbor_x_projected->data.db, 1, &ann_index_x, &ann_dist_x, ErrorBound);	
-		//mp_neighbor_kdTree_y[level]->annkSearch(current_neighbor_y_projected->data.db, 1, &ann_index_y, &ann_dist_y, ErrorBound);
-		//mp_neighbor_kdTree_z[level]->annkSearch(current_neighbor_z_projected->data.db, 1, &ann_index_z, &ann_dist_z, ErrorBound);
-		
+
 		// CV release
 		cvReleaseMat(&current_neighbor_x);
 		cvReleaseMat(&current_neighbor_y);
@@ -1175,12 +1138,6 @@ void DoPAR::searchVolume(int level) {
 		m_volume_nearest_x_dist[level][i] = ann_dist_x[selected_index_x] + min_dist;
 		m_volume_nearest_y_dist[level][i] = ann_dist_y[selected_index_y] + min_dist;
 		m_volume_nearest_z_dist[level][i] = ann_dist_z[selected_index_z] + min_dist;
-		//m_volume_nearest_x_index[level][i] = ann_index_x;
-		//m_volume_nearest_y_index[level][i] = ann_index_y;
-		//m_volume_nearest_z_index[level][i] = ann_index_z;
-		//m_volume_nearest_x_dist[level][i] = ann_dist_x + min_dist;
-		//m_volume_nearest_y_dist[level][i] = ann_dist_y + min_dist;
-		//m_volume_nearest_z_dist[level][i] = ann_dist_z + min_dist;
 
 		//search all points then optimize! Not search one point optimize one point!
 		if (m_volume_nearest_x_index[level][i] != nearest_x_index_old[i]) ++cnt_nearest_index_new;	//just for illustration
@@ -1261,14 +1218,12 @@ void DoPAR::optimizeVolume(int level) {
 						color[ch] = p_neighbor[NUM_CHANNEL * (NEIGHBORSIZE[level] - 1 - m) + ch];	
 						//index2 ~ m, index ~ NEIGHBORSIZE[level] - 1 - m; the position is symmetrical!
 												
-						//========discrete solver=================
-						//record each color and its position
-						colorset[ori*NEIGHBORSIZE[level] + m] = color[ch];
+						//========discrete solver=================	
+						colorset[ori*NEIGHBORSIZE[level] + m] = color[ch];//record each color and its position				
 						if (POSITIONHIS_ON){
 							//relative index to centre:(NEIGHBORSIZE[level] - 1)/2 - m	absolute index:annconvert(nearest_index) + absolute[relative]
 							positionset[ori*NEIGHBORSIZE[level] + m] = ori*(TEXSIZE[level] * TEXSIZE[level] )
 																	+ (convertIndexANN(level, nearest_index) + absoluteneigh[level][NEIGHBORSIZE[level] - 1 - m]);				
-							
 							positionfrequency[ori*NEIGHBORSIZE[level] + m] = m_positionhistogram_synthesis[level][positionset[ori*NEIGHBORSIZE[level] + m]];;
 						}
 					}
@@ -1288,16 +1243,19 @@ void DoPAR::optimizeVolume(int level) {
 							difference = histogram_synthesis - histogram_exemplar;
 							histogram_matching = max(0.0, histogram_synthesis - histogram_exemplar);		
 						}
-						//weight *= 1.0 / (1.0 + WEIGHT_HISTOGRAM * histogram_matching);	//additional weight to accelerate convergence
+						
 						////changed to gaussian distribution, std = accepted error
-						double ColourHisstddev = 0.01;  	// accept maximum stddev*3 error
+						double ColourHisstddev = 0.02;  	// accept maximum stddev*3 error
 						double ColourHisgaussianprob(0.0);
 						////increase weight when (positionhistogram_synthesis - positionhistogram_exemplar)<0	
 						//if (difference >= 0) ColourHisgaussianprob = gaussian_pdf(difference, 0.0, ColourHisstddev);
 						//else ColourHisgaussianprob = 2 * gaussian_pdf(0.0, 0.0, ColourHisstddev) - gaussian_pdf(-difference, 0.0, ColourHisstddev);
 						ColourHisgaussianprob = gaussian_pdf(histogram_matching, 0.0, ColourHisstddev);
 						
-						if (COLORHIS_ON) weight *= ColourHisgaussianprob / gaussian_pdf(0.0, 0.0, ColourHisstddev);		//(0,1]
+						if (COLORHIS_ON) {
+							//weight *= 1.0 / (1.0 + WEIGHT_HISTOGRAM * histogram_matching);	//linear weight
+							weight *= ColourHisgaussianprob / gaussian_pdf(0.0, 0.0, ColourHisstddev);		//(0,1]
+						}
 					}
 					//// modify weight according to Position Histogram matching
 					if (POSITIONHIS_ON){
@@ -1330,18 +1288,6 @@ void DoPAR::optimizeVolume(int level) {
 				++m;
 			}
 		}//for every voxel's neighbourhood, in 3 orientations
-
-		////test probability distribution
-		//for (int i = 0; i < 3 * NEIGHBORSIZE[level]; i++){
-		//	//probsum[(int)colorset[i]] += weightset[i] / weight_acc;
-		//	if (colorset[i] == 0.0) probsum[0] += weightset[i] / weight_acc;
-		//	//else if (colorset[i] == 240.0) probsum[1] += weightset[i] / weight_acc;
-		//	//else if (colorset[i] == 255.0) probsum[2] += weightset[i] / weight_acc;
-		//	else if (colorset[i] == 255.0) probsum[1] += weightset[i] / weight_acc;
-		//}
-		//double checksum(0.0);
-		//for (int i = 0; i < probsum.size(); i++) checksum += probsum[i];
-		//if (checksum < 0.9999 || checksum > 1.0001) { cout << endl << "Error: checksum=" << checksum; _getch(); }
 
 
 		// old & new colors for this voxel
@@ -1382,7 +1328,7 @@ void DoPAR::optimizeVolume(int level) {
 	}//for every voxel
 	
 
-	//test DynamicThresholding based on TI colorhis
+	//DynamicThresholding based on TI colorhis
 	DynamicThresholding(level);
 
 	long time_end = clock();
@@ -1444,8 +1390,8 @@ void DoPAR::upsampleVolume(int level) {
 
 void DoPAR::calcHistogram_synthesis(int level) {
 	m_histogram_synthesis[level].clear();
-	m_histogram_synthesis[level].resize(NUM_CHANNEL, vector<double>(NUM_HISTOGRAM_BIN, 0));
-	double delta_histogram = 1. / (TEXSIZE[level] * TEXSIZE[level] * TEXSIZE[level]);
+	m_histogram_synthesis[level].resize(NUM_CHANNEL, vector<double>(NUM_HISTOGRAM_BIN, 0.0));
+	double delta_histogram = 1.0 / (TEXSIZE[level] * TEXSIZE[level] * TEXSIZE[level]);
 	for (int i = 0; i < TEXSIZE[level] * TEXSIZE[level] * TEXSIZE[level]; ++i) {
 		for (int ch = 0; ch < NUM_CHANNEL; ++ch) {
 			double c = m_volume[level][NUM_CHANNEL * i + ch];
@@ -1476,6 +1422,15 @@ void DoPAR::calcHistogram_exemplar(int level) {
 				m_histogram_exemplar[level][ch][bin] += delta_histogram;
 			}
 		}
+	}
+
+	// calc accumulate histogram
+	acchis_exemplar[level].resize(NUM_HISTOGRAM_BIN, 0.0);
+	calcaccHistogram(m_histogram_exemplar[level][0], acchis_exemplar[level]);
+	// record existed colorset	
+	existedcolorset[level].clear();
+	for (int c = 0; c < NUM_HISTOGRAM_BIN; c++){
+		if (m_histogram_exemplar[level][0][c] > 0.0) existedcolorset[level].push_back(c);
 	}
 }
 
@@ -1617,12 +1572,17 @@ void DoPAR::writeHistogram(int level, vector<double> &hisvec, int rows, int cols
 			
 	Mat hist = Mat(rows, cols, CV_64FC1);
 	memcpy(hist.data, hisvec.data(), hisvec.size()*sizeof(double));	//float 32F, double 64F
-	hist *= TEXSIZE[level] * TEXSIZE[level] * TEXSIZE[level];
-		
-	//cv::normalize(hist, hist, 0, 255, NORM_MINMAX);
+	hist *= TEXSIZE[level] * TEXSIZE[level] * TEXSIZE[level];		
 	hist.convertTo(hist, CV_8UC1);	//convertTo just copy the value, no scaling
 
-	imwrite(filename, hist);
+	short i(0);
+	string tempFPathName = filename;
+	while (fileExists(tempFPathName) == true){
+		tempFPathName = filename.substr(0, filename.find('.')) + "_" + to_string(i) + ".png";
+		i++;
+	}//rename, not overwrite
+
+	imwrite(tempFPathName, hist);
 	cout << endl << "histogram plotted.";
 }
 
@@ -1630,22 +1590,13 @@ int DoPAR::FindClosestColorIndex(int level, vector<double> &color, vector<double
 	//find nearest color value, then compare weight for all closest values
 	//return the final index
 	
-	if (true){
-		//if (referencecolor > 160 && referencecolor < 246) referencecolor = 240;
-		//else if (referencecolor >= 246) referencecolor = 255;
-		//else if (referencecolor <= 160) referencecolor = 0;
-		//if (referencecolor > 56) referencecolor = 255;
-		//else referencecolor = 0;
-	}
-
 	auto i = min_element(begin(color), end(color), [=](double x, double y)
 	{
 		return abs(x - referencecolor) < abs(y - referencecolor);
 	});
 	int closestindex = distance(begin(color), i);
 
-	if (POSITIONHIS_ON){
-		//after choosing closest color value, filter again in these value positions, choose minimum frequency
+	if (POSITIONHIS_ON){//after choosing closest color value, filter again in these value positions, choose minimum frequency		
 		vector<int> filteredidx;
 		vector<double> filteredweight;
 		for (int j = 0; j < color.size(); j++){
@@ -1671,53 +1622,48 @@ void DoPAR::calcaccHistogram(vector<double> &inputhis, vector<double> &acchis){
 	if (acchis[acchis.size() - 1] > 1.0001 || acchis[acchis.size() - 1] < 0.9999) { cout << endl << "Error: acchis max=" << acchis[acchis.size() - 1]; _getch(); }
 }
 void DoPAR::DynamicThresholding(int level){
+	if (NUM_HISTOGRAM_BIN != 256) { cout << endl << "NUM_HISTOGRAM_BIN=" << NUM_HISTOGRAM_BIN << " only accept 256"; _getch(); }
+	
 	//first calculate accumulate histogram
-	vector<double> acchis_synthesis(NUM_HISTOGRAM_BIN, 0.0);
+	vector<double> acchis_synthesis(NUM_HISTOGRAM_BIN, 0.0);		//ch=0
 	calcaccHistogram(m_histogram_synthesis[level][0], acchis_synthesis);
 
-	vector<double> acchis_exemplar(NUM_HISTOGRAM_BIN, 0.0);	//ch=0
-	calcaccHistogram(m_histogram_exemplar[level][0], acchis_exemplar);
+	//calc threshold value set
+	vector<double> thresholdvalue(existedcolorset[level].size(), 0.0);
+	thresholdvalue[existedcolorset[level].size() - 1] = 255.01;		//the last threshold should be 255	
+	auto vectoriterator = upper_bound(acchis_synthesis.begin(), acchis_synthesis.end(), 0.0);
+	auto lastiterator = acchis_synthesis.begin();
 
-	double hisbin = CHANNEL_MAXVALUE[0] / NUM_HISTOGRAM_BIN;
-	//cout << endl << "acchis_exemplar[0/4=" << 0 * NUM_HISTOGRAM_BIN / CHANNEL_MAXVALUE[0] << "]=" << acchis_exemplar[0 * NUM_HISTOGRAM_BIN / CHANNEL_MAXVALUE[0]];
-	//cout << endl << "acchis_exemplar[240/4=" << 240 * NUM_HISTOGRAM_BIN / CHANNEL_MAXVALUE[0] << "]=" << acchis_exemplar[240 * NUM_HISTOGRAM_BIN / CHANNEL_MAXVALUE[0]];
-	//cout << endl << "acchis_exemplar[255/4=" << 255 * NUM_HISTOGRAM_BIN / CHANNEL_MAXVALUE[0] << "]=" << acchis_exemplar[255 * NUM_HISTOGRAM_BIN / CHANNEL_MAXVALUE[0]];	
+	for (int i = 0; i < existedcolorset[level].size()-1; i++){		//ignore the last threshold(should be 255)
+		double acc = acc = acchis_exemplar[level][existedcolorset[level][i]];
+		vectoriterator = upper_bound(lastiterator, acchis_synthesis.end(), acc);
+		lastiterator = max(acchis_synthesis.begin(), vectoriterator-1);
 
-	//cout << endl << "0~120: " << acchis_synthesis[120 / hisbin];
-	//cout << endl << "120~248: " << acchis_synthesis[248 / hisbin] - acchis_synthesis[120 / hisbin];
-	//cout << endl << "248~255: " << acchis_synthesis[255 / hisbin] - acchis_synthesis[248 / hisbin];
+		int upper = vectoriterator - acchis_synthesis.begin();
+		int lower = max(0, upper - 1);			//!should be lower_bound, but because the weighted average set is continuious, it is equal to upper-1
+		double up_acc = acchis_synthesis[upper];
+		double low_acc = acchis_synthesis[lower];
 
-	//just for test. directly check 0,240,255 fraction
-	int redistributecolor[2];
-	//use upperbound
-	auto i1 = upper_bound(acchis_synthesis.begin(), acchis_synthesis.end(), acchis_exemplar[0 / hisbin]);
-	redistributecolor[0] = i1 - acchis_synthesis.begin() - 1;
-	auto i2 = upper_bound(acchis_synthesis.begin(), acchis_synthesis.end(), acchis_exemplar[240 / hisbin]);
-	redistributecolor[1] = i2 - acchis_synthesis.begin() - 1;
-	
-	//cout << endl << "120--> " << redistributecolor[0]*hisbin << "   248--> " << redistributecolor[1]*hisbin <<endl;
-	
-	//thresholding
-	vector<double> color_old(NUM_CHANNEL);
-	vector<double> color_new(NUM_CHANNEL);//!!have to update color histogram when changing value!
-	for (long m = 0; m < m_volume[level].size(); m++){
-		if (m_volume[level][m] <= redistributecolor[0] * hisbin) { 
-			color_old[0] = m_volume[level][m]; 
-			color_new[0] = 0.0; 
-			updateHistogram_synthesis(level, color_old, color_new); 
-			m_volume[level][m] = 0.0;
-		}
-		else if (m_volume[level][m] <= redistributecolor[1] * hisbin){
-			color_old[0] = m_volume[level][m];
-			color_new[0] = 240.0;
-			updateHistogram_synthesis(level, color_old, color_new);
-			m_volume[level][m] = 240.0; 
-		}
-		else { 
-			color_old[0] = m_volume[level][m];
-			color_new[0] = 255.0;
-			updateHistogram_synthesis(level, color_old, color_new);
-			m_volume[level][m] = 255.0; 
-		}
+		if (up_acc - low_acc == 0) { cout << endl << endl << "up_acc - low_acc=0" << endl;  thresholdvalue[i] = 0.0; continue; }
+		thresholdvalue[i] = 1.0*lower + (acc - low_acc) / (up_acc - low_acc);	//assume linear distribution within acchis_synthesis[lower,upper]	
 	}
+
+	//for (int i = 0; i < existedcolorset[level].size(); i++){
+	//	cout << endl << "existedcolorset[" << i << "]= " << existedcolorset[level][i] << " thresholdvalue= " << thresholdvalue[i];
+	//}
+
+	//thresholding based on thresholdvalue set; 
+	for (ANNidx m = 0; m < TEXSIZE[level] * TEXSIZE[level] * TEXSIZE[level]; m++){
+		vectoriterator = lower_bound(thresholdvalue.begin(), thresholdvalue.end(), m_volume[level][m]);
+		int thresholdidx = vectoriterator - thresholdvalue.begin();
+		//if (existedcolorset[level][thresholdidx]>255.0 || existedcolorset[level][thresholdidx]<0.0) {
+		//	cout << endl << "existedcolorset[thresholdidx]=" << existedcolorset[level][thresholdidx] << " thresholdidx=" << thresholdidx; 
+		//	cout << endl << "m_volume[" << m << "]= " << m_volume[level][m];
+		//	_getch(); 
+		//}
+		m_volume[level][m] = existedcolorset[level][thresholdidx];
+	}
+	
+	//update color histogram after changing value
+	calcHistogram_synthesis(level);
 }
