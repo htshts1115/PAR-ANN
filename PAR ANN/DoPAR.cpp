@@ -50,13 +50,9 @@ DoPAR::DoPAR()
 	absoluteneigh.resize(MULTIRES);
 	m_indexhistogram_exemplar.resize(MULTIRES);
 	m_indexhistogram_synthesis.resize(MULTIRES);
-	m_volume_index_x.resize(MULTIRES);
-	m_volume_index_y.resize(MULTIRES);
-	m_volume_index_z.resize(MULTIRES);
 	acchis_exemplar.resize(MULTIRES);
-	existedcolorset.resize(MULTIRES);
+	existedbinset.resize(MULTIRES);
 
-	//weightedaverageset.resize(256, 0);
 
 	// [end] multi-res memory allocation---------------
 }
@@ -538,26 +534,26 @@ void DoPAR::GetStarted(string CurExeFile)
 
 
 //MULTIRES: larger number means finner level
-const int DoPAR::N[MULTIRES] = {4};		//Kopf{ 3, 4, 4 }; Chen{3,4,4}; Turner{5,5,5}	// neighborhood size: (2 * N + 1)^2
+const int DoPAR::N[MULTIRES] = {5};		//Kopf{ 3, 4, 4 }; Chen{3,4,4}; Turner{5,5,5}	// neighborhood size: (2 * N + 1)^2
 int DoPAR::TEXSIZE[MULTIRES];
 int DoPAR::D_NEIGHBOR[MULTIRES];
 int DoPAR::NEIGHBORSIZE[MULTIRES];
 
-const int DoPAR::NUM_HISTOGRAM_BIN = 256;	//for color histogram	Kopf used 16
-vector<int> DoPAR::CHANNEL_MAXVALUE;		//for color histogram
+const int DoPAR::NUM_HISTOGRAM_BIN = 256;		//for color histograms	Kopf used 16
+const int DoPAR::DISCRETE_HISTOGRAM_BIN = 256;	//for thresholding, discrete values. e.g. default256
+vector<int> DoPAR::CHANNEL_MAXVALUE;			//for color histogram
 int DoPAR::NUM_CHANNEL = 1;
 
 const double DoPAR::PCA_RATIO_VARIANCE = 0.95;	//Kopf used 0.95
 
 const double DoPAR::ErrorBound = 2.0;			//Kopf used 2.0
 
-const int DoPAR::ANNsearchk = 15;	
+const int DoPAR::ANNsearchk = 13;	
 
 const double DoPAR::gaussiansigma = 7.0;		//gaussian fall-off function in optimization phase, higher sigma means more uniform
 
 
 void DoPAR::DoANNOptimization(){
-	
 	init();
 	
 	time_t StartTime;
@@ -574,14 +570,12 @@ void DoPAR::DoANNOptimization(){
 			if (loop == 0) FIRSTRUN = true;
 			else FIRSTRUN = false;
 
-			//test weightedaverageset
-			//weightedaverageset.assign(256, 0);
-			
+		
 			searchVolume(curlevel);
 			optimizeVolume(curlevel);
 
 
-			if (abs(globalenergy_old - globalenergy_new) / globalenergy_old < 0.015) convergencecount++;	
+			if (abs(globalenergy_old - globalenergy_new) / globalenergy_old < 0.01) convergencecount++;	
 			globalenergy_old = globalenergy_new;
 			if (convergencecount >1) break;	//if change <1.5% for twice, then mark as converge
 
@@ -603,6 +597,9 @@ void DoPAR::DoANNOptimization(){
 				initPositionHistogram_exemplar(curlevel + 1);
 				initPositionHistogram_synthesis(curlevel + 1);		
 			}
+
+			//release vector
+			cleardata(curlevel);
 		}
 	}
 
@@ -610,11 +607,7 @@ void DoPAR::DoANNOptimization(){
 	time(&NewTime);
 	cout << endl << "Total reconstruction time: " << long(NewTime - StartTime);
 
-	//cout << endl;
-	//for (int c = 0; c < 256; c++){
-	//	cout << endl << weightedaverageset[c];
-	//}
-
+	//outputmodel(MULTIRES - 1);
 
 	if (TRUE){//draw histogram graph
 		int cols = TEXSIZE[MULTIRES - 1];
@@ -704,6 +697,7 @@ void DoPAR::InitGaussianKernel(){
 	}
 }
 
+
 bool DoPAR::loadExemplar() {
 	//---------------convert Mat to IplImage*---------------	
 	Mat matxy = cv::imread(FNameXY, CV_LOAD_IMAGE_GRAYSCALE); // ti grayscale
@@ -730,10 +724,7 @@ bool DoPAR::loadExemplar() {
 		m_neighbor_y[level].resize(D_NEIGHBOR[level] * (TEXSIZE[level] - 2 * N[level]) * (TEXSIZE[level] - 2 * N[level]));
 		m_neighbor_z[level].resize(D_NEIGHBOR[level] * (TEXSIZE[level] - 2 * N[level]) * (TEXSIZE[level] - 2 * N[level]));
 		m_volume[level].resize(NUM_CHANNEL * TEXSIZE[level] * TEXSIZE[level] * TEXSIZE[level]);
-		m_volume_position[level].resize(TEXSIZE[level] * TEXSIZE[level] * TEXSIZE[level]);
-		m_volume_index_x[level].resize(TEXSIZE[level] * TEXSIZE[level] * TEXSIZE[level]);
-		m_volume_index_y[level].resize(TEXSIZE[level] * TEXSIZE[level] * TEXSIZE[level]);
-		m_volume_index_z[level].resize(TEXSIZE[level] * TEXSIZE[level] * TEXSIZE[level]);
+		if (POSITIONHIS_ON) m_volume_position[level].resize(TEXSIZE[level] * TEXSIZE[level] * TEXSIZE[level]);
 		m_volume_nearest_x_index[level].resize(TEXSIZE[level] * TEXSIZE[level] * TEXSIZE[level]);
 		m_volume_nearest_y_index[level].resize(TEXSIZE[level] * TEXSIZE[level] * TEXSIZE[level]);
 		m_volume_nearest_z_index[level].resize(TEXSIZE[level] * TEXSIZE[level] * TEXSIZE[level]);
@@ -1098,6 +1089,39 @@ void DoPAR::showMat(const cv::String& winname, const cv::Mat& mat)
 	cv::destroyWindow(winname);
 }
 
+void DoPAR::cleardata(int level){	
+	//m_exemplar_x[level].clear();
+	//m_exemplar_y[level].clear();
+	//m_exemplar_z[level].clear();
+	m_neighbor_x[level].clear();
+	m_neighbor_y[level].clear();
+	m_neighbor_z[level].clear();
+	//m_volume[level].resize(NUM_CHANNEL * TEXSIZE[level] * TEXSIZE[level] * TEXSIZE[level]);
+	m_volume_position[level].clear();
+	m_volume_nearest_x_index[level].clear();
+	m_volume_nearest_y_index[level].clear();
+	m_volume_nearest_z_index[level].clear();
+	m_volume_nearest_x_dist[level].clear();
+	m_volume_nearest_y_dist[level].clear();
+	m_volume_nearest_z_dist[level].clear();
+	m_permutation_xyz[level].clear();
+
+	m_neighbor_kdTree_ptr_x[level].clear();
+	m_neighbor_kdTree_ptr_y[level].clear();
+	m_neighbor_kdTree_ptr_z[level].clear();
+	if (mp_neighbor_kdTree_x[level] != NULL) delete mp_neighbor_kdTree_x[level];
+	if (mp_neighbor_kdTree_y[level] != NULL) delete mp_neighbor_kdTree_y[level];
+	if (mp_neighbor_kdTree_z[level] != NULL) delete mp_neighbor_kdTree_z[level];
+	if (mp_neighbor_pca_average_x[level] != NULL) cvReleaseMat(&mp_neighbor_pca_average_x[level]);
+	if (mp_neighbor_pca_average_y[level] != NULL) cvReleaseMat(&mp_neighbor_pca_average_y[level]);
+	if (mp_neighbor_pca_average_z[level] != NULL) cvReleaseMat(&mp_neighbor_pca_average_z[level]);
+	if (mp_neighbor_pca_projected_x[level] != NULL) cvReleaseMat(&mp_neighbor_pca_projected_x[level]);
+	if (mp_neighbor_pca_projected_y[level] != NULL) cvReleaseMat(&mp_neighbor_pca_projected_y[level]);
+	if (mp_neighbor_pca_projected_z[level] != NULL) cvReleaseMat(&mp_neighbor_pca_projected_z[level]);
+	if (mp_neighbor_pca_eigenvec_x[level] != NULL) cvReleaseMat(&mp_neighbor_pca_eigenvec_x[level]);
+	if (mp_neighbor_pca_eigenvec_y[level] != NULL) cvReleaseMat(&mp_neighbor_pca_eigenvec_y[level]);
+	if (mp_neighbor_pca_eigenvec_z[level] != NULL) cvReleaseMat(&mp_neighbor_pca_eigenvec_z[level]);
+}
 
 //================= phase 1: search ===========================
 void DoPAR::searchVolume(int level) {
@@ -1186,13 +1210,9 @@ void DoPAR::searchVolume(int level) {
 			selected_index_z = indexhistmatching_ann_index(level, 2, ann_index_z, ann_dist_z);
 		
 			//update index histogram		
-			updateIndexHistogram(level, 0, m_volume_index_x[level][i], ann_index_x[selected_index_x]);	//level, ori, old, new
-			updateIndexHistogram(level, 1, m_volume_index_y[level][i], ann_index_y[selected_index_y]);
-			updateIndexHistogram(level, 2, m_volume_index_z[level][i], ann_index_z[selected_index_z]);
-			//update m_volume_index
-			m_volume_index_x[level][i] = ann_index_x[selected_index_x];
-			m_volume_index_y[level][i] = ann_index_y[selected_index_y];
-			m_volume_index_z[level][i] = ann_index_z[selected_index_z];
+			updateIndexHistogram(level, 0, m_volume_nearest_x_index[level][i], ann_index_x[selected_index_x]);	//level, ori, old, new
+			updateIndexHistogram(level, 1, m_volume_nearest_y_index[level][i], ann_index_y[selected_index_y]);
+			updateIndexHistogram(level, 2, m_volume_nearest_z_index[level][i], ann_index_z[selected_index_z]);
 		}
 
 		//update nearest_index, nearest_dist
@@ -1227,9 +1247,9 @@ void DoPAR::initIndexHistogram(int level){
 		m_indexhistogram_exemplar[level].resize(numData);
 		m_indexhistogram_exemplar[level].assign(numData, 0.0);	
 		for (ANNidx xyz = 0; xyz < TEXSIZE[level] * TEXSIZE[level] * TEXSIZE[level]; ++xyz) {
-			m_volume_index_x[level][xyz] = 10000000;
-			m_volume_index_y[level][xyz] = 10000000;
-			m_volume_index_z[level][xyz] = 10000000;
+			m_volume_nearest_x_index[level][xyz] = 10000000;
+			m_volume_nearest_y_index[level][xyz] = 10000000;
+			m_volume_nearest_z_index[level][xyz] = 10000000;
 		}
 		m_indexhistogram_synthesis[level].resize(numData);
 		m_indexhistogram_synthesis[level].assign(numData, 0.0);
@@ -1246,23 +1266,23 @@ void DoPAR::initIndexHistogram(int level){
 	//initial uniform distribution
 	ANNidx size = (TEXSIZE[level] - 2 * N[level]) * (TEXSIZE[level] - 2 * N[level]);
 	for (ANNidx xyz = 0; xyz < TEXSIZE[level] * TEXSIZE[level] * TEXSIZE[level]; ++xyz) {
-		m_volume_index_x[level][xyz] = xyz%size;
-		m_volume_index_y[level][xyz] = xyz%size;
-		m_volume_index_z[level][xyz] = xyz%size;
+		m_volume_nearest_x_index[level][xyz] = xyz%size;
+		m_volume_nearest_y_index[level][xyz] = xyz%size;
+		m_volume_nearest_z_index[level][xyz] = xyz%size;
 	}
-	shuffle(m_volume_index_x[level].begin(), m_volume_index_x[level].end(), mersennetwistergenerator);
-	shuffle(m_volume_index_y[level].begin(), m_volume_index_y[level].end(), mersennetwistergenerator);
-	shuffle(m_volume_index_z[level].begin(), m_volume_index_z[level].end(), mersennetwistergenerator);
+	shuffle(m_volume_nearest_x_index[level].begin(), m_volume_nearest_x_index[level].end(), mersennetwistergenerator);
+	shuffle(m_volume_nearest_y_index[level].begin(), m_volume_nearest_y_index[level].end(), mersennetwistergenerator);
+	shuffle(m_volume_nearest_z_index[level].begin(), m_volume_nearest_z_index[level].end(), mersennetwistergenerator);
 	//count each volume
 	m_indexhistogram_synthesis[level].resize(numData);
 	m_indexhistogram_synthesis[level].assign(numData, 0.0);
 	double delta_histogram = 1.0 / (TEXSIZE[level] * TEXSIZE[level] * TEXSIZE[level]);
 	for (ANNidx i = 0; i < TEXSIZE[level] * TEXSIZE[level] * TEXSIZE[level]; i++){
-		ANNidx binx = m_volume_index_x[level][i];
+		ANNidx binx = m_volume_nearest_x_index[level][i];
 		m_indexhistogram_synthesis[level][binx] += delta_histogram;
-		ANNidx biny = m_volume_index_y[level][i] + size;
+		ANNidx biny = m_volume_nearest_y_index[level][i] + size;
 		m_indexhistogram_synthesis[level][biny] += delta_histogram;
-		ANNidx binz = m_volume_index_z[level][i] + 2*size;
+		ANNidx binz = m_volume_nearest_z_index[level][i] + 2 * size;
 		m_indexhistogram_synthesis[level][binz] += delta_histogram;
 	}
 
@@ -1372,7 +1392,7 @@ void DoPAR::optimizeVolume(int level) {
 					// blending weight of this color according to matching distance
 					double weight = pow(nearest_dist, -0.6);	//L2norm(i.e.2)*-0.6 = -1.2 = 0.8(i.e.r)-2	
 
-					// modify weight according to histogram matching
+					// modify weight according to Color histogram matching
 					if (TRUE){
 						double histogram_matching = 0.0;
 						double difference = 0.0;
@@ -1442,9 +1462,6 @@ void DoPAR::optimizeVolume(int level) {
 			color_old[ch] = m_volume[level][NUM_CHANNEL * i + ch];
 			color_new[ch] = color_acc[ch] / weight_acc;		//least square solver
 
-			////test record weightedaverage distribution
-			//weightedaverageset[(int)color_new[ch]] ++;
-
 			if (DISCRETE_ON){//========discrete solver=================		
 				//first calculate the weighted average color, then find the most similar color existed in exemplar, each color corresponds to a m_volume_nearest_index
 				closestindex = FindClosestColorIndex(level, colorset, positionfrequency, color_new[ch]);			
@@ -1471,7 +1488,7 @@ void DoPAR::optimizeVolume(int level) {
 	
 
 	//DynamicThresholding based on TI colorhis
-	DynamicThresholding(level);
+	if (DYNAMICTHRESHOLD_ON) DynamicThresholding(level);
 
 	long time_end = clock();
 	cout << "done. clocks = " << (time_end - time_start) / CLOCKS_PER_SEC;
@@ -1524,9 +1541,9 @@ void DoPAR::calcHistogram_exemplar(int level) {
 	acchis_exemplar[level].resize(NUM_HISTOGRAM_BIN, 0.0);
 	calcaccHistogram(m_histogram_exemplar[level][0], acchis_exemplar[level]);
 	// record existed colorset	
-	existedcolorset[level].clear();
+	existedbinset[level].clear();
 	for (int c = 0; c < NUM_HISTOGRAM_BIN; c++){
-		if (m_histogram_exemplar[level][0][c] > 0.0) existedcolorset[level].push_back(c);
+		if (m_histogram_exemplar[level][0][c] > 0.0) existedbinset[level].push_back(c);
 	}
 }
 //----------- Position Histogram -----------
@@ -1613,52 +1630,96 @@ void DoPAR::calcaccHistogram(vector<double> &inputhis, vector<double> &acchis){
 	}
 	if (acchis[acchis.size() - 1] > 1.0001 || acchis[acchis.size() - 1] < 0.9999) { cout << endl << "Error: acchis max=" << acchis[acchis.size() - 1]; _getch(); }
 }
+//void DoPAR::DynamicThresholding(int level){
+//	if (NUM_HISTOGRAM_BIN != 256) { cout << endl << "NUM_HISTOGRAM_BIN=" << NUM_HISTOGRAM_BIN << " only accept 256"; _getch(); }
+//	double hisbin = CHANNEL_MAXVALUE[0] /NUM_HISTOGRAM_BIN;
+//
+//	//first calculate accumulate histogram
+//	vector<double> acchis_synthesis(NUM_HISTOGRAM_BIN, 0.0);		//ch=0
+//	calcaccHistogram(m_histogram_synthesis[level][0], acchis_synthesis);
+//
+//	//calc threshold value set
+//	vector<double> thresholdvalue(existedbinset[level].size(), 0.0);
+//	thresholdvalue[existedbinset[level].size() - 1] = CHANNEL_MAXVALUE[0]+0.1;		//the last threshold should be max	
+//	auto vectoriterator = upper_bound(acchis_synthesis.begin(), acchis_synthesis.end(), 0.0);
+//	auto lastiterator = acchis_synthesis.begin();
+//
+//	for (int i = 0; i < existedbinset[level].size()-1; i++){		//ignore the last threshold(should be max)
+//		double acc = acchis_exemplar[level][existedbinset[level][i]];
+//		vectoriterator = upper_bound(lastiterator, acchis_synthesis.end(), acc);
+//		lastiterator = max(acchis_synthesis.begin(), vectoriterator-1);
+//
+//		int upper = vectoriterator - acchis_synthesis.begin();
+//		int lower = max(0, upper - 1);			//!should be lower_bound, but because the weighted average set is continuious, it is equal to upper-1
+//		double up_acc = acchis_synthesis[upper];
+//		double low_acc = acchis_synthesis[lower];
+//
+//		if (up_acc - low_acc == 0) { cout << endl << endl << "up_acc - low_acc=0" << endl;  thresholdvalue[i] = 0.0; continue; }
+//		thresholdvalue[i] = hisbin * (1.0*lower + (acc - low_acc) / (up_acc - low_acc));	//assume linear distribution within acchis_synthesis[lower,upper]	
+//	}
+//
+//	//for (int i = 0; i < existedbinset[level].size(); i++){
+//	//	cout << endl << "existedbinset[" << i << "]= " << existedbinset[level][i] << " thresholdvalue= " << thresholdvalue[i];
+//	//}
+//
+//	//thresholding based on thresholdvalue set; 
+//	for (ANNidx m = 0; m < TEXSIZE[level] * TEXSIZE[level] * TEXSIZE[level]; m++){
+//		vectoriterator = lower_bound(thresholdvalue.begin(), thresholdvalue.end(), m_volume[level][m]);
+//		int upper = vectoriterator - thresholdvalue.begin();
+//		int lower = max(0, upper - 1);
+//		
+//		//linear not very accurate, later should use non-linear
+//		if (lower==0) m_volume[level][m] = 0.0;
+//		//else m_volume[level][m] = existedbinset[level][upper];	//just for 256bin
+//		else m_volume[level][m] = round( hisbin * (1.0*existedbinset[level][upper] + (m_volume[level][m] - thresholdvalue[lower]) / (thresholdvalue[upper] - thresholdvalue[lower])));			
+//
+//		if (m_volume[level][m]>CHANNEL_MAXVALUE[0] - 1) m_volume[level][m] = CHANNEL_MAXVALUE[0] - 1;
+//	}
+//	
+//	//update color histogram after changing value
+//	calcHistogram_synthesis(level);
+//}
 void DoPAR::DynamicThresholding(int level){
 	if (NUM_HISTOGRAM_BIN != 256) { cout << endl << "NUM_HISTOGRAM_BIN=" << NUM_HISTOGRAM_BIN << " only accept 256"; _getch(); }
-	
+
 	//first calculate accumulate histogram
-	vector<double> acchis_synthesis(NUM_HISTOGRAM_BIN, 0.0);		//ch=0
+	vector<double> acchis_synthesis(256, 0.0);		//ch=0
 	calcaccHistogram(m_histogram_synthesis[level][0], acchis_synthesis);
 
 	//calc threshold value set
-	vector<double> thresholdvalue(existedcolorset[level].size(), 0.0);
-	thresholdvalue[existedcolorset[level].size() - 1] = 255.01;		//the last threshold should be 255	
+	vector<double> thresholdvalue(existedbinset[level].size(), 0.0);
+	thresholdvalue[existedbinset[level].size() - 1] = 256;			//the last threshold should be max	
 	auto vectoriterator = upper_bound(acchis_synthesis.begin(), acchis_synthesis.end(), 0.0);
-	auto lastiterator = acchis_synthesis.begin();
 
-	for (int i = 0; i < existedcolorset[level].size()-1; i++){		//ignore the last threshold(should be 255)
-		double acc = acc = acchis_exemplar[level][existedcolorset[level][i]];
-		vectoriterator = upper_bound(lastiterator, acchis_synthesis.end(), acc);
-		lastiterator = max(acchis_synthesis.begin(), vectoriterator-1);
+	for (int i = 0; i < existedbinset[level].size() - 1; i++){		//ignore the last threshold(should be max)
+		double acc = acchis_exemplar[level][existedbinset[level][i]];
+		vectoriterator = upper_bound(acchis_synthesis.begin(), acchis_synthesis.end(), acc);
 
 		int upper = vectoriterator - acchis_synthesis.begin();
 		int lower = max(0, upper - 1);			//!should be lower_bound, but because the weighted average set is continuious, it is equal to upper-1
+		if (lower == 0) {/* cout << endl << endl << "up_acc - low_acc=0" << endl;  */thresholdvalue[i] = 0.0; continue; }
 		double up_acc = acchis_synthesis[upper];
 		double low_acc = acchis_synthesis[lower];
-
-		if (up_acc - low_acc == 0) { cout << endl << endl << "up_acc - low_acc=0" << endl;  thresholdvalue[i] = 0.0; continue; }
-		thresholdvalue[i] = 1.0*lower + (acc - low_acc) / (up_acc - low_acc);	//assume linear distribution within acchis_synthesis[lower,upper]	
+		thresholdvalue[i] =  1.0*lower + (acc - low_acc) / (up_acc - low_acc);	//assume linear distribution within acchis_synthesis[lower,upper]	
 	}
 
-	//for (int i = 0; i < existedcolorset[level].size(); i++){
-	//	cout << endl << "existedcolorset[" << i << "]= " << existedcolorset[level][i] << " thresholdvalue= " << thresholdvalue[i];
+	//for (int i = 0; i < existedbinset[level].size(); i++){
+	//	cout << endl << "existedbinset[" << i << "]= " << existedbinset[level][i] << " thresholdvalue= " << thresholdvalue[i];
 	//}
 
 	//thresholding based on thresholdvalue set; 
 	for (ANNidx m = 0; m < TEXSIZE[level] * TEXSIZE[level] * TEXSIZE[level]; m++){
 		vectoriterator = lower_bound(thresholdvalue.begin(), thresholdvalue.end(), m_volume[level][m]);
-		int thresholdidx = vectoriterator - thresholdvalue.begin();
-		//if (existedcolorset[level][thresholdidx]>255.0 || existedcolorset[level][thresholdidx]<0.0) {
-		//	cout << endl << "existedcolorset[thresholdidx]=" << existedcolorset[level][thresholdidx] << " thresholdidx=" << thresholdidx; 
-		//	cout << endl << "m_volume[" << m << "]= " << m_volume[level][m];
-		//	_getch(); 
-		//}
-		m_volume[level][m] = existedcolorset[level][thresholdidx];
+		int upper = vectoriterator - thresholdvalue.begin();
+		//linear not very accurate, later should use non-linear
+		m_volume[level][m] = existedbinset[level][upper];	//just for 256bin
+
+		if (m_volume[level][m] > 255) m_volume[level][m] = 255;
 	}
-	
 	//update color histogram after changing value
 	calcHistogram_synthesis(level);
 }
+
 
 // ========= Distance Map ===========
 vector<unsigned short> DoPAR::BarDMap(short tSx, short tSy, short tSz, vector<char>& OImg)
@@ -1802,7 +1863,6 @@ vector<unsigned short> DoPAR::BarDMap(short tSx, short tSy, short tSz, vector<ch
 
 	return DMap;
 }
-
 vector<short> DoPAR::GetDMap(short Sx, short Sy, short Sz, vector<char>& OImg, char DM_Type, bool DisValYN)
 {	////(0) Sz = 1: for 2D image
 	////(1) OImg: <= 0 for solid, > 0 for pores
@@ -1919,4 +1979,55 @@ vector<short> DoPAR::GetDMap(short Sx, short Sy, short Sz, vector<char>& OImg, c
 	}//DM_Type == 1 || DM_Type == 2
 
 	return DMap;
+}
+vector<char> DoPAR::BinariseImg(short Sx, short Sy, short Sz, vector<short>& DMap, double TPorosity)
+{	//(1) 3 dimensions of the image: Sx, Sy, Sz
+	//(2) Distance map: Pores have the most largest values
+	//(3) TPorosity: Targeting porosity to determine the actual threshold value to binarise the image
+
+	if (TPorosity > 0.99) TPorosity = 0.99;
+	if (TPorosity < 0.01) TPorosity = 0.01;
+
+	short MaxVal(0), MinVal(0);
+
+	for (long idx = 0; idx < DMap.size(); ++idx) {
+		if (DMap[idx] < MinVal) MinVal = DMap[idx];
+		if (DMap[idx] > MaxVal) MaxVal = DMap[idx];
+	}
+
+	vector<long> CntValue(MaxVal - MinVal + 2, 0);
+
+	for (long idx = 0; idx < DMap.size(); ++idx) {
+		CntValue[DMap[idx] - MinVal]++;
+	}
+
+	long TotNum = TPorosity * DMap.size();
+	long RemNum(0), SelIj(0), RemainingNum(0);
+
+	for (long ij = CntValue.size() - 1; ij >= 0; --ij) {
+		RemNum += CntValue[ij];
+		if (RemNum > TotNum) {
+			SelIj = ij;
+			RemainingNum = TotNum - RemNum + CntValue[ij];
+			break;
+		}
+	}
+
+	vector<char> Res(DMap.size(), 0);
+
+	long RemNowC(0);
+	short TVal;
+	for (long idx = 0; idx < DMap.size(); ++idx) {
+		TVal = DMap[idx] - MinVal;
+		if (TVal < SelIj) continue;
+		if (TVal > SelIj) {
+			Res[idx] = 1;
+			continue;
+		}
+
+		if (RemNowC > RemainingNum) continue;
+		Res[idx] = 1; RemNowC++;
+	}
+
+	return Res;
 }

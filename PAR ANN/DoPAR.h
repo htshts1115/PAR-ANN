@@ -92,21 +92,14 @@ private:
 	static int TEXSIZE[MULTIRES];			// size of input exemplar
 	static int D_NEIGHBOR[MULTIRES];		// dimension of neighborhood (:= 3 * (2 * N + 1)^2)
 	static int NEIGHBORSIZE[MULTIRES];		// size: (2 * N + 1) * (2 * N + 1)
-	static const int NUM_HISTOGRAM_BIN;			// # of histogram bins
 	static int NUM_CHANNEL;						// # of channels (RGB, feature dist., RTF)
-	static std::vector<int> CHANNEL_MAXVALUE;	// for color histogram
-	static const double PCA_RATIO_VARIANCE;		//0.95
-	static const double ErrorBound;				//Kopf used 2.0
-	static const int ANNsearchk;			//search k nearest index
-	
-	double WEIGHT_HISTOGRAM;					// weight for histogram
-	vector<double> WEIGHT_POSITIONHISTOGRAM;
 
-	static const bool INDEXHIS_ON = true;				// Using Index Histogram in search step
-	static const bool POSITIONHIS_ON = false;			// Using Position Histogram	in optimize step
-	static const bool COLORHIS_ON = true;				// Using Colour Histogram in optimize step
-	static const bool DISCRETE_ON = false;				//discrete solver in optimize step
-	static const bool GAUSSIANFALLOFF_ON = false;		//gaussian fall off weight in optimize step
+	static const bool INDEXHIS_ON = true;				// Index Histogram in search step
+	static const bool POSITIONHIS_ON = false;			// Position Histogram	in optimize step
+	static const bool COLORHIS_ON = true;				// Colour Histogram in optimize step
+	static const bool DISCRETE_ON = false;				// discrete solver in optimize step
+	static const bool GAUSSIANFALLOFF_ON = false;		// gaussian fall off weight in optimize step
+	static const bool DYNAMICTHRESHOLD_ON = true;		// dynamic thresholding in optimize step
 
 	void DoANNOptimization();
 	void init();
@@ -171,9 +164,6 @@ private:
 	void initabsoluteneigh();
 	vector<vector<ANNidx>> absoluteneigh;
 
-	////test weighted average value distribution
-	//vector<long> weightedaverageset;		//size=0~255
-
 	// pseudocode-----------------------------------------------------------------
 	// volume[0] := initVolume(0);                                        % initialization
 	// for level = 0 to L                                                 % coarse-to-fine synthesis
@@ -190,6 +180,9 @@ private:
 	std::vector<int> MAXITERATION;				//max iteration time
 
 	//=========== phase 1: search ===========================
+	static const double PCA_RATIO_VARIANCE;		//0.95
+	static const double ErrorBound;				//Kopf used 2.0
+	static const int ANNsearchk;			//search k nearest index
 	std::vector<std::vector<ANNidx> > m_volume_nearest_x_index;		// [M] size: TEXSIZE^3
 	std::vector<std::vector<ANNidx> > m_volume_nearest_y_index;		// [M] size: TEXSIZE^3
 	std::vector<std::vector<ANNidx> > m_volume_nearest_z_index;		// [M] size: TEXSIZE^3
@@ -197,13 +190,13 @@ private:
 	std::vector<std::vector<double> > m_volume_nearest_y_dist;		// [M] size: TEXSIZE^3
 	std::vector<std::vector<double> > m_volume_nearest_z_dist;		// [M] size: TEXSIZE^3
 	void searchVolume(int level);
-	// ===========index histogram ==============
+
+	// ----------- index histogram -------------
 	std::vector<std::vector<double> >  m_indexhistogram_exemplar;
 	std::vector<std::vector<double> >  m_indexhistogram_synthesis;
 	void initIndexHistogram(int level);
 	void updateIndexHistogram(int level, int orientation, const ANNidx oldannidx, const ANNidx newannidx);
 	ANNidx indexhistmatching_ann_index(int level, int orientation, ANNidxArray idxarray, ANNdistArray distarry);
-	std::vector<std::vector<ANNidx> > m_volume_index_x, m_volume_index_y, m_volume_index_z;		// [M] size: TEXSIZE^3
 	bool FIRSTRUN = true;					// dont use random initial histogram. start counting from 0 for the first run.
 
 
@@ -216,13 +209,21 @@ private:
 	static const double gaussiansigma;
 	std::vector<std::vector<double> > gaussiankernel;					// m level gaussian kernel
 	void InitGaussianKernel();
-	//---------- color histogram ---------------
+
+	//---------- color histogram ---------------	
+	static const int NUM_HISTOGRAM_BIN;			// # of histogram bins
+	static std::vector<int> CHANNEL_MAXVALUE;	// for color histogram
+	static const int DISCRETE_HISTOGRAM_BIN;	// for thresholding, discrete values. e.g. default256
+	//double WEIGHT_HISTOGRAM;					// linear weight for histogram
+	vector<vector<double> > dimensional_histogram_exemplar;
 	std::vector<std::vector<std::vector<double> > > m_histogram_exemplar;			// [M] size: NUM_CHANNEL x NUM_HISTOGRAM_BIN
 	std::vector<std::vector<std::vector<double> > > m_histogram_synthesis;			// m_histogram[level][ch][bin]
 	void calcHistogram_exemplar(int level);
 	void calcHistogram_synthesis(int level);
 	void updateHistogram_synthesis(int level, const std::vector<double>& color_old, const std::vector<double>& color_new);
+	
 	//---------- position histogram ------------
+	vector<double> WEIGHT_POSITIONHISTOGRAM;
 	std::vector<std::vector<double> >  m_positionhistogram_exemplar;				//  multires * binsize(exemplar area)
 	std::vector<std::vector<double> >  m_positionhistogram_synthesis;				//  multires * binsize(exmeplar area)
 	void initPositionHistogram_exemplar(int level);
@@ -232,15 +233,21 @@ private:
 	std::vector<std::vector<ANNidx> > m_volume_position;		// volume_position record // [M] size: TEXSIZE^3
 	//discrete solver
 	int FindClosestColorIndex(int level, vector<double>& colorset, vector<double>& weightset, double referencecolor);	// return the index in colorset of the most similar color	
+	
 	//----------- Dynamic thresholding ----------
 	void DoPAR::DynamicThresholding(int level);//reassign values based on TI colorhis after optimize step
 	void DoPAR::calcaccHistogram(vector<double> &inputhis, vector<double> &acchis);
-	vector<vector<int>> existedcolorset;		//[level][<256]
-	vector<vector<double>> acchis_exemplar;		//[level][256]
+	vector<vector<int>> existedbinset;		//[level][<=max bin size]
+	vector<vector<double>> acchis_exemplar;		//[level][bin]
 
 
 	//=============== distance map ===================
 	vector<unsigned short> BarDMap(short tSx, short tSy, short tSz, vector<char>& OImg);
 	vector<short> GetDMap(short Sx, short Sy, short Sz, vector<char>& OImg, char DM_Type, bool DisValYN);
+	vector<char> BinariseImg(short Sx, short Sy, short Sz, vector<short>& DMap, double TPorosity);
+
+
+	//release data
+	void cleardata(int level);
 };
 
