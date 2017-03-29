@@ -40,41 +40,38 @@ private:
 	bool ReadTxtFiles(const string PFName, vector<string>& ResLines);
 	bool GetNextRowParameters(short Cno, vector<string>& ValidParStr, vector<string>& ParV);
 	long FileLength(const string& FName);
-	bool Read(const string FPathName, vector<uchar>& Data);
+	//bool Read(const string FPathName, vector<uchar>& Data);
 	bool Write(const string FPathName, vector<uchar> Data);
-	bool iFileExistYN(const string& PFileName);
-	string workpath, outputpath, outputfilename;
-	//=============================================================
+	bool iFileExistYN(const string& PFileName);		
 	void ReadRunPar(string CurExeFile); //Read running parameters
-	void ReadPBMImage(string FName, char DirID, double UpPro); //Read each training image
-	//DirID: '1' - XY plane, '2' - XZ plane, '3' - YZ plane
-	//       otherwise a single image for three direction 
-	//UpPro: upper porosity, 0.5 for default. 
-	
 	//=============================================================
-	bool Identical3DYN;  //wether or not three training images are identical
-	vector<uchar> Model;
-	vector<uchar> XY2DImg, XZ2DImg, YZ2DImg; // 1 - pore, 0 - grain
-	//@@@@@@@10/05/2016@@@@@@@   multiple TI  
 	string FNameXY, FNameXZ, FNameYZ;
+	string workpath, outputpath, outputfilename;
 	vector<string> FNameAddition;  //file path names of the training images
-	vector<vector<uchar>> TIs;
-	int XYSx, XYSy, XZSx, XZSz, YZSy, YZSz;
-	int PARx, PARy, PARz; //Resultant model
-	int TIx, TIy; 
-	long PARxy;
-	double PorosityXY, PorosityXZ, PorosityYZ, AverPoro; //Original porosities from 3 training images
+	//vector<uchar> Model;
+	//double PorosityXY, PorosityXZ, PorosityYZ, PorosityM; //Original porosities from 3 training images
 
-	//=============================================================
+	//void ReadPBMImage(string FName, char DirID, double UpPro); //Read each training image
+	////DirID: '1' - XY plane, '2' - XZ plane, '3' - YZ plane
+	////       otherwise a single image for three direction 
+	////UpPro: upper porosity, 0.5 for default. 
+	
+	
+
+	//vector<uchar> XY2DImg, XZ2DImg, YZ2DImg; // 1 - pore, 0 - grain
+	////@@@@@@@10/05/2016@@@@@@@   multiple TI  
+	//vector<vector<uchar>> TIs;
+	//int XYSx, XYSy, XZSx, XZSz, YZSy, YZSz;
+	//int PARx, PARy, PARz; //Resultant model
+	//int TIx, TIy; 
+	//long PARxy;
+	//bool Identical3DYN;  //wether or not three training images are identical
+	
+
 	std::random_device randomseed;
 	std::mt19937 mersennetwistergenerator;
 	std::uniform_real_distribution<double> probabilitydistribution;
 
-	
-
-	//=============================================================
-	vector<Mat> matTIs; 	
-	vector<int> TIsID;
 	void showMat(const cv::String& winname, const cv::Mat& mat);
 	///========================== 190217 Kopf. optimization based =====================
 
@@ -95,11 +92,17 @@ private:
 	static int NUM_CHANNEL;						// # of channels (RGB, feature dist., RTF)
 
 	static const bool INDEXHIS_ON = true;				// Index Histogram in search step
+	static const bool COLORHIS_ON = false;				// Colour Histogram in optimize step
+	
+	static const bool DISTANCEMAP_ON = false;			// convert to distance map model
+	static const bool PROPORTIONTHRESHOLD_ON = true;	// ProportionThreshold() 
+
+	static const bool DISCRETETHRESHOLD_ON = false;		// dynamic thresholding in optimize step
 	static const bool POSITIONHIS_ON = false;			// Position Histogram	in optimize step
-	static const bool COLORHIS_ON = true;				// Colour Histogram in optimize step
 	static const bool DISCRETE_ON = false;				// discrete solver in optimize step
 	static const bool GAUSSIANFALLOFF_ON = false;		// gaussian fall off weight in optimize step
-	static const bool DYNAMICTHRESHOLD_ON = true;		// dynamic thresholding in optimize step
+	
+
 
 	void DoANNOptimization();
 	void init();
@@ -137,10 +140,14 @@ private:
 		return inv_sqrt_2pi / stddev * std::exp(-0.5 * a * a);
 	}
 
-	std::vector<std::vector<double> >  m_exemplar_x;		// [M] exemplar RGB image, size: NUM_CHANNEL * TEXSIZE^2
-	std::vector<std::vector<double> >  m_exemplar_y;
-	std::vector<std::vector<double> >  m_exemplar_z;
+	std::vector<std::vector<double> >  m_exemplar_x;		// ========== need to change to short ==================
+	std::vector<std::vector<double> >  m_exemplar_y;		
+	std::vector<std::vector<double> >  m_exemplar_z;		// [M] exemplar RGB image, size: NUM_CHANNEL * TEXSIZE^2
 	bool loadExemplar();
+	void calcNeighbor();
+	void initabsoluteneigh();
+	vector<vector<ANNidx>> absoluteneigh;
+
 	// PCA-projected neighborhood vector
 	std::vector<std::vector<double> > m_neighbor_x;				// [M] original neighborhood vector required for texture optimization
 	std::vector<std::vector<double> > m_neighbor_y;
@@ -160,9 +167,6 @@ private:
 	std::vector<ANNkd_tree*          > mp_neighbor_kdTree_x;	// [M] ANN kdTree
 	std::vector<ANNkd_tree*          > mp_neighbor_kdTree_y;	// ANNkd_tree, 3 level
 	std::vector<ANNkd_tree*          > mp_neighbor_kdTree_z;
-	void calcNeighbor();
-	void initabsoluteneigh();
-	vector<vector<ANNidx>> absoluteneigh;
 
 	// pseudocode-----------------------------------------------------------------
 	// volume[0] := initVolume(0);                                        % initialization
@@ -212,12 +216,12 @@ private:
 
 	//---------- color histogram ---------------	
 	static const int NUM_HISTOGRAM_BIN;			// # of histogram bins
-	static std::vector<int> CHANNEL_MAXVALUE;	// for color histogram
-	static const int DISCRETE_HISTOGRAM_BIN;	// for thresholding, discrete values. e.g. default256
+	static std::vector<int> CHANNEL_MAXVALUE;	// for color histogram	
 	//double WEIGHT_HISTOGRAM;					// linear weight for histogram
-	vector<vector<double> > dimensional_histogram_exemplar;
-	std::vector<std::vector<std::vector<double> > > m_histogram_exemplar;			// [M] size: NUM_CHANNEL x NUM_HISTOGRAM_BIN
-	std::vector<std::vector<std::vector<double> > > m_histogram_synthesis;			// m_histogram[level][ch][bin]
+	vector<vector<vector<double> > > dimensional_histogram_exemplar;				// [level][ori][bin]	16
+	//std::vector<std::vector<std::vector<double> > > m_histogram_exemplar;			// [level][ch][bin]		16
+	vector<vector<vector<double> > > m_histogram_synthesis;							// [level][ch][bin]		16
+
 	void calcHistogram_exemplar(int level);
 	void calcHistogram_synthesis(int level);
 	void updateHistogram_synthesis(int level, const std::vector<double>& color_old, const std::vector<double>& color_new);
@@ -226,26 +230,38 @@ private:
 	vector<double> WEIGHT_POSITIONHISTOGRAM;
 	std::vector<std::vector<double> >  m_positionhistogram_exemplar;				//  multires * binsize(exemplar area)
 	std::vector<std::vector<double> >  m_positionhistogram_synthesis;				//  multires * binsize(exmeplar area)
+	std::vector<std::vector<ANNidx> > m_volume_position;		// volume_position record // [M] size: TEXSIZE^3
+	
 	void initPositionHistogram_exemplar(int level);
 	void initPositionHistogram_synthesis(int level);
 	void updatePositionHistogram_synthesis(int level, const ANNidx position_old, const ANNidx position_new);
 	void writeHistogram(int level, vector<double> &histogram, int rows, int cols, const string filename);
-	std::vector<std::vector<ANNidx> > m_volume_position;		// volume_position record // [M] size: TEXSIZE^3
 	//discrete solver
 	int FindClosestColorIndex(int level, vector<double>& colorset, vector<double>& weightset, double referencecolor);	// return the index in colorset of the most similar color	
 	
 	//----------- Dynamic thresholding ----------
-	void DoPAR::DynamicThresholding(int level);//reassign values based on TI colorhis after optimize step
-	void DoPAR::calcaccHistogram(vector<double> &inputhis, vector<double> &acchis);
-	vector<vector<int>> existedbinset;		//[level][<=max bin size]
-	vector<vector<double>> acchis_exemplar;		//[level][bin]
+	static const int DISCRETE_HISTOGRAM_BIN;						// for thresholding, discrete values. e.g. default256
+	vector<vector<double> >  discrete_histogram_exemplar;			// [level][discretebin]	256
+	vector<vector<double> >  discrete_histogram_synthesis;			// [level][discretebin]	256
+	vector<vector<short> > existedbin_exemplar;						//[level][<=max bin size]
+	vector<vector<double>> existed_histogram_examplar;				//[level][<=max bin size]
+	vector<vector<double>> discrete_acchis_exemplar;							//[level][bin]
 
+	void DynamicThresholding(int level);//reassign values based on TI colorhis after optimize step
+	void calcaccHistogram(vector<double> &inputhis, vector<double> &acchis);
+	void ProportionThreshold(vector<short>& Model, vector<short>& BinNum, vector<double>& Prob);
+
+	//Non-linear solver
+	void PolynomialInterpolation(vector<double>& Xv, vector<double>& Yv, vector<double>& X);
 
 	//=============== distance map ===================
+	double porosityTI, porosityModel;
+	short DistanceThreshold;
 	vector<unsigned short> BarDMap(short tSx, short tSy, short tSz, vector<char>& OImg);
 	vector<short> GetDMap(short Sx, short Sy, short Sz, vector<char>& OImg, char DM_Type, bool DisValYN);
-	vector<char> BinariseImg(short Sx, short Sy, short Sz, vector<short>& DMap, double TPorosity);
-
+	vector<char> BinariseImg(vector<short>& DMap, double TPorosity);
+	void BinariseThreshold(vector<short>& DMap, vector<char>& Binarised, short threshold);
+	void RedistributeDMap(vector<short>& DMap);
 
 	//release data
 	void cleardata(int level);
