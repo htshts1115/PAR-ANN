@@ -57,7 +57,7 @@ DoPAR::DoPAR()
 	m_indexhistogram_synthesis.resize(MULTIRES);
 	discrete_acchis_exemplar.resize(MULTIRES);
 	existedbin_exemplar.resize(MULTIRES);
-
+	existed_histogram_examplar.resize(MULTIRES);
 
 	// [end] multi-res memory allocation---------------
 }
@@ -565,9 +565,12 @@ int DoPAR::TEXSIZE[MULTIRES];
 int DoPAR::D_NEIGHBOR[MULTIRES];
 int DoPAR::NEIGHBORSIZE[MULTIRES];
 
-const int DoPAR::NUM_HISTOGRAM_BIN = 64;		//for color histograms	Kopf used 16
-const int DoPAR::DISCRETE_HISTOGRAM_BIN = 256;	//for thresholding, discrete values. e.g. default256
-vector<int> DoPAR::CHANNEL_MAXVALUE;			//for color histogram
+const short DoPAR::NUM_HISTOGRAM_BIN = 64;			//for color histograms	Kopf used 16
+
+const short DoPAR::DISCRETE_HISTOGRAM_BIN = 256;	//for thresholding, discrete values. e.g. default256
+const short DoPAR::DistanceThreshold = 135;			//for binarise distance model (0-120, 150-256)
+
+vector<short> DoPAR::CHANNEL_MAXVALUE;			//for color histogram
 int DoPAR::NUM_CHANNEL = 1;
 
 const double DoPAR::PCA_RATIO_VARIANCE = 0.95;	//Kopf used 0.95
@@ -965,7 +968,7 @@ void DoPAR::calcNeighbor() {
 		m_neighbor_kdTree_ptr_y[level].resize(numData);
 		m_neighbor_kdTree_ptr_z[level].resize(numData);
 		for (int i = 0; i < numData; ++i) {
-			//point array, row = 1, col = PCA dimension
+			//ANNpoint* point array, row = 1, col = PCA dimension
 			m_neighbor_kdTree_ptr_x[level][i] = &mp_neighbor_pca_projected_x[level]->data.db[dimPCA_x * i];	//ANNpoint* from PCA projection
 			//std::vector<uchar> array(mat.rows*mat.cols);
 			//if (mat.isContinuous())
@@ -976,7 +979,7 @@ void DoPAR::calcNeighbor() {
 		if (mp_neighbor_kdTree_x[level] != NULL) delete mp_neighbor_kdTree_x[level];
 		if (mp_neighbor_kdTree_y[level] != NULL) delete mp_neighbor_kdTree_y[level];
 		if (mp_neighbor_kdTree_z[level] != NULL) delete mp_neighbor_kdTree_z[level];
-		//data point array = m_neighbor_kdTree_ptr_x, number of points = numData, dimension = dimPCA_x
+		//ANNpoint* data point array = m_neighbor_kdTree_ptr_x, number of points = numData, dimension = dimPCA_x
 		mp_neighbor_kdTree_x[level] = new ANNkd_tree(&m_neighbor_kdTree_ptr_x[level][0], numData, dimPCA_x); //ANNkd_tree
 		mp_neighbor_kdTree_y[level] = new ANNkd_tree(&m_neighbor_kdTree_ptr_y[level][0], numData, dimPCA_y);
 		mp_neighbor_kdTree_z[level] = new ANNkd_tree(&m_neighbor_kdTree_ptr_z[level][0], numData, dimPCA_z);
@@ -1014,7 +1017,6 @@ bool DoPAR::loadVolume(){
 			vector<short> shortmodel(tempchar.begin(), tempchar.end());
 
 			BinariseThreshold(shortmodel, tempchar, 128);
-			//tempchar = BinariseImg(TEXSIZE[0], TEXSIZE[0], TEXSIZE[0], shortmodel, porosityModel);
 			shortmodel = GetDMap(TEXSIZE[0], TEXSIZE[0], TEXSIZE[0], tempchar, 2, false);
 		
 			//redistribute distance values
@@ -1051,7 +1053,6 @@ void DoPAR::upsampleVolume(int level) {
 	vector<short> shortmodel(m_volume[level].begin(), m_volume[level].end());
 	if (DISTANCEMAP_ON){
 		BinariseThreshold(shortmodel, tempchar, DistanceThreshold);
-		//tempchar = BinariseImg(TEXSIZE[level], TEXSIZE[level], TEXSIZE[level], shortmodel, porosityModel);
 	
 		m_volume[level] = vector<double>(tempchar.begin(), tempchar.end());		//[0,1]
 		transform(m_volume[level].begin(), m_volume[level].end(), m_volume[level].begin(), bind2nd(std::multiplies<double>(), 255)); //[0,255]
@@ -1115,7 +1116,6 @@ void DoPAR::upsampleVolume(int level) {
 		shortmodel = vector<short>(m_volume[level + 1].begin(), m_volume[level + 1].end());
 
 		BinariseThreshold(shortmodel, tempchar, 128);
-		//tempchar = BinariseImg(TEXSIZE[level + 1], TEXSIZE[level + 1], TEXSIZE[level + 1], shortmodel, porosityModel);
 		shortmodel = GetDMap(TEXSIZE[level + 1], TEXSIZE[level + 1], TEXSIZE[level + 1], tempchar, 2, false);
 
 		//redistribute distance values
@@ -1133,7 +1133,6 @@ void DoPAR::outputmodel(int level){
 		vector<short> shortmodel(m_volume[level].begin(), m_volume[level].end());
 
 		BinariseThreshold(shortmodel, tempchar, DistanceThreshold);
-		//tempchar = BinariseImg(TEXSIZE[level], TEXSIZE[level], TEXSIZE[level], shortmodel, porosityModel);
 		
 		tempmodel = vector<uchar>(tempchar.begin(), tempchar.end());
 	}
@@ -1549,7 +1548,6 @@ void DoPAR::optimizeVolume(int level) {
 				color_new[ch] = colorset[closestindex];		//update with the existed most similar color		
 			}					
 		}
-
 		////histogram update
 		if (COLORHIS_ON || DISCRETETHRESHOLD_ON){
 			updateHistogram_synthesis(level, color_old, color_new);
@@ -1738,7 +1736,7 @@ int DoPAR::FindClosestColorIndex(int level, vector<double> &color, vector<double
 	return closestindex;
 }
 
-//----------- Dynamic thresholding ---------
+//----------- Dynamic thresholding, worse than proportionthreshold ---------
 void DoPAR::calcaccHistogram(vector<double> &inputhis, vector<double> &acchis){
 	if (inputhis.size() != acchis.size()) { cout << endl << "accHistogram size " << acchis.size() << " not match " << inputhis.size(); _getch(); }
 	acchis = inputhis;
@@ -1748,7 +1746,8 @@ void DoPAR::calcaccHistogram(vector<double> &inputhis, vector<double> &acchis){
 	if (acchis[acchis.size() - 1] > 1.0001 || acchis[acchis.size() - 1] < 0.9999) { cout << endl << "Error: acchis max=" << acchis[acchis.size() - 1]; _getch(); }
 }
 void DoPAR::DynamicThresholding(int level){
-	if (DISCRETE_HISTOGRAM_BIN != 256) { cout << endl << "DISCRETE_HISTOGRAM_BIN=" << DISCRETE_HISTOGRAM_BIN << " only accept 256"; _getch(); }
+	if (PROPORTIONTHRESHOLD_ON) { cout << endl << "PROPORTIONTHRESHOLD_ON"; _getch(); }
+	if (DISCRETE_HISTOGRAM_BIN != CHANNEL_MAXVALUE[0]) { cout << endl << "DISCRETE_HISTOGRAM_BIN=" << DISCRETE_HISTOGRAM_BIN << " only accept " << CHANNEL_MAXVALUE[0]; _getch(); }
 	//first calculate accumulate histogram
 	vector<double> acchis_synthesis(DISCRETE_HISTOGRAM_BIN, 0.0);		//ch=0
 	calcaccHistogram(discrete_histogram_synthesis[level], acchis_synthesis);
@@ -1841,39 +1840,86 @@ void DoPAR::PolynomialInterpolation(vector<double>& Xv, vector<double>& Yv, vect
 	YRes.swap(X);
 }
 
+//----------- Proportion Threshold, better ---------
 void DoPAR::ProportionThreshold(vector<short>& shortmodel, vector<short>& BinNum, vector<double>& Prob){
 	//(1) Model to be thresholded according to a distribution <BinNum, Prob>
 	//(2) BinNum and Prob corresponds to histogram (), BinNum must be ordered. The last BinNum is biggest.
+	const bool SelNewAlgYN = true;
+
 	if (BinNum.size() == 0 || Prob.size() != BinNum.size()) { cout << endl << "BinNum.size=" << BinNum.size() << " Prob.size=" << Prob.size(); _getch(); return; }
 	if (shortmodel.size() == 0) { cout << endl << "shortmodel.size=" << shortmodel.size(); _getch(); return; }
 	double check_sum_Prob(0.0); 
 	for_each(Prob.rbegin(), Prob.rend(), [&](double n) { check_sum_Prob += n; });
 	if (check_sum_Prob > 1.0001 || check_sum_Prob < 0.9999) { cout << endl << "check_sum_Prob=" << check_sum_Prob; _getch(); return; }
 
-	short MinVal = -32000;
-	//short MinVal(0);
-	//for (long idx = 0; idx < Model.size(); ++idx) {
-	//	if (Model[idx] < MinVal)
-	//		MinVal = Model[idx];
-	//}
+	if (!SelNewAlgYN) {
+		short MinVal = -32000;
+		//short MinVal(0);
+		//for (long idx = 0; idx < Model.size(); ++idx) {
+		//	if (Model[idx] < MinVal)
+		//		MinVal = Model[idx];
+		//}
 
-	vector<short> ResModel(shortmodel.size(), BinNum[0]);
+		vector<short> ResModel(shortmodel.size(), BinNum[0]);
 
-	for (long ij = BinNum.size() - 1; ij > 0; --ij) {
-		if (long(1000 * Prob[ij]) < 0) continue;
-		vector<char> Tmp;
-		Tmp = BinariseImg(shortmodel, Prob[ij]);
-		for (long idx = 0; idx < shortmodel.size(); ++idx) {
-			if (Tmp[idx] == 1) {
-				ResModel[idx] = BinNum[ij];
-				shortmodel[idx] = MinVal;
+		for (long ij = BinNum.size() - 1; ij > 0; --ij) {
+			if (long(1000 * Prob[ij]) < 0) continue;
+			vector<char> Tmp;
+			Tmp = BinariseImg(shortmodel, Prob[ij]);
+			for (long idx = 0; idx < shortmodel.size(); ++idx) {
+				if (Tmp[idx] == 1) {
+					ResModel[idx] = BinNum[ij];
+					shortmodel[idx] = MinVal;
+				}
 			}
 		}
+		shortmodel.swap(ResModel);
 	}
+	else {//New algorithm 
+		short MaxVal(0), MinVal(0);
+		for (long idx = 0; idx < shortmodel.size(); ++idx) {
+			if (shortmodel[idx] < MinVal) MinVal = shortmodel[idx];
+			if (shortmodel[idx] > MaxVal) MaxVal = shortmodel[idx];
+		}
+		vector<long> CntValue(MaxVal - MinVal + 2, 0);
+		vector<short> SelMlVal(MaxVal - MinVal + 2, BinNum[0]);
 
-	shortmodel.swap(ResModel);
+		for (long idx = 0; idx < shortmodel.size(); ++idx) {
+			CntValue[shortmodel[idx] - MinVal]++;
+		}
+
+		long SelNo = Prob.size() - 1;
+		long TotNum = Prob[SelNo] * shortmodel.size();
+		long RemNum(0);
+		for (long ij = CntValue.size() - 1; ij >= 0; --ij) {
+			if (CntValue[ij] == 0) continue;
+			RemNum += CntValue[ij];
+			if (RemNum > TotNum) {
+				if (TotNum - RemNum + CntValue[ij] > CntValue[ij] / 2) {
+					SelMlVal[ij] = BinNum[SelNo];
+					RemNum = 0;
+				}
+				else {
+					SelMlVal[ij] = BinNum[SelNo - 1];
+					RemNum = SelMlVal[ij];
+				}
+				SelNo--;
+				if (SelNo < 0) break;
+				TotNum = Prob[SelNo] * shortmodel.size();
+			}
+			else {
+				SelMlVal[ij] = BinNum[SelNo];
+			}
+		}
+
+		vector<short> ResModel(shortmodel.size(), BinNum[0]);
+
+		for (long idx = 0; idx < shortmodel.size(); ++idx) {
+			ResModel[idx] = SelMlVal[shortmodel[idx] - MinVal];
+		}
+		shortmodel.swap(ResModel);
+	}
 }
-
 
 
 // ========= Distance Map ===========

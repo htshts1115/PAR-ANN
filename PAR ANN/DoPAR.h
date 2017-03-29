@@ -95,9 +95,10 @@ private:
 	static const bool COLORHIS_ON = false;				// Colour Histogram in optimize step
 	
 	static const bool DISTANCEMAP_ON = false;			// convert to distance map model
-	static const bool PROPORTIONTHRESHOLD_ON = true;	// ProportionThreshold() 
 
+	static const bool PROPORTIONTHRESHOLD_ON = true;	// ProportionThreshold() 
 	static const bool DISCRETETHRESHOLD_ON = false;		// dynamic thresholding in optimize step
+
 	static const bool POSITIONHIS_ON = false;			// Position Histogram	in optimize step
 	static const bool DISCRETE_ON = false;				// discrete solver in optimize step
 	static const bool GAUSSIANFALLOFF_ON = false;		// gaussian fall off weight in optimize step
@@ -215,8 +216,8 @@ private:
 	void InitGaussianKernel();
 
 	//---------- color histogram ---------------	
-	static const int NUM_HISTOGRAM_BIN;			// # of histogram bins
-	static std::vector<int> CHANNEL_MAXVALUE;	// for color histogram	
+	static const short NUM_HISTOGRAM_BIN;			// # of histogram bins
+	static std::vector<short> CHANNEL_MAXVALUE;	// for color histogram	
 	//double WEIGHT_HISTOGRAM;					// linear weight for histogram
 	vector<vector<vector<double> > > dimensional_histogram_exemplar;				// [level][ori][bin]	16
 	//std::vector<std::vector<std::vector<double> > > m_histogram_exemplar;			// [level][ch][bin]		16
@@ -240,7 +241,7 @@ private:
 	int FindClosestColorIndex(int level, vector<double>& colorset, vector<double>& weightset, double referencecolor);	// return the index in colorset of the most similar color	
 	
 	//----------- Dynamic thresholding ----------
-	static const int DISCRETE_HISTOGRAM_BIN;						// for thresholding, discrete values. e.g. default256
+	static const short DISCRETE_HISTOGRAM_BIN;						// for thresholding, discrete values. e.g. default256
 	vector<vector<double> >  discrete_histogram_exemplar;			// [level][discretebin]	256
 	vector<vector<double> >  discrete_histogram_synthesis;			// [level][discretebin]	256
 	vector<vector<short> > existedbin_exemplar;						//[level][<=max bin size]
@@ -256,7 +257,7 @@ private:
 
 	//=============== distance map ===================
 	double porosityTI, porosityModel;
-	short DistanceThreshold;
+	static const short DistanceThreshold;
 	vector<unsigned short> BarDMap(short tSx, short tSy, short tSz, vector<char>& OImg);
 	vector<short> GetDMap(short Sx, short Sy, short Sz, vector<char>& OImg, char DM_Type, bool DisValYN);
 	vector<char> BinariseImg(vector<short>& DMap, double TPorosity);
