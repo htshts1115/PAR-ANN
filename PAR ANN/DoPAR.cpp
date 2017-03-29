@@ -56,7 +56,7 @@ DoPAR::DoPAR()
 	m_indexhistogram_exemplar.resize(MULTIRES);
 	m_indexhistogram_synthesis.resize(MULTIRES);
 	discrete_acchis_exemplar.resize(MULTIRES);
-	existedbin_exemplar.resize(MULTIRES);
+	existed_bin_exemplar.resize(MULTIRES);
 	existed_histogram_examplar.resize(MULTIRES);
 
 	// [end] multi-res memory allocation---------------
@@ -550,6 +550,10 @@ vector<uchar> DoPAR::load3Dmodel(const char* filename)
 void DoPAR::GetStarted(string CurExeFile)
 {
 	ReadRunPar(CurExeFile);
+
+
+	//vector<short> shortmodel(200*200*200)
+	//ProportionThreshold(shortmodel, bin, prob);
 
 
 	DoANNOptimization();
@@ -1541,24 +1545,21 @@ void DoPAR::optimizeVolume(int level) {
 		for (int ch = 0; ch < NUM_CHANNEL; ++ch) {
 			color_old[ch] = m_volume[level][NUM_CHANNEL * i + ch];
 			color_new[ch] = color_acc[ch] / weight_acc;		//least square solver
-
 			if (POSITIONHIS_ON && DISCRETE_ON){//========discrete solver=================		
 				//first calculate the weighted average color, then find the most similar color existed in exemplar, each color corresponds to a m_volume_nearest_index
 				closestindex = FindClosestColorIndex(level, colorset, positionfrequency, color_new[ch]);			
-				color_new[ch] = colorset[closestindex];		//update with the existed most similar color		
-			}					
+				color_new[ch] = colorset[closestindex];		//update with the existed most similar color	
+				//Position histogram update
+				position_new = positionset[closestindex];
+				position_old = m_volume_position[level][i];
+				updatePositionHistogram_synthesis(level, position_old, position_new);
+				m_volume_position[level][i] = position_new;
+			}
 		}
-		////histogram update
+		//color histogram update
 		if (COLORHIS_ON || DISCRETETHRESHOLD_ON){
 			updateHistogram_synthesis(level, color_old, color_new);
-		}	
-		//Position histogram update
-		if (POSITIONHIS_ON && DISCRETE_ON){
-			position_new = positionset[closestindex];
-			position_old = m_volume_position[level][i];
-			updatePositionHistogram_synthesis(level, position_old, position_new);
-			m_volume_position[level][i] = position_new;
-		}
+		}			
 		// voxel update
 		for (int ch = 0; ch < NUM_CHANNEL; ++ch) {
 			m_volume[level][NUM_CHANNEL * i + ch] = color_new[ch];		
@@ -1566,12 +1567,14 @@ void DoPAR::optimizeVolume(int level) {
 	}//for every voxel
 	
 
-	//DynamicThresholding based on TI histogram	
+	//========= Dynamic Thresholding based on TI histogram =========
 	if (PROPORTIONTHRESHOLD_ON){
 		vector<short> tempshort = vector<short>(m_volume[level].begin(), m_volume[level].end());
-		ProportionThreshold(tempshort, existedbin_exemplar[level], existed_histogram_examplar[level]);
+		ProportionThreshold(tempshort, existed_bin_exemplar[level], existed_histogram_examplar[level]);
+		m_volume[level] = vector<double>(tempshort.begin(), tempshort.end());
 	}
 	else if (DISCRETETHRESHOLD_ON) DynamicThresholding(level);
+
 
 	long time_end = clock();
 	cout << "done. clocks = " << (time_end - time_start) / CLOCKS_PER_SEC;
@@ -1594,8 +1597,8 @@ void DoPAR::calcHistogram_exemplar(int level) {
 	discrete_histogram_exemplar[level].clear();
 	discrete_histogram_exemplar[level].resize(DISCRETE_HISTOGRAM_BIN, 0.0);		//[level][discretebin]
 
-	double dimensional_delta_histogram = 1. / (TEXSIZE[level] * TEXSIZE[level]);
-	double discrete_delta_histogram = 1. / (3 * TEXSIZE[level] * TEXSIZE[level]);
+	double dimensional_delta_histogram = 1.0 / (TEXSIZE[level] * TEXSIZE[level]);
+	double discrete_delta_histogram = 1.0 / (3 * TEXSIZE[level] * TEXSIZE[level]);
 	vector<double>* p[3] = { &m_exemplar_x[level], &m_exemplar_y[level], &m_exemplar_z[level] };
 	for (int ori = 0; ori < 3; ++ori) {
 		for (int i = 0; i < TEXSIZE[level] * TEXSIZE[level]; ++i) {
@@ -1617,15 +1620,19 @@ void DoPAR::calcHistogram_exemplar(int level) {
 	}
 	// record existed colorset (discrete)
 	if (DISCRETETHRESHOLD_ON || PROPORTIONTHRESHOLD_ON){
-		existedbin_exemplar[level].clear();
+		existed_bin_exemplar[level].clear();
 		existed_histogram_examplar[level].clear();
 		for (int c = 0; c < DISCRETE_HISTOGRAM_BIN; c++){
 			if (discrete_histogram_exemplar[level][c] > 0.0) {
-				existedbin_exemplar[level].push_back(c);
+				existed_bin_exemplar[level].push_back(c);
 				existed_histogram_examplar[level].push_back(discrete_histogram_exemplar[level][c]);
 			}
 		}
 	}
+
+	//for (int i = 0; i < existed_bin_exemplar[level].size(); i++){
+	//	cout << endl << existed_bin_exemplar[level][i] << "     " << existed_histogram_examplar[level][i];
+	//}_getch();
 }
 void DoPAR::calcHistogram_synthesis(int level) {
 	m_histogram_synthesis[level].clear();
@@ -1753,11 +1760,11 @@ void DoPAR::DynamicThresholding(int level){
 	calcaccHistogram(discrete_histogram_synthesis[level], acchis_synthesis);
 
 	//calc threshold value set
-	vector<double> thresholdvalue(existedbin_exemplar[level].size()-1, 0.0);
+	vector<double> thresholdvalue(existed_bin_exemplar[level].size()-1, 0.0);
 	//----------- Linear solver, not very accurate ----------------------
 	auto vectoriterator = upper_bound(acchis_synthesis.begin(), acchis_synthesis.end(), 0.0);
-	for (int i = 0; i < existedbin_exemplar[level].size() - 1; i++){		//ignore the last threshold(should be max)
-		double acc = discrete_acchis_exemplar[level][existedbin_exemplar[level][i]];
+	for (int i = 0; i < existed_bin_exemplar[level].size() - 1; i++){		//ignore the last threshold(should be max)
+		double acc = discrete_acchis_exemplar[level][existed_bin_exemplar[level][i]];
 		vectoriterator = upper_bound(acchis_synthesis.begin(), acchis_synthesis.end(), acc);
 		int upper = vectoriterator - acchis_synthesis.begin();
 		int lower = max(0, upper - 1);			//!should be lower_bound, but because the weighted average set is continuious, it is equal to upper-1
@@ -1769,7 +1776,7 @@ void DoPAR::DynamicThresholding(int level){
 
 	////============ Non-linear solver to calculate thresholdvalue ======================
 	////PolynomialInterpolation(vector<double>& Xv, vector<double>& Yv, vector<double>& X)
-	////Xv: trimed acchis_synthesis	Yv: 0,1,,...,DISCRETE_HISTOGRAM_BIN-1	X: discrete_acchis_exemplar[level][existedbin_exemplar[level][i]] stored in thresholdvalue[]
+	////Xv: trimed acchis_synthesis	Yv: 0,1,,...,DISCRETE_HISTOGRAM_BIN-1	X: discrete_acchis_exemplar[level][existed_bin_exemplar[level][i]] stored in thresholdvalue[]
 	////!!Note: Xv must not have two same values
 	//vector<double> Xv; Xv.reserve(DISCRETE_HISTOGRAM_BIN);
 	//vector<double> Yv; Yv.reserve(DISCRETE_HISTOGRAM_BIN);
@@ -1779,15 +1786,15 @@ void DoPAR::DynamicThresholding(int level){
 	//		Yv.push_back(i);
 	//	}
 	//}
-	//for (int t = 0; t < thresholdvalue.size(); t++){ thresholdvalue[t] = discrete_acchis_exemplar[level][existedbin_exemplar[level][t]]; }
+	//for (int t = 0; t < thresholdvalue.size(); t++){ thresholdvalue[t] = discrete_acchis_exemplar[level][existed_bin_exemplar[level][t]]; }
 	//
 	//PolynomialInterpolation(Xv, Yv, thresholdvalue);	//output is thresholdvalue
 	//////////////////////////////wrong results////////////////////////////////////////////
 	//cout << endl;
 	//for (int i = 0; i < thresholdvalue.size(); i++){ cout << endl << thresholdvalue[i]; }_getch();
 
-	//for (int i = 0; i < existedbin_exemplar[level].size(); i++){
-	//	cout << endl << "existedbin_exemplar[" << i << "]= " << existedbin_exemplar[level][i] << " thresholdvalue= " << thresholdvalue[i];
+	//for (int i = 0; i < existed_bin_exemplar[level].size(); i++){
+	//	cout << endl << "existed_bin_exemplar[" << i << "]= " << existed_bin_exemplar[level][i] << " thresholdvalue= " << thresholdvalue[i];
 	//}
 
 	thresholdvalue.push_back(DISCRETE_HISTOGRAM_BIN - 1);
@@ -1795,7 +1802,7 @@ void DoPAR::DynamicThresholding(int level){
 	for (ANNidx m = 0; m < TEXSIZE[level] * TEXSIZE[level] * TEXSIZE[level]; m++){
 		auto i = lower_bound(thresholdvalue.begin(), thresholdvalue.end(), m_volume[level][m]);
 		int bin = i - thresholdvalue.begin();		
-		m_volume[level][m] = existedbin_exemplar[level][bin];
+		m_volume[level][m] = existed_bin_exemplar[level][bin];
 		if (m_volume[level][m] > DISCRETE_HISTOGRAM_BIN-1) m_volume[level][m] = DISCRETE_HISTOGRAM_BIN-1;
 	}
 
@@ -1841,56 +1848,61 @@ void DoPAR::PolynomialInterpolation(vector<double>& Xv, vector<double>& Yv, vect
 }
 
 //----------- Proportion Threshold, better ---------
-void DoPAR::ProportionThreshold(vector<short>& shortmodel, vector<short>& BinNum, vector<double>& Prob){
+void DoPAR::ProportionThreshold(vector<short>& Model, vector<short>& BinNum, vector<double>& Prob){
 	//(1) Model to be thresholded according to a distribution <BinNum, Prob>
 	//(2) BinNum and Prob corresponds to histogram (), BinNum must be ordered. The last BinNum is biggest.
-	const bool SelNewAlgYN = true;
+	const bool SelNewAlgYN = false;
 
 	if (BinNum.size() == 0 || Prob.size() != BinNum.size()) { cout << endl << "BinNum.size=" << BinNum.size() << " Prob.size=" << Prob.size(); _getch(); return; }
-	if (shortmodel.size() == 0) { cout << endl << "shortmodel.size=" << shortmodel.size(); _getch(); return; }
+	if (Model.size() == 0) { cout << endl << "shortmodel.size=" << Model.size(); _getch(); return; }
 	double check_sum_Prob(0.0); 
 	for_each(Prob.rbegin(), Prob.rend(), [&](double n) { check_sum_Prob += n; });
-	if (check_sum_Prob > 1.0001 || check_sum_Prob < 0.9999) { cout << endl << "check_sum_Prob=" << check_sum_Prob; _getch(); return; }
+	if (check_sum_Prob > 1.00001 || check_sum_Prob < 0.99999) { cout << endl << "check_sum_Prob=" << check_sum_Prob; _getch(); return; }
 
 	if (!SelNewAlgYN) {
-		short MinVal = -32000;
-		//short MinVal(0);
-		//for (long idx = 0; idx < Model.size(); ++idx) {
-		//	if (Model[idx] < MinVal)
-		//		MinVal = Model[idx];
-		//}
 
-		vector<short> ResModel(shortmodel.size(), BinNum[0]);
+		short MinVal = Model[0];
+
+		for (long idx = 0; idx < Model.size(); ++idx) {
+			if (Model[idx] < MinVal)
+				MinVal = Model[idx];
+		}
+
+		vector<short> ResModel(Model.size(), BinNum[0]);
 
 		for (long ij = BinNum.size() - 1; ij > 0; --ij) {
-			if (long(1000 * Prob[ij]) < 0) continue;
+			//if (long(100 * Prob[ij]) < 0) continue;
 			vector<char> Tmp;
-			Tmp = BinariseImg(shortmodel, Prob[ij]);
-			for (long idx = 0; idx < shortmodel.size(); ++idx) {
+			Tmp = BinariseImg(Model, Prob[ij]);
+			for (long idx = 0; idx < Model.size(); ++idx) {
 				if (Tmp[idx] == 1) {
 					ResModel[idx] = BinNum[ij];
-					shortmodel[idx] = MinVal;
+					Model[idx] = MinVal;
 				}
 			}
 		}
-		shortmodel.swap(ResModel);
+		Model.swap(ResModel);
 	}
 	else {//New algorithm 
-		short MaxVal(0), MinVal(0);
-		for (long idx = 0; idx < shortmodel.size(); ++idx) {
-			if (shortmodel[idx] < MinVal) MinVal = shortmodel[idx];
-			if (shortmodel[idx] > MaxVal) MaxVal = shortmodel[idx];
+		short MaxVal, MinVal;
+		MaxVal = MinVal = Model[0];
+
+		for (long idx = 0; idx < Model.size(); ++idx) {
+			if (Model[idx] < MinVal) MinVal = Model[idx];
+			if (Model[idx] > MaxVal) MaxVal = Model[idx];
 		}
+
 		vector<long> CntValue(MaxVal - MinVal + 2, 0);
 		vector<short> SelMlVal(MaxVal - MinVal + 2, BinNum[0]);
 
-		for (long idx = 0; idx < shortmodel.size(); ++idx) {
-			CntValue[shortmodel[idx] - MinVal]++;
+		for (long idx = 0; idx < Model.size(); ++idx) {
+			CntValue[Model[idx] - MinVal]++;
 		}
 
 		long SelNo = Prob.size() - 1;
-		long TotNum = Prob[SelNo] * shortmodel.size();
+		long TotNum = Prob[SelNo] * Model.size();
 		long RemNum(0);
+
 		for (long ij = CntValue.size() - 1; ij >= 0; --ij) {
 			if (CntValue[ij] == 0) continue;
 			RemNum += CntValue[ij];
@@ -1903,23 +1915,112 @@ void DoPAR::ProportionThreshold(vector<short>& shortmodel, vector<short>& BinNum
 					SelMlVal[ij] = BinNum[SelNo - 1];
 					RemNum = SelMlVal[ij];
 				}
+
 				SelNo--;
 				if (SelNo < 0) break;
-				TotNum = Prob[SelNo] * shortmodel.size();
+				TotNum = Prob[SelNo] * Model.size();
 			}
 			else {
 				SelMlVal[ij] = BinNum[SelNo];
 			}
 		}
 
-		vector<short> ResModel(shortmodel.size(), BinNum[0]);
+		vector<short> ResModel(Model.size(), BinNum[0]);
 
-		for (long idx = 0; idx < shortmodel.size(); ++idx) {
-			ResModel[idx] = SelMlVal[shortmodel[idx] - MinVal];
+		for (long idx = 0; idx < Model.size(); ++idx) {
+			ResModel[idx] = SelMlVal[Model[idx] - MinVal];
 		}
-		shortmodel.swap(ResModel);
+
+		Model.swap(ResModel);
 	}
 }
+//void DoPAR::ProportionThreshold(vector<double>& Model, vector<short>& BinNum, vector<double>& Prob){
+//	//(1) Model to be thresholded according to a distribution <BinNum, Prob>
+//	//(2) BinNum and Prob corresponds to histogram (), BinNum must be ordered. The last BinNum is biggest.
+//	const bool SelNewAlgYN = false;
+//
+//	if (BinNum.size() == 0 || Prob.size() != BinNum.size()) { cout << endl << "BinNum.size=" << BinNum.size() << " Prob.size=" << Prob.size(); _getch(); return; }
+//	if (Model.size() == 0) { cout << endl << "shortmodel.size=" << Model.size(); _getch(); return; }
+//	double check_sum_Prob(0.0);
+//	for_each(Prob.rbegin(), Prob.rend(), [&](double n) { check_sum_Prob += n; });
+//	if (check_sum_Prob > 1.0001 || check_sum_Prob < 0.9999) { cout << endl << "check_sum_Prob=" << check_sum_Prob; _getch(); return; }
+//
+//	if (!SelNewAlgYN) {
+//
+//		double MinVal = Model[0];
+//
+//		for (long idx = 0; idx < Model.size(); ++idx) {
+//			if (Model[idx] < MinVal)
+//				MinVal = Model[idx];
+//		}
+//
+//		vector<double> ResModel(Model.size(), BinNum[0]);
+//
+//		for (long ij = BinNum.size() - 1; ij > 0; --ij) {
+//			if (long(1000 * Prob[ij]) < 0) continue;
+//			vector<char> Tmp;
+//			Tmp = BinariseImg(Model, Prob[ij]);
+//			for (long idx = 0; idx < Model.size(); ++idx) {
+//				if (Tmp[idx] == 1) {
+//					ResModel[idx] = BinNum[ij];
+//					Model[idx] = MinVal;
+//				}
+//			}
+//		}
+//		Model.swap(ResModel);
+//	}
+//	else {//New algorithm 
+//		short MaxVal, MinVal;
+//		MaxVal = MinVal = Model[0];
+//
+//		for (long idx = 0; idx < Model.size(); ++idx) {
+//			if (Model[idx] < MinVal) MinVal = Model[idx];
+//			if (Model[idx] > MaxVal) MaxVal = Model[idx];
+//		}
+//
+//		vector<long> CntValue(MaxVal - MinVal + 2, 0);
+//		vector<short> SelMlVal(MaxVal - MinVal + 2, BinNum[0]);
+//
+//		for (long idx = 0; idx < Model.size(); ++idx) {
+//			CntValue[Model[idx] - MinVal]++;
+//		}
+//
+//		long SelNo = Prob.size() - 1;
+//		long TotNum = Prob[SelNo] * Model.size();
+//		long RemNum(0);
+//
+//		for (long ij = CntValue.size() - 1; ij >= 0; --ij) {
+//			if (CntValue[ij] == 0) continue;
+//			RemNum += CntValue[ij];
+//			if (RemNum > TotNum) {
+//				if (TotNum - RemNum + CntValue[ij] > CntValue[ij] / 2) {
+//					SelMlVal[ij] = BinNum[SelNo];
+//					RemNum = 0;
+//				}
+//				else {
+//					SelMlVal[ij] = BinNum[SelNo - 1];
+//					RemNum = SelMlVal[ij];
+//				}
+//
+//				SelNo--;
+//				if (SelNo < 0) break;
+//				TotNum = Prob[SelNo] * Model.size();
+//			}
+//			else {
+//				SelMlVal[ij] = BinNum[SelNo];
+//			}
+//		}
+//
+//		vector<short> ResModel(Model.size(), BinNum[0]);
+//
+//		for (long idx = 0; idx < Model.size(); ++idx) {
+//			ResModel[idx] = SelMlVal[Model[idx] - MinVal];
+//		}
+//
+//		Model.swap(ResModel);
+//	}
+//}
+
 
 
 // ========= Distance Map ===========
@@ -2185,8 +2286,8 @@ vector<char> DoPAR::BinariseImg(vector<short>& DMap, double TPorosity){
 	//(1) Distance map: Pores have the most largest values
 	//(2) TPorosity: Targeting porosity to determine the actual threshold value to binarise the image
 
-	if (TPorosity > 0.99) TPorosity = 0.99;
-	if (TPorosity < 0.01) TPorosity = 0.01;
+	//if (TPorosity > 0.99) TPorosity = 0.99;
+	//if (TPorosity < 0.01) TPorosity = 0.01;
 
 	short MaxVal(0), MinVal(0);
 

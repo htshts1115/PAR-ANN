@@ -83,7 +83,7 @@ private:
 	void InitRandomVolume(int level);
 	void upsampleVolume(int level);
 	void outputmodel(int level);
-
+////////////////////////////////////////////////////////////////////////////////////////////////////////////
 	static const int MULTIRES = 1;			// # of multi-resolution (0 -> MULTIRES - 1 :: coarsest -> finest)
 	static const int N[MULTIRES];
 	static int TEXSIZE[MULTIRES];			// size of input exemplar
@@ -102,8 +102,7 @@ private:
 	static const bool POSITIONHIS_ON = false;			// Position Histogram	in optimize step
 	static const bool DISCRETE_ON = false;				// discrete solver in optimize step
 	static const bool GAUSSIANFALLOFF_ON = false;		// gaussian fall off weight in optimize step
-	
-
+////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 	void DoANNOptimization();
 	void init();
@@ -140,12 +139,15 @@ private:
 		double a = (x - mean) / stddev;
 		return inv_sqrt_2pi / stddev * std::exp(-0.5 * a * a);
 	}
-
-	std::vector<std::vector<double> >  m_exemplar_x;		// ========== need to change to short ==================
+	
+	// ========== need to change to short ==================
+	std::vector<std::vector<double> >  m_exemplar_x;		
 	std::vector<std::vector<double> >  m_exemplar_y;		
 	std::vector<std::vector<double> >  m_exemplar_z;		// [M] exemplar RGB image, size: NUM_CHANNEL * TEXSIZE^2
+
 	bool loadExemplar();
 	void calcNeighbor();
+
 	void initabsoluteneigh();
 	vector<vector<ANNidx>> absoluteneigh;
 
@@ -244,16 +246,17 @@ private:
 	static const short DISCRETE_HISTOGRAM_BIN;						// for thresholding, discrete values. e.g. default256
 	vector<vector<double> >  discrete_histogram_exemplar;			// [level][discretebin]	256
 	vector<vector<double> >  discrete_histogram_synthesis;			// [level][discretebin]	256
-	vector<vector<short> > existedbin_exemplar;						//[level][<=max bin size]
+	vector<vector<short> > existed_bin_exemplar;						//[level][<=max bin size]
 	vector<vector<double>> existed_histogram_examplar;				//[level][<=max bin size]
 	vector<vector<double>> discrete_acchis_exemplar;							//[level][bin]
 
 	void DynamicThresholding(int level);//reassign values based on TI colorhis after optimize step
 	void calcaccHistogram(vector<double> &inputhis, vector<double> &acchis);
-	void ProportionThreshold(vector<short>& Model, vector<short>& BinNum, vector<double>& Prob);
-
 	//Non-linear solver
 	void PolynomialInterpolation(vector<double>& Xv, vector<double>& Yv, vector<double>& X);
+
+	void ProportionThreshold(vector<short>& Model, vector<short>& BinNum, vector<double>& Prob);
+	void ProportionThreshold(vector<double>& Model, vector<short>& BinNum, vector<double>& Prob);
 
 	//=============== distance map ===================
 	double porosityTI, porosityModel;
@@ -262,7 +265,7 @@ private:
 	vector<short> GetDMap(short Sx, short Sy, short Sz, vector<char>& OImg, char DM_Type, bool DisValYN);
 	vector<char> BinariseImg(vector<short>& DMap, double TPorosity);
 	void BinariseThreshold(vector<short>& DMap, vector<char>& Binarised, short threshold);
-	void RedistributeDMap(vector<short>& DMap);
+	void RedistributeDMap(vector<short>& DMap, short solid_upper, short pore_lower);
 
 	//release data
 	void cleardata(int level);
