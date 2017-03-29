@@ -570,12 +570,13 @@ int DoPAR::D_NEIGHBOR[MULTIRES];
 int DoPAR::NEIGHBORSIZE[MULTIRES];
 
 const short DoPAR::NUM_HISTOGRAM_BIN = 64;			//for color histograms	Kopf used 16
-
-const short DoPAR::DISCRETE_HISTOGRAM_BIN = 256;	//for thresholding, discrete values. e.g. default256
-const short DoPAR::DistanceThreshold = 135;			//for binarise distance model (0-120, 150-256)
-
 vector<short> DoPAR::CHANNEL_MAXVALUE;			//for color histogram
 int DoPAR::NUM_CHANNEL = 1;
+
+const short DoPAR::DISCRETE_HISTOGRAM_BIN = 256;	//for thresholding, discrete values. e.g. default256
+short DoPAR::Solid_Upper = 192;
+short DoPAR::Pore_Lower  = 223;
+short DoPAR::DistanceThreshold = (Solid_Upper + Pore_Lower) / 2;	//for binarise distance model (0-100, 155-255)
 
 const double DoPAR::PCA_RATIO_VARIANCE = 0.95;	//Kopf used 0.95
 
@@ -743,7 +744,7 @@ bool DoPAR::loadExemplar() {
 	porosityxyz[1] = tempmean.val[0] / 256.0;
 	tempmean = mean(matyz);
 	porosityxyz[2] = tempmean.val[0] / 256.0;
-	porosityTI = (porosityxyz[0] + porosityxyz[1] + porosityxyz[2]) / 3.0;
+	//porosityTI = (porosityxyz[0] + porosityxyz[1] + porosityxyz[2]) / 3.0;
 
 	// build image pyramid
 	int img_depth = img_x->depth;
@@ -790,26 +791,29 @@ bool DoPAR::loadExemplar() {
 			vector<short> shortx(m_exemplar_x[level].begin(), m_exemplar_x[level].end());
 			vector<short> shorty(m_exemplar_y[level].begin(), m_exemplar_y[level].end());
 			vector<short> shortz(m_exemplar_z[level].begin(), m_exemplar_z[level].end());
-
+	
 			tempchar = BinariseImg(shortx, porosityxyz[0]);
 			shortx = GetDMap(TEXSIZE[level], TEXSIZE[level], 1, tempchar, 2, false);
-			vector<double> doublex(shortx.begin(), shortx.end());
-			m_exemplar_x[level] = doublex;
-		
 			tempchar = BinariseImg(shorty, porosityxyz[1]);
 			shorty = GetDMap(TEXSIZE[level], TEXSIZE[level], 1, tempchar, 2, false);
-			vector<double> doubley(shorty.begin(), shorty.end());
-			m_exemplar_y[level] = doubley;
-		
 			tempchar = BinariseImg(shortz, porosityxyz[2]);
 			shortz = GetDMap(TEXSIZE[level], TEXSIZE[level], 1, tempchar, 2, false);
-			vector<double> doublez(shortz.begin(), shortz.end());
-			m_exemplar_z[level] = doublez;
-
-			//redistribute distance values
 			
+			//redistribute distance values
+			RedistributeDMap(shortx, Solid_Upper, Pore_Lower);
+			RedistributeDMap(shorty, Solid_Upper, Pore_Lower);
+			RedistributeDMap(shortz, Solid_Upper, Pore_Lower);
+
+			m_exemplar_x[level] = vector<double>(shortx.begin(), shortx.end());
+			m_exemplar_y[level] = vector<double>(shorty.begin(), shorty.end());
+			m_exemplar_z[level] = vector<double>(shortz.begin(), shortz.end());
 		}
 		
+		//cout << endl;
+		//for (int i = 0; i < m_exemplar_x[level].size(); i++){
+		//	cout << m_exemplar_x[level][i] << " ";
+		//}_getch();
+
 		//cvShowImage("dismap", img_x);
 		//cvWaitKey(0);
 		if (level == 0) continue;
@@ -1024,7 +1028,7 @@ bool DoPAR::loadVolume(){
 			shortmodel = GetDMap(TEXSIZE[0], TEXSIZE[0], TEXSIZE[0], tempchar, 2, false);
 		
 			//redistribute distance values
-
+			RedistributeDMap(shortmodel, Solid_Upper, Pore_Lower);
 
 			m_volume[0] = vector<double>(shortmodel.begin(), shortmodel.end());
 		}
@@ -1860,9 +1864,7 @@ void DoPAR::ProportionThreshold(vector<short>& Model, vector<short>& BinNum, vec
 	if (check_sum_Prob > 1.00001 || check_sum_Prob < 0.99999) { cout << endl << "check_sum_Prob=" << check_sum_Prob; _getch(); return; }
 
 	if (!SelNewAlgYN) {
-
 		short MinVal = Model[0];
-
 		for (long idx = 0; idx < Model.size(); ++idx) {
 			if (Model[idx] < MinVal)
 				MinVal = Model[idx];
@@ -1883,7 +1885,7 @@ void DoPAR::ProportionThreshold(vector<short>& Model, vector<short>& BinNum, vec
 		}
 		Model.swap(ResModel);
 	}
-	else {//New algorithm 
+	else {//New algorithm. Not accurate for small frequency distribution
 		short MaxVal, MinVal;
 		MaxVal = MinVal = Model[0];
 
@@ -2090,7 +2092,7 @@ vector<unsigned short> DoPAR::BarDMap(short tSx, short tSy, short tSz, vector<ch
 
 	//cout<<" scanning forwards...";
 	for (idx = -1, z = 0; z<Sz; ++z) {
-		if (z % 100 == 0) cout << "*";
+		//if (z % 100 == 0) cout << "*";
 		for (y = 0; y<Sy; ++y) {
 			for (x = 0; x<Sx; ++x) { 	//if(++JCnt >= JStepNum) {JCnt=0; cout<<".";}
 				if (DMap[++idx] < 1) {
@@ -2131,7 +2133,7 @@ vector<unsigned short> DoPAR::BarDMap(short tSx, short tSy, short tSz, vector<ch
 
 	//cout<<"  scanning backwards...";
 	for (idx = Size, z = Sz - 1; z >= 0; --z) {
-		if (z % 100 == 0) cout << ".";
+		//if (z % 100 == 0) cout << ".";
 		for (y = Sy - 1; y >= 0; --y) {
 			for (x = Sx - 1; x >= 0; --x) { //if(++JCnt >= JStepNum) {JCnt=0; cout<<".";}
 				if (DMap[--idx] <= 0) continue;
@@ -2335,8 +2337,51 @@ vector<char> DoPAR::BinariseImg(vector<short>& DMap, double TPorosity){
 
 void DoPAR::BinariseThreshold(vector<short>& DMap, vector<char>& Binarised, short threshold){
 	if (Binarised.size() != DMap.size()) { cout << endl << "BinariseThreshold() size not matched"; _getch(); return; }
-	for (int i = 0; i < DMap.size(); i++){
+	for (long i = 0; i < DMap.size(); i++){
 		if (DMap[i] < threshold) Binarised[i] = 0;
 		else Binarised[i] = 1;
 	}
+}
+
+void DoPAR::RedistributeDMap(vector<short>& DMap, short solid_upper, short pore_lower){
+	//linear projection for DMap
+	//solid: [minVal,-1] to [0,solid_upper]  ;  pore: [1,maxVal] to [pore_lower,DISCRETE_HISTOGRAM_BIN]
+	//if requires to have same ratio for solid and pore, use the bigger compress ratio
+	const bool equalratio = true;
+
+	short minVal, maxVal; 
+	minVal = maxVal = DMap[0];
+	for (long idx = 0; idx < DMap.size(); ++idx) {
+		if (DMap[idx] < minVal) minVal = DMap[idx];
+		if (DMap[idx] > maxVal) maxVal = DMap[idx];
+		if (DMap[idx] == 0) { cout << endl << "DMap[" << idx << "]=0"; _getch(); return; }
+	}
+
+	double ratiosolid = 1.0* (solid_upper - 0) / (- minVal - 1);
+	double ratiopore = 1.0* (DISCRETE_HISTOGRAM_BIN - 1 - pore_lower) / (maxVal - 1);
+	if (equalratio){
+		double ratio = min(ratiosolid, ratiopore);
+		for (long idx = 0; idx < DMap.size(); ++idx){
+			if (DMap[idx] > 0) { DMap[idx] = (DMap[idx] - 1) * ratio + pore_lower; /*if (DMap[idx]<pore_lower || DMap[idx]>DISCRETE_HISTOGRAM_BIN - 1) cout << "Error"; */}
+			else if (DMap[idx] < 0) { DMap[idx] = solid_upper + (DMap[idx] + 1) * ratio; /*if (DMap[idx] > solid_upper || DMap[idx] <0) cout << "Error";*/ }
+		}
+	}
+	else {
+		for (long idx = 0; idx < DMap.size(); ++idx){
+			if (DMap[idx] > 0) { DMap[idx] = (DMap[idx] - 1) * ratiopore + pore_lower; /*if (DMap[idx]<pore_lower || DMap[idx]>DISCRETE_HISTOGRAM_BIN - 1) cout << "Error";*/ }
+			else if (DMap[idx] < 0) { DMap[idx] = solid_upper + (DMap[idx] + 1) * ratiosolid; /*if (DMap[idx] > solid_upper || DMap[idx] <0) cout << "Error"; */}
+		}
+	}
+
+
+	//int cntmin(0), cntmax(0);
+	//for (long idx = 0; idx < DMap.size(); ++idx) {
+	//	if (DMap[idx] <= 0) cntmin++;
+	//	if (DMap[idx] >= 255) cntmax++;
+	//}
+	//cout << endl << " CntMin= " << cntmin << " CntMax= " << cntmax; _getch();
+	//cout << endl;
+	//for (long idx = 0; idx < DMap.size(); ++idx) {
+	//	cout << DMap[idx] <<" ";
+	//}_getch();
 }

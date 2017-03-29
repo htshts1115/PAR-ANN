@@ -94,7 +94,7 @@ private:
 	static const bool INDEXHIS_ON = true;				// Index Histogram in search step
 	static const bool COLORHIS_ON = false;				// Colour Histogram in optimize step
 	
-	static const bool DISTANCEMAP_ON = false;			// convert to distance map model
+	static const bool DISTANCEMAP_ON = true;			// convert to distance map model
 
 	static const bool PROPORTIONTHRESHOLD_ON = true;	// ProportionThreshold() 
 	static const bool DISCRETETHRESHOLD_ON = false;		// dynamic thresholding in optimize step
@@ -260,7 +260,10 @@ private:
 
 	//=============== distance map ===================
 	double porosityTI, porosityModel;
-	static const short DistanceThreshold;
+	static short Solid_Upper;
+	static short Pore_Lower;
+	static short DistanceThreshold;
+
 	vector<unsigned short> BarDMap(short tSx, short tSy, short tSz, vector<char>& OImg);
 	vector<short> GetDMap(short Sx, short Sy, short Sz, vector<char>& OImg, char DM_Type, bool DisValYN);
 	vector<char> BinariseImg(vector<short>& DMap, double TPorosity);
