@@ -243,7 +243,7 @@ private:
 	int FindClosestColorIndex(int level, vector<double>& colorset, vector<double>& weightset, double referencecolor);	// return the index in colorset of the most similar color	
 	
 	//----------- Dynamic thresholding ----------
-	static const short DISCRETE_HISTOGRAM_BIN;						// for thresholding, discrete values. e.g. default256
+	static short DISCRETE_HISTOGRAM_BIN;						// for thresholding, discrete values. e.g. default256
 	vector<vector<double> >  discrete_histogram_exemplar;			// [level][discretebin]	256
 	vector<vector<double> >  discrete_histogram_synthesis;			// [level][discretebin]	256
 	vector<vector<short> > existed_bin_exemplar;						//[level][<=max bin size]
@@ -260,15 +260,16 @@ private:
 
 	//=============== distance map ===================
 	double porosityTI, porosityModel;
-	static short Solid_Upper;
-	static short Pore_Lower;
-	static short DistanceThreshold;
+	static vector<short> Solid_Upper;
+	static vector<short> Pore_Lower;
+	static vector<short> DistanceThreshold;
 
 	vector<unsigned short> BarDMap(short tSx, short tSy, short tSz, vector<char>& OImg);
 	vector<short> GetDMap(short Sx, short Sy, short Sz, vector<char>& OImg, char DM_Type, bool DisValYN);
 	vector<char> BinariseImg(vector<short>& DMap, double TPorosity);
 	void BinariseThreshold(vector<short>& DMap, vector<char>& Binarised, short threshold);
-	void RedistributeDMap(vector<short>& DMap, short solid_upper, short pore_lower);
+	void RedistributeDMap(vector<short>& DMap, int level);
+	void CalcDistanceThreshold(vector<short>& TI1, vector<short>& TI2, vector<short>& TI3, int level);
 
 	//release data
 	void cleardata(int level);
