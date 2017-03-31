@@ -49,7 +49,7 @@ private:
 	string workpath, outputpath, outputfilename;
 	vector<string> FNameAddition;  //file path names of the training images
 	//vector<uchar> Model;
-	//double PorosityXY, PorosityXZ, PorosityYZ, PorosityM; //Original porosities from 3 training images
+	double PorosityX, PorosityY, PorosityZ, PorosityM; //Original porosities from 3 training images
 
 	//void ReadPBMImage(string FName, char DirID, double UpPro); //Read each training image
 	////DirID: '1' - XY plane, '2' - XZ plane, '3' - YZ plane
@@ -84,7 +84,7 @@ private:
 	void upsampleVolume(int level);
 	void outputmodel(int level);
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////
-	static const int MULTIRES = 1;			// # of multi-resolution (0 -> MULTIRES - 1 :: coarsest -> finest)
+	static const int MULTIRES = 3;			// # of multi-resolution (0 -> MULTIRES - 1 :: coarsest -> finest)
 	static const int N[MULTIRES];
 	static int TEXSIZE[MULTIRES];			// size of input exemplar
 	static int D_NEIGHBOR[MULTIRES];		// dimension of neighborhood (:= 3 * (2 * N + 1)^2)
@@ -92,13 +92,14 @@ private:
 	static int NUM_CHANNEL;						// # of channels (RGB, feature dist., RTF)
 
 	static const bool INDEXHIS_ON = true;				// Index Histogram in search step
-	static const bool COLORHIS_ON = false;				// Colour Histogram in optimize step
-	
+
 	static const bool DISTANCEMAP_ON = true;			// convert to distance map model
 
-	static const bool PROPORTIONTHRESHOLD_ON = true;	// ProportionThreshold() 
-	static const bool DISCRETETHRESHOLD_ON = false;		// dynamic thresholding in optimize step
+	static const bool PROPORTIONTHRESHOLD_ON = true;	// ProportionThreshold() same or better effect than DISCRETETHRESHOLD_ON
 
+	//not used anymore, tested to have worse quality
+	static const bool DISCRETETHRESHOLD_ON = false;		// dynamic thresholding in optimize step. 
+	static const bool COLORHIS_ON = false;				// Colour Histogram in optimize step
 	static const bool POSITIONHIS_ON = false;			// Position Histogram	in optimize step
 	static const bool DISCRETE_ON = false;				// discrete solver in optimize step
 	static const bool GAUSSIANFALLOFF_ON = false;		// gaussian fall off weight in optimize step
@@ -184,7 +185,7 @@ private:
 
 	//check convergence
 	double globalenergy_new, globalenergy_old;
-	std::vector<int> MAXITERATION;				//max iteration time
+	static const short MAXITERATION;				//max iteration time
 
 	//=========== phase 1: search ===========================
 	static const double PCA_RATIO_VARIANCE;		//0.95
@@ -260,16 +261,19 @@ private:
 
 	//=============== distance map ===================
 	double porosityTI, porosityModel;
-	static vector<short> Solid_Upper;
+	static vector<short> Solid_Upper;			//Redistribute DMap Model. Use same Solid_Upper,Pore_Lower for 3TIs and loaded model
 	static vector<short> Pore_Lower;
-	static vector<short> DistanceThreshold;
+	static vector<short> DistanceThreshold;		//Binarise DM, use the same threshold.
+	static short ProjectDMapGap;
+	static short ProjectDMapMaxBins;
+	static vector<double> ProjectDMapCompressRatio;//Redistribute DMap Model. Use same (projection)ratio for 3TIs and loaded model
 
 	vector<unsigned short> BarDMap(short tSx, short tSy, short tSz, vector<char>& OImg);
 	vector<short> GetDMap(short Sx, short Sy, short Sz, vector<char>& OImg, char DM_Type, bool DisValYN);
 	vector<char> BinariseImg(vector<short>& DMap, double TPorosity);
 	void BinariseThreshold(vector<short>& DMap, vector<char>& Binarised, short threshold);
-	void RedistributeDMap(vector<short>& DMap, int level);
-	void CalcDistanceThreshold(vector<short>& TI1, vector<short>& TI2, vector<short>& TI3, int level);
+	void ProjectDMap(vector<short>& DMap, int level);
+	void PrepareDMapProjection(vector<short>& TI1, vector<short>& TI2, vector<short>& TI3, int level);
 
 	//release data
 	void cleardata(int level);
