@@ -46,7 +46,7 @@ private:
 	void ReadRunPar(string CurExeFile); //Read running parameters
 	//=============================================================
 	string FNameXY, FNameXZ, FNameYZ;
-	string workpath, outputpath, outputfilename;
+	string workpath, outputpath, outputfilename, parameterstring;
 	vector<string> FNameAddition;  //file path names of the training images
 	//vector<uchar> Model;
 	double PorosityX, PorosityY, PorosityZ, PorosityM; //Original porosities from 3 training images
@@ -56,18 +56,6 @@ private:
 	////       otherwise a single image for three direction 
 	////UpPro: upper porosity, 0.5 for default. 
 	
-	
-
-	//vector<uchar> XY2DImg, XZ2DImg, YZ2DImg; // 1 - pore, 0 - grain
-	////@@@@@@@10/05/2016@@@@@@@   multiple TI  
-	//vector<vector<uchar>> TIs;
-	//int XYSx, XYSy, XZSx, XZSz, YZSy, YZSz;
-	//int PARx, PARy, PARz; //Resultant model
-	//int TIx, TIy; 
-	//long PARxy;
-	//bool Identical3DYN;  //wether or not three training images are identical
-	
-
 	std::random_device randomseed;
 	std::mt19937 mersennetwistergenerator;
 	std::uniform_real_distribution<double> probabilitydistribution;
@@ -84,7 +72,7 @@ private:
 	void upsampleVolume(int level);
 	void outputmodel(int level);
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////
-	static const int MULTIRES = 3;			// # of multi-resolution (0 -> MULTIRES - 1 :: coarsest -> finest)
+	static const int MULTIRES = 1;			// # of multi-resolution (0 -> MULTIRES - 1 :: coarsest -> finest)
 	static const int N[MULTIRES];
 	static int TEXSIZE[MULTIRES];			// size of input exemplar
 	static int D_NEIGHBOR[MULTIRES];		// dimension of neighborhood (:= 3 * (2 * N + 1)^2)
@@ -95,14 +83,24 @@ private:
 
 	static const bool DISTANCEMAP_ON = true;			// convert to distance map model
 
-	static const bool PROPORTIONTHRESHOLD_ON = true;	// ProportionThreshold() same or better effect than DISCRETETHRESHOLD_ON
+	static const bool LINEARTRANSFORM_ON = false;		//transform weighted average to have same mean and dev as TI
 
-	//not used anymore, tested to have worse quality
+	static const bool PROPORTIONTHRESHOLD_ON = true;	// ProportionThreshold() same or better effect than DISCRETETHRESHOLD_ON
 	static const bool DISCRETETHRESHOLD_ON = false;		// dynamic thresholding in optimize step. 
+
 	static const bool COLORHIS_ON = false;				// Colour Histogram in optimize step
-	static const bool POSITIONHIS_ON = false;			// Position Histogram	in optimize step
+	
+	static const bool ITERATIVEGETDMAP_ON = true;		//convert to 3D DMap every iteration, to correct DM values
+	
+	static const bool COLORSELECT_ON = true;
+
+	bool COUTCH_ON = false;
+
 	static const bool DISCRETE_ON = false;				// discrete solver in optimize step
+	static const bool POSITIONHIS_ON = false;			// Position Histogram	in optimize step
 	static const bool GAUSSIANFALLOFF_ON = false;		// gaussian fall off weight in optimize step
+
+	static const bool HYBRID_DMGREY_ON = false;			//Testing! For finnest resolution use grey image not DM
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 	void DoANNOptimization();
@@ -188,9 +186,9 @@ private:
 	static const short MAXITERATION;				//max iteration time
 
 	//=========== phase 1: search ===========================
-	static const double PCA_RATIO_VARIANCE;		//0.95
+	static double PCA_RATIO_VARIANCE;			//0.95
 	static const double ErrorBound;				//Kopf used 2.0
-	static const int ANNsearchk;			//search k nearest index
+	static vector<short> ANNsearchk;				//search k nearest index
 	std::vector<std::vector<ANNidx> > m_volume_nearest_x_index;		// [M] size: TEXSIZE^3
 	std::vector<std::vector<ANNidx> > m_volume_nearest_y_index;		// [M] size: TEXSIZE^3
 	std::vector<std::vector<ANNidx> > m_volume_nearest_z_index;		// [M] size: TEXSIZE^3
@@ -223,7 +221,7 @@ private:
 	static std::vector<short> CHANNEL_MAXVALUE;	// for color histogram	
 	//double WEIGHT_HISTOGRAM;					// linear weight for histogram
 	vector<vector<vector<double> > > dimensional_histogram_exemplar;				// [level][ori][bin]	16
-	//std::vector<std::vector<std::vector<double> > > m_histogram_exemplar;			// [level][ch][bin]		16
+	std::vector<std::vector<std::vector<double> > > m_histogram_exemplar;			// [level][ch][bin]		16
 	vector<vector<vector<double> > > m_histogram_synthesis;							// [level][ch][bin]		16
 
 	void calcHistogram_exemplar(int level);
@@ -267,15 +265,20 @@ private:
 	static short ProjectDMapGap;
 	static short ProjectDMapMaxBins;
 	static vector<double> ProjectDMapCompressRatio;//Redistribute DMap Model. Use same (projection)ratio for 3TIs and loaded model
+	vector<double> TIsDMmean;
+	bool GenerateDMTI = false;
 
 	vector<unsigned short> BarDMap(short tSx, short tSy, short tSz, vector<char>& OImg);
 	vector<short> GetDMap(short Sx, short Sy, short Sz, vector<char>& OImg, char DM_Type, bool DisValYN);
 	vector<char> BinariseImg(vector<short>& DMap, double TPorosity);
 	void BinariseThreshold(vector<short>& DMap, vector<char>& Binarised, short threshold);
-	void ProjectDMap(vector<short>& DMap, int level);
 	void PrepareDMapProjection(vector<short>& TI1, vector<short>& TI2, vector<short>& TI3, int level);
-
+	void ProjectDMap(vector<short>& DMap, int level);
+	
 	//release data
 	void cleardata(int level);
+
+
+	void calcstddev(int level);
 };
 

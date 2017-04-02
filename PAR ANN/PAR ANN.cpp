@@ -6,12 +6,13 @@
 
 int main(int argc, const char* argv[])
 {
-	
+	//cout << endl << "double=" << sizeof(double) << " float=" << sizeof(float) << " short=" << sizeof(short) << " int=" << sizeof(int) << " long=" << sizeof(long); _getch();
+	//double 8, float 4, short 2, int 4, long 4;
+
 	string CurWorkExeFile = argv[0];
 
 	DoPAR DoItNow;
-	DoItNow.GetStarted(CurWorkExeFile);
-
+	DoItNow.GetStarted(CurWorkExeFile);	
 
 	cout << endl << "Finally: Press any key to quit...";
 

@@ -30,7 +30,7 @@ DoPAR::DoPAR()
 	mp_neighbor_kdTree_x.resize(MULTIRES, NULL);
 	mp_neighbor_kdTree_y.resize(MULTIRES, NULL);
 	mp_neighbor_kdTree_z.resize(MULTIRES, NULL);
-	//m_histogram_exemplar.resize(MULTIRES);
+	m_histogram_exemplar.resize(MULTIRES);
 	dimensional_histogram_exemplar.resize(MULTIRES);
 
 	discrete_histogram_exemplar.resize(MULTIRES);
@@ -49,7 +49,7 @@ DoPAR::DoPAR()
 	m_volume_nearest_z_dist.resize(MULTIRES);
 	m_permutation_xyz.resize(MULTIRES);
 	
-	WEIGHT_POSITIONHISTOGRAM.resize(MULTIRES);
+	WEIGHT_POSITIONHISTOGRAM.resize(MULTIRES,0);
 	gaussiankernel.resize(MULTIRES);
 	absoluteneigh.resize(MULTIRES);
 	m_indexhistogram_exemplar.resize(MULTIRES);
@@ -58,10 +58,13 @@ DoPAR::DoPAR()
 	existed_bin_exemplar.resize(MULTIRES);
 	existed_histogram_examplar.resize(MULTIRES);
 
-	Solid_Upper.resize(MULTIRES);
-	Pore_Lower.resize(MULTIRES);
-	DistanceThreshold.resize(MULTIRES);
-	ProjectDMapCompressRatio.resize(MULTIRES);
+	Solid_Upper.resize(MULTIRES, 0);
+	Pore_Lower.resize(MULTIRES, 0);
+	DistanceThreshold.resize(MULTIRES, 0);
+	ProjectDMapCompressRatio.resize(MULTIRES, 0);
+	TIsDMmean.resize(MULTIRES, 0);
+	
+	ANNsearchk.resize(MULTIRES);
 	// [end] multi-res memory allocation---------------
 }
 
@@ -340,7 +343,18 @@ void DoPAR::ReadRunPar(string CurExeFile)
 		tempoutputfilename = ParV[0].substr(0, ParV[0].rfind('.') == std::string::npos ? ParV[0].length() : ParV[0].rfind('.'));
 	}
 
-	outputfilename = tempoutputfilename + "_ANN" + tempoutputformat;
+	for (int i = 0; i < MULTIRES; i++) parameterstring += to_string(N[i]);
+	if (INDEXHIS_ON) parameterstring += "ih";
+	if (COLORHIS_ON) parameterstring += "ch";
+	if (POSITIONHIS_ON) parameterstring += "ph";
+	if (DISCRETE_ON) parameterstring += "ds";
+	if (GAUSSIANFALLOFF_ON) parameterstring += "g";
+	if (PROPORTIONTHRESHOLD_ON) parameterstring += "pt";
+	if (DISCRETETHRESHOLD_ON) parameterstring += "dt";
+	if (LINEARTRANSFORM_ON) parameterstring += "lt";
+	if (DISTANCEMAP_ON) parameterstring += "DM";
+
+	outputfilename = tempoutputfilename + "_"+ parameterstring + tempoutputformat;
 
 	double UpPorosity = 0.50;
 	/////////////////////////resolution, upper limit of porosity, template type, template radius, minimum pattern existence, scan type, iteration
@@ -569,12 +583,18 @@ void VectorShortToMat(const vector<short>& in, Mat& out)
 	jt = out.begin<int>();
 	for (; it != in.end(); ++it) { *jt++ = (int)(*it); }
 }
+void VectorDoubleToMat(const vector<double>& in, Mat& out){
+	vector<double>::const_iterator it = in.begin();
+	MatIterator_<int> jt, end;
+	jt = out.begin<int>();
+	for (; it != in.end(); ++it) { *jt++ = (int)(*it); }
+}
 
 ///========================== 190217 Kopf. optimization based =====================
 
 
 //MULTIRES: larger number means finner level
-const int DoPAR::N[MULTIRES] = {4, 5, 5};		//Kopf{ 3, 4, 4 }; Chen{3,4,4}; Turner{5,5,5}	// neighborhood size: (2 * N + 1)^2
+const int DoPAR::N[MULTIRES] = {5};		//Kopf{ 3, 4, 4 }; Chen{3,4,4}; Turner{5,5,5}	// neighborhood size: (2 * N + 1)^2
 int DoPAR::TEXSIZE[MULTIRES];
 int DoPAR::D_NEIGHBOR[MULTIRES];
 int DoPAR::NEIGHBORSIZE[MULTIRES];
@@ -591,17 +611,19 @@ short DoPAR::ProjectDMapGap;
 vector<double>DoPAR::ProjectDMapCompressRatio;
 short DoPAR::ProjectDMapMaxBins;
 
-const double DoPAR::PCA_RATIO_VARIANCE = 0.99;	//Kopf used 0.95
+double DoPAR::PCA_RATIO_VARIANCE = 0.99;		//Kopf used 0.95
 
 const double DoPAR::ErrorBound = 2.0;			//Kopf used 2.0
 
-const int DoPAR::ANNsearchk = 13;	
+vector<short> DoPAR::ANNsearchk;				//related to N[level]
 
 const double DoPAR::gaussiansigma = 7.0;		//gaussian fall-off function in optimization phase, higher sigma means more uniform
 
-const short DoPAR::MAXITERATION = 30;
+const short DoPAR::MAXITERATION = 15;
 
 void DoPAR::DoANNOptimization(){
+	if (NUM_CHANNEL>1){ cout << endl << "Error NUM_CHANNEL>1"; _getch(); exit(1); }
+
 	init();
 	
 	time_t StartTime;
@@ -612,20 +634,25 @@ void DoPAR::DoANNOptimization(){
 		globalenergy_new = 0.0; globalenergy_old = 10e-9;
 		
 		int convergencecount(0);
-		for (int loop = 0; loop < MAXITERATION; loop++){
+		for (int loop = 0; loop < MAXITERATION - MULTIRES; loop++){
 			cout << endl << "---------iteration: " << loop+1<<"------------";
 			
 			if (loop == 0) FIRSTRUN = true;
 			else FIRSTRUN = false;
+
+			//if (loop>0) COUTCH_ON = true;
 	
 			searchVolume(curlevel);
 			optimizeVolume(curlevel);
 
-			if (abs(globalenergy_old - globalenergy_new) / globalenergy_old < 0.01) convergencecount++;	
+			if (LINEARTRANSFORM_ON) calcstddev(curlevel);
+
+			if ((globalenergy_old - globalenergy_new)>0 && (globalenergy_old - globalenergy_new) / globalenergy_old < 0.02) convergencecount++;
 			globalenergy_old = globalenergy_new;
 			if (convergencecount > MULTIRES-curlevel) break;	//if change <1% for twice, then mark as converge
+			if (LINEARTRANSFORM_ON && loop > 4) break;
 
-			//outputmodel(curlevel);
+			//if (ITERATIVEGETDMAP_ON) outputmodel(curlevel);
 			//_getch();
 		}
 		if (curlevel >= MULTIRES-2) outputmodel(curlevel);
@@ -658,8 +685,8 @@ void DoPAR::DoANNOptimization(){
 	if (TRUE){//draw histogram graph
 		int cols = TEXSIZE[MULTIRES - 1];
 		int rows = 3*cols;
-		if (POSITIONHIS_ON) writeHistogram(MULTIRES - 1, m_positionhistogram_synthesis[MULTIRES - 1], rows, cols, "PosHis.png");
-		if (INDEXHIS_ON) writeHistogram(MULTIRES - 1, m_indexhistogram_synthesis[MULTIRES - 1], 3 * (cols - 2 * N[MULTIRES - 1]), cols - 2 * N[MULTIRES - 1], "IndexHis.png");
+		if (POSITIONHIS_ON) writeHistogram(MULTIRES - 1, m_positionhistogram_synthesis[MULTIRES - 1], rows, cols, "PosHis_" + parameterstring+ ".png");
+		if (INDEXHIS_ON) writeHistogram(MULTIRES - 1, m_indexhistogram_synthesis[MULTIRES - 1], 3 * (cols - 2 * N[MULTIRES - 1]), cols - 2 * N[MULTIRES - 1], "IndexHis_" + parameterstring + ".png");
 	}
 }
 
@@ -749,10 +776,9 @@ bool DoPAR::loadExemplar() {
 	porosityxyz[1] = tempmean.val[0] / 256.0;	PorosityY = porosityxyz[1];
 	tempmean = mean(matyz);
 	porosityxyz[2] = tempmean.val[0] / 256.0;	PorosityZ = porosityxyz[2];
-	//porosityTI = (porosityxyz[0] + porosityxyz[1] + porosityxyz[2]) / 3.0;
+	porosityTI = (porosityxyz[0] + porosityxyz[1] + porosityxyz[2]) / 3.0;
 
-	//Generate DM TI or not
-	bool GenerateDMTI(false);
+	//Generate DM TI or not	
 	char type;
 	if (DISTANCEMAP_ON){		
 		do{
@@ -848,6 +874,22 @@ bool DoPAR::loadExemplar() {
 			m_exemplar_y[level] = vector<double>(shorty.begin(), shorty.end());
 			m_exemplar_z[level] = vector<double>(shortz.begin(), shortz.end());
 
+			//LINEARTRANSFORM_ON: calculate TIsDMmean
+			if (TRUE){
+				TIsDMmean[level] = 0.0;	
+				for (long idx = 0; idx < shortx.size(); ++idx){
+					TIsDMmean[level] += shortx[idx];
+				}
+				for (long idx = 0; idx < shorty.size(); ++idx){
+					TIsDMmean[level] += shorty[idx];
+				}
+				for (long idx = 0; idx < shortz.size(); ++idx){
+					TIsDMmean[level] += shortz[idx];
+				}
+				TIsDMmean[level] /= (shortx.size() + shorty.size() + shortz.size());
+				cout << endl << "TIsDMmean[" << level << "]= " << TIsDMmean[level]; //_getch();
+			}
+
 			//draw distance model
 			if (GenerateDMTI){
 				std::ostringstream name;
@@ -920,9 +962,11 @@ bool DoPAR::loadExemplar() {
 }
 void DoPAR::calcNeighbor() {
 	//initialize kdtree for certain template/neighbourhood
-
 	cout << endl << "calcNeighbor...";
 	for (int level = 0; level < MULTIRES; ++level) {
+		//ANNsearchk now relates to neighbourhood size
+		ANNsearchk[level] = N[level] * N[level];
+
 		cout << endl << "level:" << level;
 		int numData = (TEXSIZE[level] - 2 * N[level]) * (TEXSIZE[level] - 2 * N[level]);
 		//ann_index range=[0,numData), corresponds to (x,y) where x/y range=[N[level],TEXSIZE[level]-N[level])!
@@ -987,35 +1031,56 @@ void DoPAR::calcNeighbor() {
 			contribution_total_y += cvmGet(p_eigenValues_y, 0, i);
 			contribution_total_z += cvmGet(p_eigenValues_z, 0, i);
 		}
+
 		int dimPCA_x = 0;
 		int dimPCA_y = 0;
 		int dimPCA_z = 0;
-		double contribution_acc_x = 0;
-		double contribution_acc_y = 0;
-		double contribution_acc_z = 0;
-		for (int i = 0; i < D_NEIGHBOR[level]; ++i) {
-			double ratio_x = contribution_acc_x / contribution_total_x;
-			double ratio_y = contribution_acc_y / contribution_total_y;
-			double ratio_z = contribution_acc_z / contribution_total_z;
-			if (ratio_x < PCA_RATIO_VARIANCE) {	//now have better function //PCA pca(data, mean, PCA::DATA_AS_ROW, 0.95);
-				contribution_acc_x += cvmGet(p_eigenValues_x, 0, i);
-				++dimPCA_x;
-			}
-			if (ratio_y < PCA_RATIO_VARIANCE) {
-				contribution_acc_y += cvmGet(p_eigenValues_y, 0, i);
-				++dimPCA_y;
-			}
-			if (ratio_z < PCA_RATIO_VARIANCE) {
-				contribution_acc_z += cvmGet(p_eigenValues_z, 0, i);
-				++dimPCA_z;
-			}
-			if (PCA_RATIO_VARIANCE <= ratio_x && PCA_RATIO_VARIANCE <= ratio_y && PCA_RATIO_VARIANCE <= ratio_z) break;
-		}
 
-		cout << endl;
-		printf("PCA reduction (x): %d -> %d\n", D_NEIGHBOR[level], dimPCA_x);
-		printf("PCA reduction (y): %d -> %d\n", D_NEIGHBOR[level], dimPCA_y);
-		printf("PCA reduction (z): %d -> %d\n", D_NEIGHBOR[level], dimPCA_z);
+		char type;
+		do{
+			type = 'n';
+
+			dimPCA_x = 0;
+			dimPCA_y = 0;
+			dimPCA_z = 0;
+			double contribution_acc_x = 0;
+			double contribution_acc_y = 0;
+			double contribution_acc_z = 0;
+			for (int i = 0; i < D_NEIGHBOR[level]; ++i) {
+				double ratio_x = contribution_acc_x / contribution_total_x;
+				double ratio_y = contribution_acc_y / contribution_total_y;
+				double ratio_z = contribution_acc_z / contribution_total_z;
+				if (ratio_x < PCA_RATIO_VARIANCE) {	//now have better function //PCA pca(data, mean, PCA::DATA_AS_ROW, 0.95);
+					contribution_acc_x += cvmGet(p_eigenValues_x, 0, i);
+					++dimPCA_x;
+				}
+				if (ratio_y < PCA_RATIO_VARIANCE) {
+					contribution_acc_y += cvmGet(p_eigenValues_y, 0, i);
+					++dimPCA_y;
+				}
+				if (ratio_z < PCA_RATIO_VARIANCE) {
+					contribution_acc_z += cvmGet(p_eigenValues_z, 0, i);
+					++dimPCA_z;
+				}
+				if (PCA_RATIO_VARIANCE <= ratio_x && PCA_RATIO_VARIANCE <= ratio_y && PCA_RATIO_VARIANCE <= ratio_z) break;
+			}
+
+			cout << endl;
+			printf("PCA reduction (x): %d -> %d\n", D_NEIGHBOR[level], dimPCA_x);
+			printf("PCA reduction (y): %d -> %d\n", D_NEIGHBOR[level], dimPCA_y);
+			printf("PCA reduction (z): %d -> %d\n", D_NEIGHBOR[level], dimPCA_z);
+
+			if (level == 0){
+				do{
+					cout << endl << "PCA_RATIO_VARIANCE= " << PCA_RATIO_VARIANCE << " Modify or not? [y / n]";
+					cin >> type;
+				} while (!cin.fail() && type != 'y' && type != 'n');
+				if (type == 'y'){
+					cout << endl << "new PCA_RATIO_VARIANCE(e.g.0.99)= ";
+					cin >> PCA_RATIO_VARIANCE;
+				}
+			}
+		} while (type == 'y' && PCA_RATIO_VARIANCE<1.0 && PCA_RATIO_VARIANCE>0.85);
 
 		// Trim total eigenvectors into partial eigenvectors
 		if (mp_neighbor_pca_eigenvec_x[level] != NULL) cvReleaseMat(&mp_neighbor_pca_eigenvec_x[level]);
@@ -1066,6 +1131,49 @@ void DoPAR::calcNeighbor() {
 		mp_neighbor_kdTree_x[level] = new ANNkd_tree(&m_neighbor_kdTree_ptr_x[level][0], numData, dimPCA_x); //ANNkd_tree
 		mp_neighbor_kdTree_y[level] = new ANNkd_tree(&m_neighbor_kdTree_ptr_y[level][0], numData, dimPCA_y);
 		mp_neighbor_kdTree_z[level] = new ANNkd_tree(&m_neighbor_kdTree_ptr_z[level][0], numData, dimPCA_z);
+		
+		
+	
+		//============ TEST TI PCA backproject result
+		if (GenerateDMTI && level == 0){
+			CvMat* backproject_x = cvCreateMat(numData, D_NEIGHBOR[level], CV_64F);
+			cvBackProjectPCA(mp_neighbor_pca_projected_x[level], mp_neighbor_pca_average_x[level], mp_neighbor_pca_eigenvec_x[level], backproject_x);	
+			Mat backprojectMat_x = cvarrToMat(backproject_x);			
+			Mat PCAbackprojectDM1 = Mat(TEXSIZE[level], TEXSIZE[level], CV_8UC1);
+			VectorDoubleToMat(m_exemplar_x[level], PCAbackprojectDM1);
+
+			CvMat* backproject_y = cvCreateMat(numData, D_NEIGHBOR[level], CV_64F);
+			cvBackProjectPCA(mp_neighbor_pca_projected_y[level], mp_neighbor_pca_average_y[level], mp_neighbor_pca_eigenvec_y[level], backproject_y);
+			Mat backprojectMat_y = cvarrToMat(backproject_y);
+			Mat PCAbackprojectDM2 = Mat(TEXSIZE[level], TEXSIZE[level], CV_8UC1);
+			VectorDoubleToMat(m_exemplar_y[level], PCAbackprojectDM2);
+
+			CvMat* backproject_z = cvCreateMat(numData, D_NEIGHBOR[level], CV_64F);
+			cvBackProjectPCA(mp_neighbor_pca_projected_z[level], mp_neighbor_pca_average_z[level], mp_neighbor_pca_eigenvec_z[level], backproject_z);
+			Mat backprojectMat_z = cvarrToMat(backproject_z);
+			Mat PCAbackprojectDM3 = Mat(TEXSIZE[level], TEXSIZE[level], CV_8UC1);
+			VectorDoubleToMat(m_exemplar_z[level], PCAbackprojectDM3);
+
+			int row = 0; 
+			int cols = 0.5*((2 * N[level] + 1)*(2 * N[level] + 1) - 1);
+			for (int v = N[level]; v < TEXSIZE[level] - N[level]; ++v) {
+				for (int u = N[level]; u < TEXSIZE[level] - N[level]; ++u) {
+					PCAbackprojectDM1.at<uchar>(v, u) = backprojectMat_x.at<double>(row, cols);
+					PCAbackprojectDM2.at<uchar>(v, u) = backprojectMat_y.at<double>(row, cols);
+					PCAbackprojectDM3.at<uchar>(v, u) = backprojectMat_z.at<double>(row, cols);
+					++row;
+				}
+			}
+
+			imwrite("PCAbackproject_DM1.png", PCAbackprojectDM1);
+			imwrite("PCAbackproject_DM2.png", PCAbackprojectDM2);
+			imwrite("PCAbackproject_DM3.png", PCAbackprojectDM3);
+			cvReleaseMat(&backproject_x);
+			cvReleaseMat(&backproject_y);
+			cvReleaseMat(&backproject_z);
+			cout << endl << "PCA back projected image outputed."; 
+		}
+
 		// release CV matrices
 		cvReleaseMat(&p_source_x);
 		cvReleaseMat(&p_source_y);
@@ -1083,25 +1191,28 @@ void DoPAR::calcNeighbor() {
 
 bool DoPAR::loadVolume(){
 	//----------------convert Model(vector<uchar>) to m_volume (vector<vector<int>> (multires,ch*x*y*z))		
-	//load from Model, later can also load from file
+	//load from Model, later can also load from file		//level 0
 	if (fileExists(modelFilename3D.c_str()) == true){	
 		vector<uchar> model = load3Dmodel(modelFilename3D.c_str());	
 
 		if (DISTANCEMAP_ON){
-			vector<char> tempchar = vector<char>(model.begin(), model.end());
-
 			//============= Convert to distance model ==========================
 			long PoreNum = 0;
-			short autothresholdvalue(127);
-			cout << endl << "Input autothresholdvalue for Model (default=127)"<< endl<< "e.g. for grey image it could be 100: "; 
-			cin >> autothresholdvalue;
+			short autothresholdvalue(0);
+			bool binaryYN(true);
+			if (binaryYN) for (int i = 0; i < model.size(); i++){ if ((model[i] != 0 && model[i]!=1) && (model[i]<255 && model[i]>0)) { binaryYN = false; break; } }
+			if (binaryYN == false){
+				cout << endl << "Input autothresholdvalue for TIs (default=110): ";
+				cin >> autothresholdvalue;
+			}
 			for (ANNidx idx = 0; idx < model.size(); idx++){
 				if (model[idx] > autothresholdvalue) PoreNum++;
 			}
 			porosityModel = 1.0*PoreNum / model.size();
-			cout << endl << "Thresholded porosity= " << porosityModel;
+			cout << endl << "Loaded Model porosity= " << porosityModel;
 
-			vector<short> shortmodel(tempchar.begin(), tempchar.end());
+			vector<short> shortmodel(model.begin(), model.end());
+			vector<char> tempchar(model.size());
 			BinariseThreshold(shortmodel, tempchar, autothresholdvalue);
 			shortmodel = GetDMap(TEXSIZE[0], TEXSIZE[0], TEXSIZE[0], tempchar, 2, false);
 		
@@ -1109,6 +1220,11 @@ bool DoPAR::loadVolume(){
 			ProjectDMap(shortmodel, 0);
 
 			m_volume[0] = vector<double>(shortmodel.begin(), shortmodel.end());
+			
+			vector<uchar> tempmodel = vector<uchar>(shortmodel.begin(), shortmodel.end());
+			string tempoutputfilename = outputfilename;
+			tempoutputfilename = outputfilename.substr(0, outputfilename.find('.')) + "loadedDM" + ".RAW";
+			Write(outputpath + tempoutputfilename, tempmodel);
 		}
 		else{
 			m_volume[0] = vector<double>(model.begin(), model.end());
@@ -1139,7 +1255,7 @@ void DoPAR::upsampleVolume(int level) {
 	vector<short> shortmodel(m_volume[level].begin(), m_volume[level].end());
 	double porosity(0.0);
 	if (DISTANCEMAP_ON){
-		BinariseThreshold(shortmodel, tempchar, DistanceThreshold[level]);				//[0,1]	
+		BinariseThreshold(shortmodel, tempchar, Solid_Upper[level]);				//[0,1]	
 		for_each(tempchar.rbegin(), tempchar.rend(), [&](char n) { porosity += n; });
 		porosity /= tempchar.size();
 		//cout << endl << "porosity=" << porosity; _getch();
@@ -1219,15 +1335,19 @@ void DoPAR::upsampleVolume(int level) {
 void DoPAR::outputmodel(int level){
 	vector<uchar> tempmodel;
 	tempmodel = vector<uchar>(m_volume[level].begin(), m_volume[level].end());
-	Write(outputpath + outputfilename, tempmodel);
+	string tempoutputfilename = outputfilename;
+	if (MULTIRES>1) tempoutputfilename = outputfilename.substr(0, outputfilename.find('.')) + "_L" + to_string(level) + ".RAW";
+	Write(outputpath + tempoutputfilename, tempmodel);
 	//============= Convert to binary model [leve]==========================
 	if (DISTANCEMAP_ON){
 		vector<char> tempchar(tempmodel.size());
 		//output an extra binary model
 		vector<short> shortmodel(tempmodel.begin(), tempmodel.end());
-		BinariseThreshold(shortmodel, tempchar, DistanceThreshold[level]);
+		BinariseThreshold(shortmodel, tempchar, Solid_Upper[level]);
+		//BinariseImg(shortmodel, porosityTI);
 		tempmodel = vector<uchar>(tempchar.begin(), tempchar.end());
-		Write(outputpath + outputfilename, tempmodel);
+		tempoutputfilename = tempoutputfilename.substr(0, tempoutputfilename.find('.')) + "_binary.RAW";
+		Write(outputpath + tempoutputfilename, tempmodel);
 	}
 	cout << endl << "output done.";
 }
@@ -1243,7 +1363,7 @@ void DoPAR::writeHistogram(int level, vector<double> &hisvec, int rows, int cols
 	short i(0);
 	string tempFPathName = filename;
 	while (fileExists(tempFPathName) == true){
-		tempFPathName = filename.substr(0, filename.find('.')) + "_" + to_string(i) + ".png";
+		tempFPathName = filename.substr(0, filename.find('.')) +  "_" + to_string(i) + ".png";
 		i++;
 	}//rename, not overwrite
 
@@ -1352,17 +1472,17 @@ void DoPAR::searchVolume(int level) {
 		cvProjectPCA(current_neighbor_z, mp_neighbor_pca_average_z[level], mp_neighbor_pca_eigenvec_z[level], current_neighbor_z_projected);
 		// ANN search!
 		//==========multiple nearest index, position control=========
-		ANNidxArray ann_index_x = new ANNidx[ANNsearchk];
-		ANNidxArray ann_index_y = new ANNidx[ANNsearchk];
-		ANNidxArray ann_index_z = new ANNidx[ANNsearchk];
-		ANNdistArray ann_dist_x = new ANNdist[ANNsearchk];
-		ANNdistArray ann_dist_y = new ANNdist[ANNsearchk];
-		ANNdistArray ann_dist_z = new ANNdist[ANNsearchk];
+		ANNidxArray ann_index_x = new ANNidx[ANNsearchk[level]];
+		ANNidxArray ann_index_y = new ANNidx[ANNsearchk[level]];
+		ANNidxArray ann_index_z = new ANNidx[ANNsearchk[level]];
+		ANNdistArray ann_dist_x = new ANNdist[ANNsearchk[level]];
+		ANNdistArray ann_dist_y = new ANNdist[ANNsearchk[level]];
+		ANNdistArray ann_dist_z = new ANNdist[ANNsearchk[level]];
 		
 		// ANN search. error bound = 2.0; Kopf used 2.0
-		mp_neighbor_kdTree_x[level]->annkSearch(current_neighbor_x_projected->data.db, ANNsearchk, ann_index_x, ann_dist_x, ErrorBound);	
-		mp_neighbor_kdTree_y[level]->annkSearch(current_neighbor_y_projected->data.db, ANNsearchk, ann_index_y, ann_dist_y, ErrorBound);
-		mp_neighbor_kdTree_z[level]->annkSearch(current_neighbor_z_projected->data.db, ANNsearchk, ann_index_z, ann_dist_z, ErrorBound);
+		mp_neighbor_kdTree_x[level]->annkSearch(current_neighbor_x_projected->data.db, ANNsearchk[level], ann_index_x, ann_dist_x, ErrorBound);
+		mp_neighbor_kdTree_y[level]->annkSearch(current_neighbor_y_projected->data.db, ANNsearchk[level], ann_index_y, ann_dist_y, ErrorBound);
+		mp_neighbor_kdTree_z[level]->annkSearch(current_neighbor_z_projected->data.db, ANNsearchk[level], ann_index_z, ann_dist_z, ErrorBound);
 
 		// CV release
 		cvReleaseMat(&current_neighbor_x);
@@ -1487,8 +1607,8 @@ ANNidx DoPAR::indexhistmatching_ann_index(int level, int orientation, ANNidxArra
 	double idx_acc(0.0);
 
 	//simple form works better: just select minimum frequency
-	vector<double> frequecyarray(ANNsearchk, 0.0);
-	for (int i = 0; i < ANNsearchk; i++){
+	vector<double> frequecyarray(ANNsearchk[level], 0.0);
+	for (int i = 0; i < ANNsearchk[level]; i++){
 		ANNidx idx = idxarray[i] + orientation*size;
 		frequecyarray[i] = m_indexhistogram_synthesis[level][idx];
 	}
@@ -1497,7 +1617,6 @@ ANNidx DoPAR::indexhistmatching_ann_index(int level, int orientation, ANNidxArra
 
 	return closestindex;	
 }
-
 
 
 //================= phase 2: optimization =====================
@@ -1511,6 +1630,7 @@ void DoPAR::optimizeVolume(int level) {
 		int x = i % TEXSIZE[level];
 		int y = (i / TEXSIZE[level]) % TEXSIZE[level];
 		int z = i / (TEXSIZE[level] * TEXSIZE[level]);
+
 		double weight_acc = 0.0;
 		vector<double> color_acc(NUM_CHANNEL, 0.0);
 
@@ -1522,16 +1642,20 @@ void DoPAR::optimizeVolume(int level) {
 			}
 		}
 
-		//========discrete solver=================
 		//colorset and its positionset [3*NEIGHBORSIZE]	//just for NUM_CHANNEL=1
-		vector<double> colorset(3 * NEIGHBORSIZE[level], 10e5);
-		vector<ANNidx> positionset(3 * NEIGHBORSIZE[level], 10000000);
-		vector<double> positionfrequency(3 * NEIGHBORSIZE[level], 10e2);
+		vector<double> colorset;	if (DISCRETE_ON) colorset.resize(3 * NEIGHBORSIZE[level], 10e5);
+		vector<ANNidx> positionset;	if (DISCRETE_ON&&POSITIONHIS_ON) positionset.resize(3 * NEIGHBORSIZE[level], 10000000);
+		vector<double> positionfrequency; if (DISCRETE_ON&&POSITIONHIS_ON) positionfrequency.resize(3 * NEIGHBORSIZE[level], 10e2);
+		//LINEAR TRANSFORM
+		vector<double> transformedweight; if (LINEARTRANSFORM_ON) transformedweight.resize(3 * NEIGHBORSIZE[level], 0.0);
+		
 
 		int m = 0;	
+		if (COUTCH_ON) cout << endl;
 		//for every voxel's neighbourhood, in 3 orientations
 		for (int dv = -N[level]; dv <= N[level]; ++dv) {
 			for (int du = -N[level]; du <= N[level]; ++du) {
+				//skipping boundary neighbourhood
 				if ((z + dv <0 || z + dv>TEXSIZE[level] - 1) || (y + du <0 || y + du >TEXSIZE[level] - 1)
 					|| (z + du <0 || z + du >TEXSIZE[level] - 1) || (x + dv <0 || x + dv >TEXSIZE[level] - 1)
 					|| (y + dv <0 || y + dv >TEXSIZE[level] - 1) || (x + du <0 || x + du >TEXSIZE[level] - 1))
@@ -1539,6 +1663,7 @@ void DoPAR::optimizeVolume(int level) {
 					m++;
 					continue;
 				}
+
 				//corresponding index of neighbour
 				ANNidx index2_x = TEXSIZE[level] * TEXSIZE[level] * trimIndex(level, z + dv) + TEXSIZE[level] * trimIndex(level, y + du) + x;
 				ANNidx index2_y = TEXSIZE[level] * TEXSIZE[level] * trimIndex(level, z + du) + TEXSIZE[level] * y + trimIndex(level, x + dv);
@@ -1558,7 +1683,7 @@ void DoPAR::optimizeVolume(int level) {
 						//index2 ~ m, index ~ NEIGHBORSIZE[level] - 1 - m; the position is symmetrical!
 												
 						//========discrete solver=================	
-						colorset[ori*NEIGHBORSIZE[level] + m] = color[ch];//record each color and its position				
+						if (DISCRETE_ON) colorset[ori*NEIGHBORSIZE[level] + m] = color[ch];//record each color and its position				
 						if (POSITIONHIS_ON && DISCRETE_ON){
 							//relative index to centre:(NEIGHBORSIZE[level] - 1)/2 - m	absolute index:annconvert(nearest_index) + absolute[relative]
 							positionset[ori*NEIGHBORSIZE[level] + m] = ori*(TEXSIZE[level] * TEXSIZE[level] )
@@ -1577,15 +1702,15 @@ void DoPAR::optimizeVolume(int level) {
 						double histogram_synthesis = 0.0;
 						for (int ch = 0; ch < NUM_CHANNEL; ++ch) {
 							int bin = (int)(color[ch] * NUM_HISTOGRAM_BIN / CHANNEL_MAXVALUE[ch]);
-							//histogram_exemplar = m_histogram_exemplar[level][ch][bin];	
-							histogram_exemplar = dimensional_histogram_exemplar[level][ori][bin];
+							histogram_exemplar = m_histogram_exemplar[level][ch][bin];	
+							//histogram_exemplar = dimensional_histogram_exemplar[level][ori][bin];
 							
 							histogram_synthesis = m_histogram_synthesis[level][ch][bin];	
 							difference = histogram_synthesis - histogram_exemplar;
 							histogram_matching = max(0.0, histogram_synthesis - histogram_exemplar);		
 						}
 						////changed to gaussian distribution, std = accepted error
-						double ColourHisstddev = 0.02;  	// accept maximum stddev*3 error
+						double ColourHisstddev = 0.01;  	// accept maximum stddev*3 error
 						double ColourHisgaussianprob(0.0);
 						////increase weight when (positionhistogram_synthesis - positionhistogram_exemplar)<0	
 						//if (difference >= 0) ColourHisgaussianprob = gaussian_pdf(difference, 0.0, ColourHisstddev);
@@ -1621,11 +1746,22 @@ void DoPAR::optimizeVolume(int level) {
 						color_acc[ch] += weight * color[ch];						
 					}
 					weight_acc += weight;
+
+					//======== Linear Transform from c_new to c_new' ===============
+					if (LINEARTRANSFORM_ON) transformedweight[ori*NEIGHBORSIZE[level] + m] = weight;
+
+					if (COUTCH_ON) {
+						if (ori == 0) {
+							cout << color[0] << " ";	
+							if (m % (N[level] * 2 + 1) == N[level] * 2) cout << ";" << endl;
+						}
+					}
 				}//3 orientations
 				++m;
 			}
 		}//for every voxel's neighbourhood, in 3 orientations
 
+		
 
 		// old & new colors for this voxel
 		vector<double> color_old(NUM_CHANNEL);
@@ -1635,16 +1771,40 @@ void DoPAR::optimizeVolume(int level) {
 		int closestindex;
 		for (int ch = 0; ch < NUM_CHANNEL; ++ch) {
 			color_old[ch] = m_volume[level][NUM_CHANNEL * i + ch];
-			color_new[ch] = color_acc[ch] / weight_acc;		//least square solver
-			if (POSITIONHIS_ON && DISCRETE_ON){//========discrete solver=================		
+			//least square solver
+			color_new[ch] = 1.0*color_acc[ch] / weight_acc;		
+			
+			if (COUTCH_ON) { cout << "---------"<< color_new[0]<<"-------"; _getch(); }
+
+			//======== Linear Transform from c_new to c_new' ===============
+			if (LINEARTRANSFORM_ON){
+				double transformedweightsquare_acc(0.0);
+				double check(0.0); 
+				for (int i = 0; i < 3 * NEIGHBORSIZE[level]; i++){
+					transformedweight[i] /= weight_acc;
+					transformedweightsquare_acc += transformedweight[i] * transformedweight[i];	//sum(wi'^2)
+					check += transformedweight[i];
+				}
+				double alpha = 1.0 / sqrt(transformedweightsquare_acc);
+				double beta = (1.0 - alpha)*TIsDMmean[level];
+				
+				//double temp = color_new[0];
+				color_new[0] = alpha* color_new[0] + beta;		//Linear transform to have same mean and dev as TIs
+				if (check<0.99999 || check>1.00001) exit(1);
+			}
+
+			//========discrete solver=================	
+			if (DISCRETE_ON){	
 				//first calculate the weighted average color, then find the most similar color existed in exemplar, each color corresponds to a m_volume_nearest_index
 				closestindex = FindClosestColorIndex(level, colorset, positionfrequency, color_new[ch]);			
-				color_new[ch] = colorset[closestindex];		//update with the existed most similar color	
+				color_new[ch] = colorset[closestindex];		
 				//Position histogram update
-				position_new = positionset[closestindex];
-				position_old = m_volume_position[level][i];
-				updatePositionHistogram_synthesis(level, position_old, position_new);
-				m_volume_position[level][i] = position_new;
+				if (POSITIONHIS_ON){
+					position_new = positionset[closestindex];
+					position_old = m_volume_position[level][i];
+					updatePositionHistogram_synthesis(level, position_old, position_new);
+					m_volume_position[level][i] = position_new;
+				}
 			}
 		}
 		//color histogram update
@@ -1667,6 +1827,19 @@ void DoPAR::optimizeVolume(int level) {
 	else if (DISCRETETHRESHOLD_ON) DynamicThresholding(level);
 
 
+	//========= Binarise & GetDMap ===============
+	if (DISTANCEMAP_ON && ITERATIVEGETDMAP_ON){
+		vector<short> tempshort(m_volume[level].size());
+		vector<char> tempchar(m_volume[level].size());
+		if (!PROPORTIONTHRESHOLD_ON && !DISCRETETHRESHOLD_ON) transform(m_volume[level].begin(), m_volume[level].end(), tempshort.begin(), std::bind1st(std::multiplies<short>(), 100));	//32767/256 = 128
+		if (PROPORTIONTHRESHOLD_ON || DISCRETETHRESHOLD_ON) BinariseThreshold(tempshort, tempchar, Solid_Upper[level]);
+		else tempchar = BinariseImg(tempshort, porosityTI);
+		tempshort = GetDMap(TEXSIZE[level], TEXSIZE[level], TEXSIZE[level], tempchar, 2, false);
+		ProjectDMap(tempshort, level);
+		m_volume[level] = vector<double>(tempshort.begin(), tempshort.end());
+	}
+
+
 	long time_end = clock();
 	cout << "done. clocks = " << (time_end - time_start) / CLOCKS_PER_SEC;
 }
@@ -1681,12 +1854,12 @@ void DoPAR::initPermutation(int level) {// random permutation (precomputed)
 
 //---------- Color histogram ---------------
 void DoPAR::calcHistogram_exemplar(int level) {
-	//m_histogram_exemplar[level].clear();
-	//m_histogram_exemplar[level].resize(NUM_CHANNEL, vector<double>(NUM_HISTOGRAM_BIN, 0));
-	dimensional_histogram_exemplar[level].clear();
-	if (COLORHIS_ON) dimensional_histogram_exemplar[level].resize(3, vector<double>(NUM_HISTOGRAM_BIN, 0));	//[level][ori][bin]
+	m_histogram_exemplar[level].clear();
+	m_histogram_exemplar[level].resize(NUM_CHANNEL, vector<double>(NUM_HISTOGRAM_BIN, 0));
+	//dimensional_histogram_exemplar[level].clear();
+	//if (COLORHIS_ON) dimensional_histogram_exemplar[level].resize(3, vector<double>(NUM_HISTOGRAM_BIN, 0));	//[level][ori][bin]
 	discrete_histogram_exemplar[level].clear();
-	discrete_histogram_exemplar[level].resize(DISCRETE_HISTOGRAM_BIN, 0.0);		//[level][discretebin]
+	if (DISCRETETHRESHOLD_ON || PROPORTIONTHRESHOLD_ON) discrete_histogram_exemplar[level].resize(DISCRETE_HISTOGRAM_BIN, 0.0);		//[level][discretebin]
 
 	double dimensional_delta_histogram = 1.0 / (TEXSIZE[level] * TEXSIZE[level]);
 	double discrete_delta_histogram = 1.0 / (3 * TEXSIZE[level] * TEXSIZE[level]);
@@ -1697,10 +1870,10 @@ void DoPAR::calcHistogram_exemplar(int level) {
 				double c = (*p[ori])[NUM_CHANNEL * i + ch];
 				if (COLORHIS_ON){					
 					int bin = (int)(c * NUM_HISTOGRAM_BIN / CHANNEL_MAXVALUE[ch]);
-					//m_histogram_exemplar[level][ch][bin] += discrete_delta_histogram;
-					dimensional_histogram_exemplar[level][ori][bin] += dimensional_delta_histogram;
+					m_histogram_exemplar[level][ch][bin] += discrete_delta_histogram;
+					//dimensional_histogram_exemplar[level][ori][bin] += dimensional_delta_histogram;
 				}
-				discrete_histogram_exemplar[level][(int)c] += discrete_delta_histogram;
+				if (DISCRETETHRESHOLD_ON || PROPORTIONTHRESHOLD_ON) discrete_histogram_exemplar[level][(int)c] += discrete_delta_histogram;
 			}
 		}
 	}
@@ -1729,7 +1902,7 @@ void DoPAR::calcHistogram_synthesis(int level) {
 	m_histogram_synthesis[level].clear();
 	m_histogram_synthesis[level].resize(NUM_CHANNEL, vector<double>(NUM_HISTOGRAM_BIN, 0.0));
 	discrete_histogram_synthesis[level].clear();
-	discrete_histogram_synthesis[level].resize(DISCRETE_HISTOGRAM_BIN, 0.0);
+	if (DISCRETETHRESHOLD_ON) discrete_histogram_synthesis[level].resize(DISCRETE_HISTOGRAM_BIN, 0.0);
 
 	double delta_histogram = 1.0 / (TEXSIZE[level] * TEXSIZE[level] * TEXSIZE[level]);
 	for (int i = 0; i < TEXSIZE[level] * TEXSIZE[level] * TEXSIZE[level]; ++i) {
@@ -1739,7 +1912,7 @@ void DoPAR::calcHistogram_synthesis(int level) {
 			m_histogram_synthesis[level][ch][bin] += delta_histogram;
 
 			int discretebin = (int)c;
-			discrete_histogram_synthesis[level][discretebin] += delta_histogram;
+			if (DISCRETETHRESHOLD_ON) discrete_histogram_synthesis[level][discretebin] += delta_histogram;
 		}
 	}
 }
@@ -1753,8 +1926,10 @@ void DoPAR::updateHistogram_synthesis(int level, const std::vector<double>& colo
 
 		int discretebin_old = (int)color_old[ch];
 		int discretebin_new = (int)color_new[ch];
-		discrete_histogram_synthesis[level][discretebin_old] -= delta_histogram;
-		discrete_histogram_synthesis[level][discretebin_new] += delta_histogram;
+		if (DISCRETETHRESHOLD_ON) {
+			discrete_histogram_synthesis[level][discretebin_old] -= delta_histogram;
+			discrete_histogram_synthesis[level][discretebin_new] += delta_histogram;
+		}
 	}
 }
 
@@ -1811,6 +1986,11 @@ int DoPAR::FindClosestColorIndex(int level, vector<double> &color, vector<double
 	//find nearest color value, then compare weight for all closest values
 	//return the final index
 	
+	if (DISTANCEMAP_ON) { 
+		if (referencecolor < Solid_Upper[level]) referencecolor = floor(referencecolor);
+		if (referencecolor > Pore_Lower[level]) referencecolor = ceil(referencecolor);
+	}
+
 	auto i = min_element(begin(color), end(color), [=](double x, double y)
 	{
 		return abs(x - referencecolor) < abs(y - referencecolor);
@@ -1981,56 +2161,56 @@ void DoPAR::ProportionThreshold(vector<short>& Model, vector<short>& BinNum, vec
 		}
 		Model.swap(ResModel);
 	}
-	else {//New algorithm. Not accurate for small frequency distribution
-		short MaxVal, MinVal;
-		MaxVal = MinVal = Model[0];
+	//else {//New algorithm. Not accurate for small frequency distribution
+	//	short MaxVal, MinVal;
+	//	MaxVal = MinVal = Model[0];
 
-		for (long idx = 0; idx < Model.size(); ++idx) {
-			if (Model[idx] < MinVal) MinVal = Model[idx];
-			if (Model[idx] > MaxVal) MaxVal = Model[idx];
-		}
+	//	for (long idx = 0; idx < Model.size(); ++idx) {
+	//		if (Model[idx] < MinVal) MinVal = Model[idx];
+	//		if (Model[idx] > MaxVal) MaxVal = Model[idx];
+	//	}
 
-		vector<long> CntValue(MaxVal - MinVal + 2, 0);
-		vector<short> SelMlVal(MaxVal - MinVal + 2, BinNum[0]);
+	//	vector<long> CntValue(MaxVal - MinVal + 2, 0);
+	//	vector<short> SelMlVal(MaxVal - MinVal + 2, BinNum[0]);
 
-		for (long idx = 0; idx < Model.size(); ++idx) {
-			CntValue[Model[idx] - MinVal]++;
-		}
+	//	for (long idx = 0; idx < Model.size(); ++idx) {
+	//		CntValue[Model[idx] - MinVal]++;
+	//	}
 
-		long SelNo = Prob.size() - 1;
-		long TotNum = Prob[SelNo] * Model.size();
-		long RemNum(0);
+	//	long SelNo = Prob.size() - 1;
+	//	long TotNum = Prob[SelNo] * Model.size();
+	//	long RemNum(0);
 
-		for (long ij = CntValue.size() - 1; ij >= 0; --ij) {
-			if (CntValue[ij] == 0) continue;
-			RemNum += CntValue[ij];
-			if (RemNum > TotNum) {
-				if (TotNum - RemNum + CntValue[ij] > CntValue[ij] / 2) {
-					SelMlVal[ij] = BinNum[SelNo];
-					RemNum = 0;
-				}
-				else {
-					SelMlVal[ij] = BinNum[SelNo - 1];
-					RemNum = SelMlVal[ij];
-				}
+	//	for (long ij = CntValue.size() - 1; ij >= 0; --ij) {
+	//		if (CntValue[ij] == 0) continue;
+	//		RemNum += CntValue[ij];
+	//		if (RemNum > TotNum) {
+	//			if (TotNum - RemNum + CntValue[ij] > CntValue[ij] / 2) {
+	//				SelMlVal[ij] = BinNum[SelNo];
+	//				RemNum = 0;
+	//			}
+	//			else {
+	//				SelMlVal[ij] = BinNum[SelNo - 1];
+	//				RemNum = SelMlVal[ij];
+	//			}
 
-				SelNo--;
-				if (SelNo < 0) break;
-				TotNum = Prob[SelNo] * Model.size();
-			}
-			else {
-				SelMlVal[ij] = BinNum[SelNo];
-			}
-		}
+	//			SelNo--;
+	//			if (SelNo < 0) break;
+	//			TotNum = Prob[SelNo] * Model.size();
+	//		}
+	//		else {
+	//			SelMlVal[ij] = BinNum[SelNo];
+	//		}
+	//	}
 
-		vector<short> ResModel(Model.size(), BinNum[0]);
+	//	vector<short> ResModel(Model.size(), BinNum[0]);
 
-		for (long idx = 0; idx < Model.size(); ++idx) {
-			ResModel[idx] = SelMlVal[Model[idx] - MinVal];
-		}
+	//	for (long idx = 0; idx < Model.size(); ++idx) {
+	//		ResModel[idx] = SelMlVal[Model[idx] - MinVal];
+	//	}
 
-		Model.swap(ResModel);
-	}
+	//	Model.swap(ResModel);
+	//}
 }
 //void DoPAR::ProportionThreshold(vector<double>& Model, vector<short>& BinNum, vector<double>& Prob){
 //	//(1) Model to be thresholded according to a distribution <BinNum, Prob>
@@ -2118,7 +2298,6 @@ void DoPAR::ProportionThreshold(vector<short>& Model, vector<short>& BinNum, vec
 //		Model.swap(ResModel);
 //	}
 //}
-
 
 
 // ========= Distance Map ===========
@@ -2384,9 +2563,6 @@ vector<char> DoPAR::BinariseImg(vector<short>& DMap, double TPorosity){
 	//(1) Distance map: Pores have the most largest values
 	//(2) TPorosity: Targeting porosity to determine the actual threshold value to binarise the image
 
-	//if (TPorosity > 0.99) TPorosity = 0.99;
-	//if (TPorosity < 0.01) TPorosity = 0.01;
-
 	short MaxVal(0), MinVal(0);
 
 	for (long idx = 0; idx < DMap.size(); ++idx) {
@@ -2477,7 +2653,7 @@ void DoPAR::BinariseThreshold(vector<short>& DMap, vector<char>& Binarised, shor
 	//output vector<char>Binarised 
 	if (Binarised.size() != DMap.size()) { cout << endl << "BinariseThreshold() size not matched"; _getch(); return; }
 	for (long i = 0; i < DMap.size(); i++){
-		if (DMap[i] < threshold) Binarised[i] = 0;
+		if (DMap[i] <= threshold) Binarised[i] = 0;
 		else Binarised[i] = 1;
 	}
 }
@@ -2506,14 +2682,8 @@ void DoPAR::PrepareDMapProjection(vector<short>& TI1, vector<short>& TI2, vector
 		if (TI3[idx] > maxVal3) maxVal3 = TI3[idx];
 	}cout << endl << "TI3: porosity= " << PorosityZ << " solid_min= " << minVal3 << " pore_max= " << maxVal3;
 
-	if (level == MULTIRES - 1){
-		//cout << endl << "Input Max Bins for projected DMap: ";
-		//cin >> ProjectDMapMaxBins;
-		//cout << endl << "Input Gap for pore and solid (-1&+1): ";
-		//cin >> ProjectDMapGap;
-	}
 	ProjectDMapMaxBins = -minVal + maxVal;
-	ProjectDMapGap = (DISCRETE_HISTOGRAM_BIN - 1) / (ProjectDMapMaxBins + 1);
+	ProjectDMapGap = ceil(1.0*(DISCRETE_HISTOGRAM_BIN - 1) / (ProjectDMapMaxBins + 1));
 
 	//compress minVal, maxVal, reducing the dimension. e.g.-1,-2,-3-->-1; -4,-5,-6-->-2...
 	//ProjectDMapCompressRatio[level] = 1.0*(maxVal - minVal) / ProjectDMapMaxBins;
@@ -2522,26 +2692,9 @@ void DoPAR::PrepareDMapProjection(vector<short>& TI1, vector<short>& TI2, vector
 	Solid_Upper[level] = (-minVal * (DISCRETE_HISTOGRAM_BIN - 1 - ProjectDMapGap)) / (maxVal - minVal);
 	Pore_Lower[level] = Solid_Upper[level] + ProjectDMapGap;
 
-
-	//short small(maxVal), big(-minVal);
-	//if (-minVal < maxVal) { small = -minVal; big = maxVal; }
-	//Use same ratio for 3TIs. so as to reduce dimension, and also giving the same meaning to pore/solid in 3TIs
-	//short gapratio = 5;
-	//cout << endl << "Level: "<< level << " Choose gapratio (default 5) between solid_upper & pore_lower: ";
-	//cin >> gapratio;
-	//ProjectDMapRatio[level] = 1.0*(DISCRETE_HISTOGRAM_BIN - 1) / (-minVal + maxVal + gapratio);
-	//short gap = gapratio*ProjectDMapRatio[level];//Calc gap based on maxVal & minVal.	
-	//default 256 bin, save gap bin to gap two parts.
-	//cout << endl << "Choose gap for solid_upper & pore_lower for level:"<<level<<" ";
-	//cin >> ProjectDMapGap;
-	//short smallrange = (DISCRETE_HISTOGRAM_BIN - ProjectDMapGap) / (1.0*big / small + 1.0);
-	//decide Solid_Upper && Pore_Lower && DISTANCETHRESHOLD
-	//if (-minVal >= maxVal) { Pore_Lower[level] = DISCRETE_HISTOGRAM_BIN - 1 - smallrange; Solid_Upper[level] = smallrange*1.0*big / small; }
-	//else { Solid_Upper[level] = smallrange;  Pore_Lower[level] = DISCRETE_HISTOGRAM_BIN - 1 - smallrange*1.0*big / small; }	
-	
 	DistanceThreshold[level] = 0.5*(Solid_Upper[level] + Pore_Lower[level]);
 
-	cout << endl << "ProjectDMapMaxBins= " << ProjectDMapMaxBins << " ProjectDMapGap= " << ProjectDMapGap << " ProjectDMapCompressRatio= " << ProjectDMapCompressRatio[level];
+	cout << endl << "ProjectDMapMaxBins= " << ProjectDMapMaxBins << " ProjectDMapGap= " << ProjectDMapGap /*<< " ProjectDMapCompressRatio= " << ProjectDMapCompressRatio[level]*/;
 	cout << endl << "Solid_Upper= " << Solid_Upper[level] << "  Pore_Lower= " << Pore_Lower[level];
 }
 void DoPAR::ProjectDMap(vector<short>& DMap, int level){
@@ -2559,14 +2712,26 @@ void DoPAR::ProjectDMap(vector<short>& DMap, int level){
 	for (long idx = 0; idx < DMap.size(); ++idx){
 		//if (!reversemodel){
 		if (DMap[idx] > 0) { 
-			DMap[idx] = floor((DMap[idx] - 1) / ProjectDMapCompressRatio[level])*binsize + Pore_Lower[level];
+			DMap[idx] = ceil(((DMap[idx] - 1) / ProjectDMapCompressRatio[level])*binsize) + Pore_Lower[level];
 			if (DMap[idx] > DISCRETE_HISTOGRAM_BIN - 1) DMap[idx] = DISCRETE_HISTOGRAM_BIN - 1; 
 		}
 		else if (DMap[idx] < 0) { 
-			DMap[idx] = Solid_Upper[level] - ceil((-DMap[idx] - 1) / ProjectDMapCompressRatio[level]) *binsize;
+			DMap[idx] = Solid_Upper[level] - ceil(((-DMap[idx] - 1) / ProjectDMapCompressRatio[level]) *binsize);
 			if (DMap[idx] < 0) DMap[idx] = 0; 
 		}
 		
 		//cout << DMap[idx] <<",";
 	}
+}
+
+void DoPAR::calcstddev(int level){
+	double sum = std::accumulate(m_volume[level].begin(), m_volume[level].end(), 0.0);
+	double mean = sum / m_volume[level].size();
+
+	std::vector<double> diff(m_volume[level].size());
+	std::transform(m_volume[level].begin(), m_volume[level].end(), diff.begin(), [mean](double x) { return x - mean; });
+	double sq_sum = std::inner_product(diff.begin(), diff.end(), diff.begin(), 0.0);
+	double stdev = std::sqrt(sq_sum / m_volume[level].size());
+
+	cout << endl << "mean=" << mean << " stdev=" << stdev << " size=" << m_volume[level].size();
 }

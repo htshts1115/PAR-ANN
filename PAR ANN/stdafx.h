@@ -27,6 +27,7 @@
 #include <iterator>
 #include <set>
 #include <functional>	//bind1st
+#include <numeric>
 
 #include "opencv2/core/core.hpp"
 #include "opencv2/imgcodecs.hpp"
