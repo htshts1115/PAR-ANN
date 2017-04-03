@@ -84,21 +84,27 @@ public:
 //----------------------------------------------------------------------
 class DLL_API ANNsampStat {
 	int				n;				// number of samples
-	double			sum;			// sum
-	double			sum2;			// sum of squares
-	double			minVal, maxVal;	// min and max
+	//double			sum;			// sum
+	float sum;
+	//double			sum2;			// sum of squares
+	float sum2;
+	//double			minVal, maxVal;	// min and max
+	float minVal, maxVal;
 public :
 	void reset()				// reset everything
 	{  
 		n = 0;
 		sum = sum2 = 0;
-		minVal = ANN_DBL_MAX;
-		maxVal = -ANN_DBL_MAX; 
+		//minVal = ANN_DBL_MAX;
+		minVal = ANN_FLT_MAX;
+		//maxVal = -ANN_DBL_MAX; 
+		maxVal = -ANN_FLT_MAX;
 	}
 
 	ANNsampStat() { reset(); }		// constructor
 
-	void operator+=(double x)		// add sample
+	//void operator+=(double x)		// add sample
+	void operator+=(float x)
 	{
 		n++;  sum += x;  sum2 += x*x;
 		if (x < minVal) minVal = x;
@@ -107,13 +113,13 @@ public :
 
 	int samples() { return n; }		// number of samples
 
-	double mean() { return sum/n; } // mean
+	float/*double*/ mean() { return sum/n; } // mean
 
 									// standard deviation
-	double stdDev() { return sqrt((sum2 - (sum*sum)/n)/(n-1));}
+	float/*double*/ stdDev() { return sqrt((sum2 - (sum*sum) / n) / (n - 1)); }
 
-	double min() { return minVal; } // minimum
-	double max() { return maxVal; } // maximum
+	float/*double*/ min() { return minVal; } // minimum
+	float/*double*/ max() { return maxVal; } // maximum
 };
 
 //----------------------------------------------------------------------

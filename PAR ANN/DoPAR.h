@@ -67,7 +67,7 @@ private:
 	vector<uchar> load3Dmodel(const char* filename);
 	bool loadVolume();
 	// synthesized volume
-	std::vector<std::vector<double > > m_volume;	// [M] size: NUM_CHANNEL * TEXSIZE^3
+	std::vector<std::vector<ANNcoord > > m_volume;	// [M] size: NUM_CHANNEL * TEXSIZE^3
 	void InitRandomVolume(int level);
 	void upsampleVolume(int level);
 	void outputmodel(int level);
@@ -90,7 +90,7 @@ private:
 
 	static const bool COLORHIS_ON = false;				// Colour Histogram in optimize step
 	
-	static const bool ITERATIVEGETDMAP_ON = true;		//convert to 3D DMap every iteration, to correct DM values
+	static const bool ITERATIVEGETDMAP_ON = false;		//convert to 3D DMap every iteration, to correct DM values
 	
 	static const bool COLORSELECT_ON = true;
 
@@ -140,9 +140,9 @@ private:
 	}
 	
 	// ========== need to change to short ==================
-	std::vector<std::vector<double> >  m_exemplar_x;		
-	std::vector<std::vector<double> >  m_exemplar_y;		
-	std::vector<std::vector<double> >  m_exemplar_z;		// [M] exemplar RGB image, size: NUM_CHANNEL * TEXSIZE^2
+	std::vector<std::vector<ANNcoord> >  m_exemplar_x;
+	std::vector<std::vector<ANNcoord> >  m_exemplar_y;
+	std::vector<std::vector<ANNcoord> >  m_exemplar_z;		// [M] exemplar RGB image, size: NUM_CHANNEL * TEXSIZE^2
 
 	bool loadExemplar();
 	void calcNeighbor();
@@ -151,9 +151,9 @@ private:
 	vector<vector<ANNidx>> absoluteneigh;
 
 	// PCA-projected neighborhood vector
-	std::vector<std::vector<double> > m_neighbor_x;				// [M] original neighborhood vector required for texture optimization
-	std::vector<std::vector<double> > m_neighbor_y;
-	std::vector<std::vector<double> > m_neighbor_z;
+	std::vector<std::vector<ANNcoord> > m_neighbor_x;				// [M] original neighborhood vector required for texture optimization
+	std::vector<std::vector<ANNcoord> > m_neighbor_y;
+	std::vector<std::vector<ANNcoord> > m_neighbor_z;
 	std::vector<CvMat*> mp_neighbor_pca_average_x;						// [M] average of neighborhood vector
 	std::vector<CvMat*> mp_neighbor_pca_average_y;
 	std::vector<CvMat*> mp_neighbor_pca_average_z;
@@ -163,9 +163,9 @@ private:
 	std::vector<CvMat*> mp_neighbor_pca_eigenvec_x;						// [M] eigenvectors for covariant matrix
 	std::vector<CvMat*> mp_neighbor_pca_eigenvec_y;
 	std::vector<CvMat*> mp_neighbor_pca_eigenvec_z;
-	std::vector<std::vector<double*> > m_neighbor_kdTree_ptr_x;			// [M] array of pointers to vectors required for ANNkd_tree
-	std::vector<std::vector<double*> > m_neighbor_kdTree_ptr_y;			//ANNPoint*, 3 level
-	std::vector<std::vector<double*> > m_neighbor_kdTree_ptr_z;
+	std::vector<std::vector<ANNcoord*> > m_neighbor_kdTree_ptr_x;			// [M] array of pointers to vectors required for ANNkd_tree
+	std::vector<std::vector<ANNcoord*> > m_neighbor_kdTree_ptr_y;			//ANNPoint*, 3 level
+	std::vector<std::vector<ANNcoord*> > m_neighbor_kdTree_ptr_z;
 	std::vector<ANNkd_tree*          > mp_neighbor_kdTree_x;	// [M] ANN kdTree
 	std::vector<ANNkd_tree*          > mp_neighbor_kdTree_y;	// ANNkd_tree, 3 level
 	std::vector<ANNkd_tree*          > mp_neighbor_kdTree_z;
@@ -192,9 +192,9 @@ private:
 	std::vector<std::vector<ANNidx> > m_volume_nearest_x_index;		// [M] size: TEXSIZE^3
 	std::vector<std::vector<ANNidx> > m_volume_nearest_y_index;		// [M] size: TEXSIZE^3
 	std::vector<std::vector<ANNidx> > m_volume_nearest_z_index;		// [M] size: TEXSIZE^3
-	std::vector<std::vector<double> > m_volume_nearest_x_dist;		// [M] size: TEXSIZE^3
-	std::vector<std::vector<double> > m_volume_nearest_y_dist;		// [M] size: TEXSIZE^3
-	std::vector<std::vector<double> > m_volume_nearest_z_dist;		// [M] size: TEXSIZE^3
+	std::vector<std::vector<ANNdist> > m_volume_nearest_x_dist;		// [M] size: TEXSIZE^3
+	std::vector<std::vector<ANNdist> > m_volume_nearest_y_dist;		// [M] size: TEXSIZE^3
+	std::vector<std::vector<ANNdist> > m_volume_nearest_z_dist;		// [M] size: TEXSIZE^3
 	void searchVolume(int level);
 
 	// ----------- index histogram -------------
@@ -226,7 +226,7 @@ private:
 
 	void calcHistogram_exemplar(int level);
 	void calcHistogram_synthesis(int level);
-	void updateHistogram_synthesis(int level, const std::vector<double>& color_old, const std::vector<double>& color_new);
+	void updateHistogram_synthesis(int level, const std::vector<ANNcoord>& color_old, const std::vector<ANNcoord>& color_new);
 	
 	//---------- position histogram ------------
 	vector<double> WEIGHT_POSITIONHISTOGRAM;
@@ -239,7 +239,7 @@ private:
 	void updatePositionHistogram_synthesis(int level, const ANNidx position_old, const ANNidx position_new);
 	void writeHistogram(int level, vector<double> &histogram, int rows, int cols, const string filename);
 	//discrete solver
-	int FindClosestColorIndex(int level, vector<double>& colorset, vector<double>& weightset, double referencecolor);	// return the index in colorset of the most similar color	
+	int FindClosestColorIndex(int level, vector<ANNcoord>& colorset, vector<double>& weightset, ANNcoord referencecolor);	// return the index in colorset of the most similar color	
 	
 	//----------- Dynamic thresholding ----------
 	static short DISCRETE_HISTOGRAM_BIN;						// for thresholding, discrete values. e.g. default256
@@ -255,7 +255,7 @@ private:
 	void PolynomialInterpolation(vector<double>& Xv, vector<double>& Yv, vector<double>& X);
 
 	void ProportionThreshold(vector<short>& Model, vector<short>& BinNum, vector<double>& Prob);
-	void ProportionThreshold(vector<double>& Model, vector<short>& BinNum, vector<double>& Prob);
+	void ProportionThreshold(vector<ANNcoord>& Model, vector<short>& BinNum, vector<double>& Prob);
 
 	//=============== distance map ===================
 	double porosityTI, porosityModel;

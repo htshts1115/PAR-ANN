@@ -589,6 +589,12 @@ void VectorDoubleToMat(const vector<double>& in, Mat& out){
 	jt = out.begin<int>();
 	for (; it != in.end(); ++it) { *jt++ = (int)(*it); }
 }
+void VectorFloatToMat(const vector<float>& in, Mat& out){
+	vector<float>::const_iterator it = in.begin();
+	MatIterator_<int> jt, end;
+	jt = out.begin<int>();
+	for (; it != in.end(); ++it) { *jt++ = (int)(*it); }
+}
 
 ///========================== 190217 Kopf. optimization based =====================
 
@@ -870,9 +876,9 @@ bool DoPAR::loadExemplar() {
 			ProjectDMap(shorty, level);
 			ProjectDMap(shortz, level);
 
-			m_exemplar_x[level] = vector<double>(shortx.begin(), shortx.end());
-			m_exemplar_y[level] = vector<double>(shorty.begin(), shorty.end());
-			m_exemplar_z[level] = vector<double>(shortz.begin(), shortz.end());
+			m_exemplar_x[level] = vector<ANNcoord>(shortx.begin(), shortx.end());
+			m_exemplar_y[level] = vector<ANNcoord>(shorty.begin(), shorty.end());
+			m_exemplar_z[level] = vector<ANNcoord>(shortz.begin(), shortz.end());
 
 			//LINEARTRANSFORM_ON: calculate TIsDMmean
 			if (TRUE){
@@ -970,9 +976,9 @@ void DoPAR::calcNeighbor() {
 		cout << endl << "level:" << level;
 		int numData = (TEXSIZE[level] - 2 * N[level]) * (TEXSIZE[level] - 2 * N[level]);
 		//ann_index range=[0,numData), corresponds to (x,y) where x/y range=[N[level],TEXSIZE[level]-N[level])!
-		CvMat* p_source_x = cvCreateMat(numData, D_NEIGHBOR[level], CV_64F);	//rows='area' numData, cols=dimension (Neighbour size)
-		CvMat* p_source_y = cvCreateMat(numData, D_NEIGHBOR[level], CV_64F);
-		CvMat* p_source_z = cvCreateMat(numData, D_NEIGHBOR[level], CV_64F);
+		CvMat* p_source_x = cvCreateMat(numData, D_NEIGHBOR[level], CV_32F);	//rows='area' numData, cols=dimension (Neighbour size)
+		CvMat* p_source_y = cvCreateMat(numData, D_NEIGHBOR[level], CV_32F);
+		CvMat* p_source_z = cvCreateMat(numData, D_NEIGHBOR[level], CV_32F);
 		int row = 0;
 		for (int v = N[level]; v < TEXSIZE[level] - N[level]; ++v) {
 			for (int u = N[level]; u < TEXSIZE[level] - N[level]; ++u) {
@@ -1002,19 +1008,19 @@ void DoPAR::calcNeighbor() {
 		if (mp_neighbor_pca_average_y[level] != NULL) cvReleaseMat(&mp_neighbor_pca_average_y[level]);
 		if (mp_neighbor_pca_average_z[level] != NULL) cvReleaseMat(&mp_neighbor_pca_average_z[level]);
 		//CvMat* pMean = cvCreateMat(1, 样本的维数, CV_32FC1);
-		mp_neighbor_pca_average_x[level] = cvCreateMat(1, D_NEIGHBOR[level], CV_64F);
-		mp_neighbor_pca_average_y[level] = cvCreateMat(1, D_NEIGHBOR[level], CV_64F);
-		mp_neighbor_pca_average_z[level] = cvCreateMat(1, D_NEIGHBOR[level], CV_64F);
+		mp_neighbor_pca_average_x[level] = cvCreateMat(1, D_NEIGHBOR[level], CV_32F);
+		mp_neighbor_pca_average_y[level] = cvCreateMat(1, D_NEIGHBOR[level], CV_32F);
+		mp_neighbor_pca_average_z[level] = cvCreateMat(1, D_NEIGHBOR[level], CV_32F);
 		//pEigVals中的每个数表示一个特征值
 		//CvMat* pEigVals = cvCreateMat(1, min(总的样本数,样本的维数), CV_32FC1);
-		CvMat* p_eigenValues_x = cvCreateMat(1, D_NEIGHBOR[level], CV_64F);
-		CvMat* p_eigenValues_y = cvCreateMat(1, D_NEIGHBOR[level], CV_64F);
-		CvMat* p_eigenValues_z = cvCreateMat(1, D_NEIGHBOR[level], CV_64F);
+		CvMat* p_eigenValues_x = cvCreateMat(1, D_NEIGHBOR[level], CV_32F);
+		CvMat* p_eigenValues_y = cvCreateMat(1, D_NEIGHBOR[level], CV_32F);
+		CvMat* p_eigenValues_z = cvCreateMat(1, D_NEIGHBOR[level], CV_32F);
 		//每一行表示一个特征向量
 		//CvMat* pEigVecs = cvCreateMat( min(总的样本数,样本的维数), 样本的维数, CV_32FC1);
-		CvMat* p_eigenVectors_all_x = cvCreateMat(D_NEIGHBOR[level], D_NEIGHBOR[level], CV_64F);
-		CvMat* p_eigenVectors_all_y = cvCreateMat(D_NEIGHBOR[level], D_NEIGHBOR[level], CV_64F);
-		CvMat* p_eigenVectors_all_z = cvCreateMat(D_NEIGHBOR[level], D_NEIGHBOR[level], CV_64F);
+		CvMat* p_eigenVectors_all_x = cvCreateMat(D_NEIGHBOR[level], D_NEIGHBOR[level], CV_32F);
+		CvMat* p_eigenVectors_all_y = cvCreateMat(D_NEIGHBOR[level], D_NEIGHBOR[level], CV_32F);
+		CvMat* p_eigenVectors_all_z = cvCreateMat(D_NEIGHBOR[level], D_NEIGHBOR[level], CV_32F);
 		//PCA处理,计算出平均向量pMean,特征值pEigVals和特征向量pEigVecs
 		//cvCalcPCA(pData, pMean, pEigVals, pEigVecs, CV_PCA_DATA_AS_ROW);
 		//now have better function //PCA pca(data, mean, PCA::DATA_AS_ROW, 0.95);
@@ -1086,12 +1092,12 @@ void DoPAR::calcNeighbor() {
 		if (mp_neighbor_pca_eigenvec_x[level] != NULL) cvReleaseMat(&mp_neighbor_pca_eigenvec_x[level]);
 		if (mp_neighbor_pca_eigenvec_y[level] != NULL) cvReleaseMat(&mp_neighbor_pca_eigenvec_y[level]);
 		if (mp_neighbor_pca_eigenvec_z[level] != NULL) cvReleaseMat(&mp_neighbor_pca_eigenvec_z[level]);
-		mp_neighbor_pca_eigenvec_x[level] = cvCreateMat(dimPCA_x, D_NEIGHBOR[level], CV_64F);
-		mp_neighbor_pca_eigenvec_y[level] = cvCreateMat(dimPCA_y, D_NEIGHBOR[level], CV_64F);
-		mp_neighbor_pca_eigenvec_z[level] = cvCreateMat(dimPCA_z, D_NEIGHBOR[level], CV_64F);
-		memcpy(mp_neighbor_pca_eigenvec_x[level]->data.db, p_eigenVectors_all_x->data.db, sizeof(double)* dimPCA_x * D_NEIGHBOR[level]);
-		memcpy(mp_neighbor_pca_eigenvec_y[level]->data.db, p_eigenVectors_all_y->data.db, sizeof(double)* dimPCA_y * D_NEIGHBOR[level]);
-		memcpy(mp_neighbor_pca_eigenvec_z[level]->data.db, p_eigenVectors_all_z->data.db, sizeof(double)* dimPCA_z * D_NEIGHBOR[level]);
+		mp_neighbor_pca_eigenvec_x[level] = cvCreateMat(dimPCA_x, D_NEIGHBOR[level], CV_32F);
+		mp_neighbor_pca_eigenvec_y[level] = cvCreateMat(dimPCA_y, D_NEIGHBOR[level], CV_32F);
+		mp_neighbor_pca_eigenvec_z[level] = cvCreateMat(dimPCA_z, D_NEIGHBOR[level], CV_32F);
+		memcpy(mp_neighbor_pca_eigenvec_x[level]->data.fl, p_eigenVectors_all_x->data.fl, sizeof(ANNcoord)* dimPCA_x * D_NEIGHBOR[level]);
+		memcpy(mp_neighbor_pca_eigenvec_y[level]->data.fl, p_eigenVectors_all_y->data.fl, sizeof(ANNcoord)* dimPCA_y * D_NEIGHBOR[level]);
+		memcpy(mp_neighbor_pca_eigenvec_z[level]->data.fl, p_eigenVectors_all_z->data.fl, sizeof(ANNcoord)* dimPCA_z * D_NEIGHBOR[level]);
 		// PCA projection
 		////// And copy the PCA results:
 		////Mat mean = pca.mean.clone();
@@ -1104,9 +1110,9 @@ void DoPAR::calcNeighbor() {
 		if (mp_neighbor_pca_projected_z[level] != NULL) cvReleaseMat(&mp_neighbor_pca_projected_z[level]);
 		//选出前P个特征向量(主成份),然后投影,结果保存在pResult中，pResult中包含了P个系数
 		//CvMat* pResult = cvCreateMat( 总的样本数, PCA变换后的样本维数(即主成份的数目)?, CV_32FC1 );
-		mp_neighbor_pca_projected_x[level] = cvCreateMat(numData, dimPCA_x, CV_64F);
-		mp_neighbor_pca_projected_y[level] = cvCreateMat(numData, dimPCA_y, CV_64F);
-		mp_neighbor_pca_projected_z[level] = cvCreateMat(numData, dimPCA_z, CV_64F);
+		mp_neighbor_pca_projected_x[level] = cvCreateMat(numData, dimPCA_x, CV_32F);
+		mp_neighbor_pca_projected_y[level] = cvCreateMat(numData, dimPCA_y, CV_32F);
+		mp_neighbor_pca_projected_z[level] = cvCreateMat(numData, dimPCA_z, CV_32F);
 		//cvProjectPCA( pData, pMean, pEigVecs, pResult );
 		cvProjectPCA(p_source_x, mp_neighbor_pca_average_x[level], mp_neighbor_pca_eigenvec_x[level], mp_neighbor_pca_projected_x[level]);
 		cvProjectPCA(p_source_y, mp_neighbor_pca_average_y[level], mp_neighbor_pca_eigenvec_y[level], mp_neighbor_pca_projected_y[level]);
@@ -1117,12 +1123,12 @@ void DoPAR::calcNeighbor() {
 		m_neighbor_kdTree_ptr_z[level].resize(numData);
 		for (int i = 0; i < numData; ++i) {
 			//ANNpoint* point array, row = 1, col = PCA dimension
-			m_neighbor_kdTree_ptr_x[level][i] = &mp_neighbor_pca_projected_x[level]->data.db[dimPCA_x * i];	//ANNpoint* from PCA projection
+			m_neighbor_kdTree_ptr_x[level][i] = &mp_neighbor_pca_projected_x[level]->data.fl[dimPCA_x * i];	//ANNpoint* from PCA projection
 			//std::vector<uchar> array(mat.rows*mat.cols);
 			//if (mat.isContinuous())
 			//	array = mat.data;
-			m_neighbor_kdTree_ptr_y[level][i] = &mp_neighbor_pca_projected_y[level]->data.db[dimPCA_y * i];
-			m_neighbor_kdTree_ptr_z[level][i] = &mp_neighbor_pca_projected_z[level]->data.db[dimPCA_z * i];
+			m_neighbor_kdTree_ptr_y[level][i] = &mp_neighbor_pca_projected_y[level]->data.fl[dimPCA_y * i];
+			m_neighbor_kdTree_ptr_z[level][i] = &mp_neighbor_pca_projected_z[level]->data.fl[dimPCA_z * i];
 		}
 		if (mp_neighbor_kdTree_x[level] != NULL) delete mp_neighbor_kdTree_x[level];
 		if (mp_neighbor_kdTree_y[level] != NULL) delete mp_neighbor_kdTree_y[level];
@@ -1135,32 +1141,32 @@ void DoPAR::calcNeighbor() {
 		
 	
 		//============ TEST TI PCA backproject result
-		if (GenerateDMTI && level == 0){
-			CvMat* backproject_x = cvCreateMat(numData, D_NEIGHBOR[level], CV_64F);
+		if (GenerateDMTI && level == MULTIRES-1){
+			CvMat* backproject_x = cvCreateMat(numData, D_NEIGHBOR[level], CV_32F);
 			cvBackProjectPCA(mp_neighbor_pca_projected_x[level], mp_neighbor_pca_average_x[level], mp_neighbor_pca_eigenvec_x[level], backproject_x);	
 			Mat backprojectMat_x = cvarrToMat(backproject_x);			
 			Mat PCAbackprojectDM1 = Mat(TEXSIZE[level], TEXSIZE[level], CV_8UC1);
-			VectorDoubleToMat(m_exemplar_x[level], PCAbackprojectDM1);
+			VectorFloatToMat(m_exemplar_x[level], PCAbackprojectDM1);
 
-			CvMat* backproject_y = cvCreateMat(numData, D_NEIGHBOR[level], CV_64F);
+			CvMat* backproject_y = cvCreateMat(numData, D_NEIGHBOR[level], CV_32F);
 			cvBackProjectPCA(mp_neighbor_pca_projected_y[level], mp_neighbor_pca_average_y[level], mp_neighbor_pca_eigenvec_y[level], backproject_y);
 			Mat backprojectMat_y = cvarrToMat(backproject_y);
 			Mat PCAbackprojectDM2 = Mat(TEXSIZE[level], TEXSIZE[level], CV_8UC1);
-			VectorDoubleToMat(m_exemplar_y[level], PCAbackprojectDM2);
+			VectorFloatToMat(m_exemplar_y[level], PCAbackprojectDM2);
 
-			CvMat* backproject_z = cvCreateMat(numData, D_NEIGHBOR[level], CV_64F);
+			CvMat* backproject_z = cvCreateMat(numData, D_NEIGHBOR[level], CV_32F);
 			cvBackProjectPCA(mp_neighbor_pca_projected_z[level], mp_neighbor_pca_average_z[level], mp_neighbor_pca_eigenvec_z[level], backproject_z);
 			Mat backprojectMat_z = cvarrToMat(backproject_z);
 			Mat PCAbackprojectDM3 = Mat(TEXSIZE[level], TEXSIZE[level], CV_8UC1);
-			VectorDoubleToMat(m_exemplar_z[level], PCAbackprojectDM3);
+			VectorFloatToMat(m_exemplar_z[level], PCAbackprojectDM3);
 
 			int row = 0; 
 			int cols = 0.5*((2 * N[level] + 1)*(2 * N[level] + 1) - 1);
 			for (int v = N[level]; v < TEXSIZE[level] - N[level]; ++v) {
 				for (int u = N[level]; u < TEXSIZE[level] - N[level]; ++u) {
-					PCAbackprojectDM1.at<uchar>(v, u) = backprojectMat_x.at<double>(row, cols);
-					PCAbackprojectDM2.at<uchar>(v, u) = backprojectMat_y.at<double>(row, cols);
-					PCAbackprojectDM3.at<uchar>(v, u) = backprojectMat_z.at<double>(row, cols);
+					PCAbackprojectDM1.at<uchar>(v, u) = backprojectMat_x.at<ANNcoord>(row, cols);
+					PCAbackprojectDM2.at<uchar>(v, u) = backprojectMat_y.at<ANNcoord>(row, cols);
+					PCAbackprojectDM3.at<uchar>(v, u) = backprojectMat_z.at<ANNcoord>(row, cols);
 					++row;
 				}
 			}
@@ -1219,7 +1225,7 @@ bool DoPAR::loadVolume(){
 			//redistribute distance values
 			ProjectDMap(shortmodel, 0);
 
-			m_volume[0] = vector<double>(shortmodel.begin(), shortmodel.end());
+			m_volume[0] = vector<ANNcoord>(shortmodel.begin(), shortmodel.end());
 			
 			vector<uchar> tempmodel = vector<uchar>(shortmodel.begin(), shortmodel.end());
 			string tempoutputfilename = outputfilename;
@@ -1227,7 +1233,7 @@ bool DoPAR::loadVolume(){
 			Write(outputpath + tempoutputfilename, tempmodel);
 		}
 		else{
-			m_volume[0] = vector<double>(model.begin(), model.end());
+			m_volume[0] = vector<ANNcoord>(model.begin(), model.end());
 		}
 		cout << endl << "load 3D model done.";
 	}
@@ -1239,7 +1245,7 @@ bool DoPAR::loadVolume(){
 	return true;
 }
 void DoPAR::InitRandomVolume(int level) {
-	vector<double>* p[3] = { &m_exemplar_x[level], &m_exemplar_y[level], &m_exemplar_z[level] };
+	vector<ANNcoord>* p[3] = { &m_exemplar_x[level], &m_exemplar_y[level], &m_exemplar_z[level] };
 	for (int xyz = 0; xyz < TEXSIZE[level] * TEXSIZE[level] * TEXSIZE[level]; ++xyz) {
 		ANNidx index2 = NUM_CHANNEL * (rand() % (TEXSIZE[level] * TEXSIZE[level]));
 		int ori = rand() % 3;
@@ -1260,8 +1266,8 @@ void DoPAR::upsampleVolume(int level) {
 		porosity /= tempchar.size();
 		//cout << endl << "porosity=" << porosity; _getch();
 	
-		m_volume[level] = vector<double>(tempchar.begin(), tempchar.end());		//[0,1]
-		transform(m_volume[level].begin(), m_volume[level].end(), m_volume[level].begin(), bind2nd(std::multiplies<double>(), 255)); //[0,255]
+		m_volume[level] = vector<ANNcoord>(tempchar.begin(), tempchar.end());		//[0,1]
+		transform(m_volume[level].begin(), m_volume[level].end(), m_volume[level].begin(), bind2nd(std::multiplies<ANNcoord>(), 255)); //[0,255]
 	}
 
 	cout << endl << endl << "Upsample from level " << level << " to level " << level + 1;
@@ -1294,7 +1300,7 @@ void DoPAR::upsampleVolume(int level) {
 						for (int dx = 0; dx < 2; ++dx) {
 							//index at level+1
 							int index2 = NUM_CHANNEL * (TEXSIZE[level + 1] * TEXSIZE[level + 1] * (2 * z + dz) + TEXSIZE[level + 1] * (2 * y + dy) + 2 * x + dx);
-							vector<double> color(NUM_CHANNEL, 0);
+							vector<ANNcoord> color(NUM_CHANNEL, 0);
 							int cnt = 0;
 							for (int i = 0; i < 8; ++i) {
 								if (flag[4 * dz + 2 * dy + dx][i]) {
@@ -1328,7 +1334,7 @@ void DoPAR::upsampleVolume(int level) {
 		//redistribute distance values
 		ProjectDMap(shortmodel, level+1);
 
-		m_volume[level + 1] = vector<double>(shortmodel.begin(), shortmodel.end());		//[0,1]
+		m_volume[level + 1] = vector<ANNcoord>(shortmodel.begin(), shortmodel.end());		//[0,1]
 	}
 }
 
@@ -1416,7 +1422,7 @@ void DoPAR::cleardata(int level){
 //================= phase 1: search ===========================
 void DoPAR::searchVolume(int level) {
 	long time_start = clock();
-	const double min_dist = 0.00000000001;
+	const ANNdist min_dist = 0.00000000001;
 	cout << endl <<"phase1:searching";
 	vector<ANNidx> nearest_x_index_old = m_volume_nearest_x_index[level];	//size = texsize^3
 	vector<ANNidx> nearest_y_index_old = m_volume_nearest_y_index[level];
@@ -1443,9 +1449,9 @@ void DoPAR::searchVolume(int level) {
 		int z = i / (TEXSIZE[level] * TEXSIZE[level]);
 
 		// obtain current neighborhood_x from volume
-		CvMat* current_neighbor_x = cvCreateMat(1, D_NEIGHBOR[level], CV_64F); //rows = 1, cols = dimesnion
-		CvMat* current_neighbor_y = cvCreateMat(1, D_NEIGHBOR[level], CV_64F);
-		CvMat* current_neighbor_z = cvCreateMat(1, D_NEIGHBOR[level], CV_64F);
+		CvMat* current_neighbor_x = cvCreateMat(1, D_NEIGHBOR[level], CV_32F); //rows = 1, cols = dimesnion
+		CvMat* current_neighbor_y = cvCreateMat(1, D_NEIGHBOR[level], CV_32F);
+		CvMat* current_neighbor_z = cvCreateMat(1, D_NEIGHBOR[level], CV_32F);
 		ANNidx index = 0;
 		for (int dv = -N[level]; dv <= N[level]; ++dv) {	//N is neighbourhood size. 
 			for (int du = -N[level]; du <= N[level]; ++du) {
@@ -1464,9 +1470,9 @@ void DoPAR::searchVolume(int level) {
 		int dimPCA_x = mp_neighbor_pca_eigenvec_x[level]->rows;	//computed already
 		int dimPCA_y = mp_neighbor_pca_eigenvec_y[level]->rows;
 		int dimPCA_z = mp_neighbor_pca_eigenvec_z[level]->rows;
-		CvMat* current_neighbor_x_projected = cvCreateMat(1, dimPCA_x, CV_64F);	//project current_neighbor_x to current_neighbor_x_projected, dimension = dimPCA_x
-		CvMat* current_neighbor_y_projected = cvCreateMat(1, dimPCA_y, CV_64F);
-		CvMat* current_neighbor_z_projected = cvCreateMat(1, dimPCA_z, CV_64F);
+		CvMat* current_neighbor_x_projected = cvCreateMat(1, dimPCA_x, CV_32F);	//project current_neighbor_x to current_neighbor_x_projected, dimension = dimPCA_x
+		CvMat* current_neighbor_y_projected = cvCreateMat(1, dimPCA_y, CV_32F);
+		CvMat* current_neighbor_z_projected = cvCreateMat(1, dimPCA_z, CV_32F);
 		cvProjectPCA(current_neighbor_x, mp_neighbor_pca_average_x[level], mp_neighbor_pca_eigenvec_x[level], current_neighbor_x_projected);
 		cvProjectPCA(current_neighbor_y, mp_neighbor_pca_average_y[level], mp_neighbor_pca_eigenvec_y[level], current_neighbor_y_projected);
 		cvProjectPCA(current_neighbor_z, mp_neighbor_pca_average_z[level], mp_neighbor_pca_eigenvec_z[level], current_neighbor_z_projected);
@@ -1480,9 +1486,9 @@ void DoPAR::searchVolume(int level) {
 		ANNdistArray ann_dist_z = new ANNdist[ANNsearchk[level]];
 		
 		// ANN search. error bound = 2.0; Kopf used 2.0
-		mp_neighbor_kdTree_x[level]->annkSearch(current_neighbor_x_projected->data.db, ANNsearchk[level], ann_index_x, ann_dist_x, ErrorBound);
-		mp_neighbor_kdTree_y[level]->annkSearch(current_neighbor_y_projected->data.db, ANNsearchk[level], ann_index_y, ann_dist_y, ErrorBound);
-		mp_neighbor_kdTree_z[level]->annkSearch(current_neighbor_z_projected->data.db, ANNsearchk[level], ann_index_z, ann_dist_z, ErrorBound);
+		mp_neighbor_kdTree_x[level]->annkSearch(current_neighbor_x_projected->data.fl, ANNsearchk[level], ann_index_x, ann_dist_x, ErrorBound);
+		mp_neighbor_kdTree_y[level]->annkSearch(current_neighbor_y_projected->data.fl, ANNsearchk[level], ann_index_y, ann_dist_y, ErrorBound);
+		mp_neighbor_kdTree_z[level]->annkSearch(current_neighbor_z_projected->data.fl, ANNsearchk[level], ann_index_z, ann_dist_z, ErrorBound);
 
 		// CV release
 		cvReleaseMat(&current_neighbor_x);
@@ -1632,7 +1638,7 @@ void DoPAR::optimizeVolume(int level) {
 		int z = i / (TEXSIZE[level] * TEXSIZE[level]);
 
 		double weight_acc = 0.0;
-		vector<double> color_acc(NUM_CHANNEL, 0.0);
+		vector<ANNcoord> color_acc(NUM_CHANNEL, 0.0);
 
 		if (level == MULTIRES - 1){
 			process = i2 * 10 / (TEXSIZE[level] * TEXSIZE[level] * TEXSIZE[level]);
@@ -1643,7 +1649,7 @@ void DoPAR::optimizeVolume(int level) {
 		}
 
 		//colorset and its positionset [3*NEIGHBORSIZE]	//just for NUM_CHANNEL=1
-		vector<double> colorset;	if (DISCRETE_ON) colorset.resize(3 * NEIGHBORSIZE[level], 10e5);
+		vector<ANNcoord> colorset;	if (DISCRETE_ON) colorset.resize(3 * NEIGHBORSIZE[level], 10e5);
 		vector<ANNidx> positionset;	if (DISCRETE_ON&&POSITIONHIS_ON) positionset.resize(3 * NEIGHBORSIZE[level], 10000000);
 		vector<double> positionfrequency; if (DISCRETE_ON&&POSITIONHIS_ON) positionfrequency.resize(3 * NEIGHBORSIZE[level], 10e2);
 		//LINEAR TRANSFORM
@@ -1670,14 +1676,14 @@ void DoPAR::optimizeVolume(int level) {
 				ANNidx index2_z = TEXSIZE[level] * TEXSIZE[level] * z + TEXSIZE[level] * trimIndex(level, y + dv) + trimIndex(level, x + du);
 				ANNidx index2[3] = { index2_x, index2_y, index2_z };
 				vector<ANNidx>* volume_nearest_index[3] = { &m_volume_nearest_x_index[level], &m_volume_nearest_y_index[level], &m_volume_nearest_z_index[level] };
-				vector<double>* volume_nearest_dist[3] = { &m_volume_nearest_x_dist[level], &m_volume_nearest_y_dist[level], &m_volume_nearest_z_dist[level] };
-				vector<double>* neighbor[3] = { &m_neighbor_x[level], &m_neighbor_y[level], &m_neighbor_z[level] };
+				vector<ANNdist>* volume_nearest_dist[3] = { &m_volume_nearest_x_dist[level], &m_volume_nearest_y_dist[level], &m_volume_nearest_z_dist[level] };
+				vector<ANNcoord>* neighbor[3] = { &m_neighbor_x[level], &m_neighbor_y[level], &m_neighbor_z[level] };
 				for (int ori = 0; ori < 3; ++ori) {//3 orientations
 					ANNidx   nearest_index = (*volume_nearest_index[ori])[index2[ori]];
-					double nearest_dist = (*volume_nearest_dist[ori])[index2[ori]];
-					double* p_neighbor = &(*neighbor[ori])[D_NEIGHBOR[level] * nearest_index];
+					ANNdist nearest_dist = (*volume_nearest_dist[ori])[index2[ori]];
+					ANNcoord* p_neighbor = &(*neighbor[ori])[D_NEIGHBOR[level] * nearest_index];
 					// color of overlapping neighborhood pixel
-					vector<double> color(NUM_CHANNEL);
+					vector<ANNcoord> color(NUM_CHANNEL);
 					for (int ch = 0; ch < NUM_CHANNEL; ++ch) {
 						color[ch] = p_neighbor[NUM_CHANNEL * (NEIGHBORSIZE[level] - 1 - m) + ch];	
 						//index2 ~ m, index ~ NEIGHBORSIZE[level] - 1 - m; the position is symmetrical!
@@ -1764,8 +1770,8 @@ void DoPAR::optimizeVolume(int level) {
 		
 
 		// old & new colors for this voxel
-		vector<double> color_old(NUM_CHANNEL);
-		vector<double> color_new(NUM_CHANNEL);
+		vector<ANNcoord> color_old(NUM_CHANNEL);
+		vector<ANNcoord> color_new(NUM_CHANNEL);
 		//old & new position index for this voxel
 		ANNidx position_old, position_new;
 		int closestindex;
@@ -1820,9 +1826,10 @@ void DoPAR::optimizeVolume(int level) {
 
 	//========= Dynamic Thresholding based on TI histogram =========
 	if (PROPORTIONTHRESHOLD_ON){
-		vector<short> tempshort = vector<short>(m_volume[level].begin(), m_volume[level].end());
+		vector<short> tempshort(m_volume[level].size());
+		transform(m_volume[level].begin(), m_volume[level].end(), tempshort.begin(), bind2nd(std::multiplies<short>(), 120));	//32767/256 = 127.9
 		ProportionThreshold(tempshort, existed_bin_exemplar[level], existed_histogram_examplar[level]);
-		m_volume[level] = vector<double>(tempshort.begin(), tempshort.end());
+		m_volume[level] = vector<ANNcoord>(tempshort.begin(), tempshort.end());
 	}
 	else if (DISCRETETHRESHOLD_ON) DynamicThresholding(level);
 
@@ -1831,12 +1838,17 @@ void DoPAR::optimizeVolume(int level) {
 	if (DISTANCEMAP_ON && ITERATIVEGETDMAP_ON){
 		vector<short> tempshort(m_volume[level].size());
 		vector<char> tempchar(m_volume[level].size());
-		if (!PROPORTIONTHRESHOLD_ON && !DISCRETETHRESHOLD_ON) transform(m_volume[level].begin(), m_volume[level].end(), tempshort.begin(), std::bind1st(std::multiplies<short>(), 100));	//32767/256 = 128
-		if (PROPORTIONTHRESHOLD_ON || DISCRETETHRESHOLD_ON) BinariseThreshold(tempshort, tempchar, Solid_Upper[level]);
-		else tempchar = BinariseImg(tempshort, porosityTI);
+		if (PROPORTIONTHRESHOLD_ON || DISCRETETHRESHOLD_ON) {
+			tempshort = vector<short>(m_volume[level].begin(), m_volume[level].end());
+			BinariseThreshold(tempshort, tempchar, Solid_Upper[level]);
+		}
+		else {
+			transform(m_volume[level].begin(), m_volume[level].end(), tempshort.begin(), std::bind1st(std::multiplies<short>(), 100));	//32767/256 = 127.9
+			tempchar = BinariseImg(tempshort, porosityTI); 
+		}
 		tempshort = GetDMap(TEXSIZE[level], TEXSIZE[level], TEXSIZE[level], tempchar, 2, false);
 		ProjectDMap(tempshort, level);
-		m_volume[level] = vector<double>(tempshort.begin(), tempshort.end());
+		m_volume[level] = vector<ANNcoord>(tempshort.begin(), tempshort.end());
 	}
 
 
@@ -1863,11 +1875,11 @@ void DoPAR::calcHistogram_exemplar(int level) {
 
 	double dimensional_delta_histogram = 1.0 / (TEXSIZE[level] * TEXSIZE[level]);
 	double discrete_delta_histogram = 1.0 / (3 * TEXSIZE[level] * TEXSIZE[level]);
-	vector<double>* p[3] = { &m_exemplar_x[level], &m_exemplar_y[level], &m_exemplar_z[level] };
+	vector<ANNcoord>* p[3] = { &m_exemplar_x[level], &m_exemplar_y[level], &m_exemplar_z[level] };
 	for (int ori = 0; ori < 3; ++ori) {
 		for (int i = 0; i < TEXSIZE[level] * TEXSIZE[level]; ++i) {
 			for (int ch = 0; ch < NUM_CHANNEL; ++ch) {
-				double c = (*p[ori])[NUM_CHANNEL * i + ch];
+				ANNcoord c = (*p[ori])[NUM_CHANNEL * i + ch];
 				if (COLORHIS_ON){					
 					int bin = (int)(c * NUM_HISTOGRAM_BIN / CHANNEL_MAXVALUE[ch]);
 					m_histogram_exemplar[level][ch][bin] += discrete_delta_histogram;
@@ -1907,7 +1919,7 @@ void DoPAR::calcHistogram_synthesis(int level) {
 	double delta_histogram = 1.0 / (TEXSIZE[level] * TEXSIZE[level] * TEXSIZE[level]);
 	for (int i = 0; i < TEXSIZE[level] * TEXSIZE[level] * TEXSIZE[level]; ++i) {
 		for (int ch = 0; ch < NUM_CHANNEL; ++ch) {
-			double c = m_volume[level][NUM_CHANNEL * i + ch];
+			ANNcoord c = m_volume[level][NUM_CHANNEL * i + ch];
 			int bin = (int)(c * NUM_HISTOGRAM_BIN / CHANNEL_MAXVALUE[ch]);
 			m_histogram_synthesis[level][ch][bin] += delta_histogram;
 
@@ -1916,7 +1928,7 @@ void DoPAR::calcHistogram_synthesis(int level) {
 		}
 	}
 }
-void DoPAR::updateHistogram_synthesis(int level, const std::vector<double>& color_old, const std::vector<double>& color_new) {
+void DoPAR::updateHistogram_synthesis(int level, const std::vector<ANNcoord>& color_old, const std::vector<ANNcoord>& color_new) {
 	double delta_histogram = 1. / (TEXSIZE[level] * TEXSIZE[level] * TEXSIZE[level]);
 	for (int ch = 0; ch < NUM_CHANNEL; ++ch) {
 		int bin_old = (int)(color_old[ch] * NUM_HISTOGRAM_BIN / CHANNEL_MAXVALUE[ch]);
@@ -1982,7 +1994,7 @@ void DoPAR::updatePositionHistogram_synthesis(int level, const ANNidx position_o
 	m_positionhistogram_synthesis[level][position_old] -= delta_histogram;
 	m_positionhistogram_synthesis[level][position_new] += delta_histogram;
 }
-int DoPAR::FindClosestColorIndex(int level, vector<double> &color, vector<double> &weight, double referencecolor){
+int DoPAR::FindClosestColorIndex(int level, vector<ANNcoord> &color, vector<double> &weight, ANNcoord referencecolor){
 	//find nearest color value, then compare weight for all closest values
 	//return the final index
 	
@@ -1991,7 +2003,7 @@ int DoPAR::FindClosestColorIndex(int level, vector<double> &color, vector<double
 		if (referencecolor > Pore_Lower[level]) referencecolor = ceil(referencecolor);
 	}
 
-	auto i = min_element(begin(color), end(color), [=](double x, double y)
+	auto i = min_element(begin(color), end(color), [=](ANNcoord x, ANNcoord y)
 	{
 		return abs(x - referencecolor) < abs(y - referencecolor);
 	});
@@ -2212,92 +2224,6 @@ void DoPAR::ProportionThreshold(vector<short>& Model, vector<short>& BinNum, vec
 	//	Model.swap(ResModel);
 	//}
 }
-//void DoPAR::ProportionThreshold(vector<double>& Model, vector<short>& BinNum, vector<double>& Prob){
-//	//(1) Model to be thresholded according to a distribution <BinNum, Prob>
-//	//(2) BinNum and Prob corresponds to histogram (), BinNum must be ordered. The last BinNum is biggest.
-//	const bool SelNewAlgYN = false;
-//
-//	if (BinNum.size() == 0 || Prob.size() != BinNum.size()) { cout << endl << "BinNum.size=" << BinNum.size() << " Prob.size=" << Prob.size(); _getch(); return; }
-//	if (Model.size() == 0) { cout << endl << "shortmodel.size=" << Model.size(); _getch(); return; }
-//	double check_sum_Prob(0.0);
-//	for_each(Prob.rbegin(), Prob.rend(), [&](double n) { check_sum_Prob += n; });
-//	if (check_sum_Prob > 1.0001 || check_sum_Prob < 0.9999) { cout << endl << "check_sum_Prob=" << check_sum_Prob; _getch(); return; }
-//
-//	if (!SelNewAlgYN) {
-//
-//		double MinVal = Model[0];
-//
-//		for (long idx = 0; idx < Model.size(); ++idx) {
-//			if (Model[idx] < MinVal)
-//				MinVal = Model[idx];
-//		}
-//
-//		vector<double> ResModel(Model.size(), BinNum[0]);
-//
-//		for (long ij = BinNum.size() - 1; ij > 0; --ij) {
-//			if (long(1000 * Prob[ij]) < 0) continue;
-//			vector<char> Tmp;
-//			Tmp = BinariseImg(Model, Prob[ij]);
-//			for (long idx = 0; idx < Model.size(); ++idx) {
-//				if (Tmp[idx] == 1) {
-//					ResModel[idx] = BinNum[ij];
-//					Model[idx] = MinVal;
-//				}
-//			}
-//		}
-//		Model.swap(ResModel);
-//	}
-//	else {//New algorithm 
-//		short MaxVal, MinVal;
-//		MaxVal = MinVal = Model[0];
-//
-//		for (long idx = 0; idx < Model.size(); ++idx) {
-//			if (Model[idx] < MinVal) MinVal = Model[idx];
-//			if (Model[idx] > MaxVal) MaxVal = Model[idx];
-//		}
-//
-//		vector<long> CntValue(MaxVal - MinVal + 2, 0);
-//		vector<short> SelMlVal(MaxVal - MinVal + 2, BinNum[0]);
-//
-//		for (long idx = 0; idx < Model.size(); ++idx) {
-//			CntValue[Model[idx] - MinVal]++;
-//		}
-//
-//		long SelNo = Prob.size() - 1;
-//		long TotNum = Prob[SelNo] * Model.size();
-//		long RemNum(0);
-//
-//		for (long ij = CntValue.size() - 1; ij >= 0; --ij) {
-//			if (CntValue[ij] == 0) continue;
-//			RemNum += CntValue[ij];
-//			if (RemNum > TotNum) {
-//				if (TotNum - RemNum + CntValue[ij] > CntValue[ij] / 2) {
-//					SelMlVal[ij] = BinNum[SelNo];
-//					RemNum = 0;
-//				}
-//				else {
-//					SelMlVal[ij] = BinNum[SelNo - 1];
-//					RemNum = SelMlVal[ij];
-//				}
-//
-//				SelNo--;
-//				if (SelNo < 0) break;
-//				TotNum = Prob[SelNo] * Model.size();
-//			}
-//			else {
-//				SelMlVal[ij] = BinNum[SelNo];
-//			}
-//		}
-//
-//		vector<short> ResModel(Model.size(), BinNum[0]);
-//
-//		for (long idx = 0; idx < Model.size(); ++idx) {
-//			ResModel[idx] = SelMlVal[Model[idx] - MinVal];
-//		}
-//
-//		Model.swap(ResModel);
-//	}
-//}
 
 
 // ========= Distance Map ===========
@@ -2728,7 +2654,7 @@ void DoPAR::calcstddev(int level){
 	double sum = std::accumulate(m_volume[level].begin(), m_volume[level].end(), 0.0);
 	double mean = sum / m_volume[level].size();
 
-	std::vector<double> diff(m_volume[level].size());
+	std::vector<ANNcoord> diff(m_volume[level].size());
 	std::transform(m_volume[level].begin(), m_volume[level].end(), diff.begin(), [mean](double x) { return x - mean; });
 	double sq_sum = std::inner_product(diff.begin(), diff.end(), diff.begin(), 0.0);
 	double stdev = std::sqrt(sq_sum / m_volume[level].size());
