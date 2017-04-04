@@ -56,9 +56,9 @@ private:
 	////       otherwise a single image for three direction 
 	////UpPro: upper porosity, 0.5 for default. 
 	
-	std::random_device randomseed;
-	std::mt19937 mersennetwistergenerator;
-	std::uniform_real_distribution<double> probabilitydistribution;
+	random_device randomseed;
+	mt19937 mersennetwistergenerator;
+	uniform_real_distribution<double> probabilitydistribution;
 
 	void showMat(const cv::String& winname, const cv::Mat& mat);
 	///========================== 190217 Kopf. optimization based =====================
@@ -67,47 +67,45 @@ private:
 	vector<uchar> load3Dmodel(const char* filename);
 	bool loadVolume();
 	// synthesized volume
-	std::vector<std::vector<ANNcoord > > m_volume;	// [M] size: NUM_CHANNEL * TEXSIZE^3
+	vector<vector<ANNcoord > > m_volume;	// [M] size: TEXSIZE^3
 	void InitRandomVolume(int level);
 	void upsampleVolume(int level);
 	void outputmodel(int level);
+	void writeHistogram(int level, vector<double> &histogram, int rows, int cols, const string filename);
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////
 	static const int MULTIRES = 1;			// # of multi-resolution (0 -> MULTIRES - 1 :: coarsest -> finest)
 	static const int N[MULTIRES];
-	static int TEXSIZE[MULTIRES];			// size of input exemplar
+	static ANNidx TEXSIZE[MULTIRES];			// size of input exemplar
 	static int D_NEIGHBOR[MULTIRES];		// dimension of neighborhood (:= 3 * (2 * N + 1)^2)
 	static int NEIGHBORSIZE[MULTIRES];		// size: (2 * N + 1) * (2 * N + 1)
-	static int NUM_CHANNEL;						// # of channels (RGB, feature dist., RTF)
 
 	static const bool INDEXHIS_ON = true;				// Index Histogram in search step
 
-	static const bool DISTANCEMAP_ON = true;			// convert to distance map model
-
-	static const bool LINEARTRANSFORM_ON = false;		//transform weighted average to have same mean and dev as TI
-
-	static const bool PROPORTIONTHRESHOLD_ON = true;	// ProportionThreshold() same or better effect than DISCRETETHRESHOLD_ON
 	static const bool DISCRETETHRESHOLD_ON = false;		// dynamic thresholding in optimize step. 
 
+	static const bool DISTANCEMAP_ON = false;			// convert to distance map model
+
 	static const bool COLORHIS_ON = false;				// Colour Histogram in optimize step
-	
-	static const bool ITERATIVEGETDMAP_ON = false;		//convert to 3D DMap every iteration, to correct DM values
-	
-	static const bool COLORSELECT_ON = true;
-
-	bool COUTCH_ON = false;
-
 	static const bool DISCRETE_ON = false;				// discrete solver in optimize step
-	static const bool POSITIONHIS_ON = false;			// Position Histogram	in optimize step
-	static const bool GAUSSIANFALLOFF_ON = false;		// gaussian fall off weight in optimize step
 
+	//wrong
+	//static const bool PROPORTIONTHRESHOLD_ON = false;	// ProportionThreshold()  not good when DM is not exact DistanceMap
+	//static const bool LINEARTRANSFORM_ON = false;		//transform weighted average to have same mean and dev as TI
+	//static const bool POSITIONHIS_ON = false;			// Position Histogram	in optimize step
+	//static const bool GAUSSIANFALLOFF_ON = false;		// gaussian fall off weight in optimize step
+	//static const bool ITERATIVEGETDMAP_ON = false;		//convert to 3D DMap every iteration, to correct DM values
+	
+	//experimental
+	//bool COUTCH_ON = false;
+	static const bool COLORSELECT_ON = false;
 	static const bool HYBRID_DMGREY_ON = false;			//Testing! For finnest resolution use grey image not DM
+
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 	void DoANNOptimization();
 	void init();
-	void initthreshold();
 
-	inline ANNidx trimIndex(int level, ANNidx index, bool isToroidal = FALSE) {
+	inline ANNidx trimIndex(int level, ANNidx index, bool isToroidal = true) {
 		if (isToroidal) {
 			while (index < 0) index += TEXSIZE[level];
 			return index % TEXSIZE[level];
@@ -126,7 +124,7 @@ private:
 	}
 	inline ANNidx convertIndexANN(int level, ANNidx index){
 		//convert ANNSearch m_volume_nearest_x_index to m_volume index
-		int x, y, size;
+		ANNidx x, y, size;
 		size = TEXSIZE[level] - 2 * N[level];
 		x = index%size;
 		y = index / size;
@@ -136,39 +134,42 @@ private:
 	{
 		static const double inv_sqrt_2pi = 0.398942280401432677939946;
 		double a = (x - mean) / stddev;
-		return inv_sqrt_2pi / stddev * std::exp(-0.5 * a * a);
+		return inv_sqrt_2pi / stddev * exp(-0.5 * a * a);
 	}
 	
 	// ========== need to change to short ==================
-	std::vector<std::vector<ANNcoord> >  m_exemplar_x;
-	std::vector<std::vector<ANNcoord> >  m_exemplar_y;
-	std::vector<std::vector<ANNcoord> >  m_exemplar_z;		// [M] exemplar RGB image, size: NUM_CHANNEL * TEXSIZE^2
+	vector<vector<ANNcoord> >  m_exemplar_x;
+	vector<vector<ANNcoord> >  m_exemplar_y;
+	vector<vector<ANNcoord> >  m_exemplar_z;						// [M] exemplar RGB image, size: TEXSIZE^2
 
 	bool loadExemplar();
 	void calcNeighbor();
 
-	void initabsoluteneigh();
-	vector<vector<ANNidx>> absoluteneigh;
+	//void initabsoluteneigh(int level);
+	//vector<ANNidx> RelativeIdx_x, RelativeIdx_y, RelativeIdx_z;		// size: (2*N[level]+1)^2
+	// random permutation (precomputed)
+	vector<ANNidx>	 m_permutation_xyz;								// [M] size: TEXSIZE[level]^3
+	void initPermutation(int level);
 
 	// PCA-projected neighborhood vector
-	std::vector<std::vector<ANNcoord> > m_neighbor_x;				// [M] original neighborhood vector required for texture optimization
-	std::vector<std::vector<ANNcoord> > m_neighbor_y;
-	std::vector<std::vector<ANNcoord> > m_neighbor_z;
-	std::vector<CvMat*> mp_neighbor_pca_average_x;						// [M] average of neighborhood vector
-	std::vector<CvMat*> mp_neighbor_pca_average_y;
-	std::vector<CvMat*> mp_neighbor_pca_average_z;
-	std::vector<CvMat*> mp_neighbor_pca_projected_x;						// [M] PCA-projected neighborhood data
-	std::vector<CvMat*> mp_neighbor_pca_projected_y;
-	std::vector<CvMat*> mp_neighbor_pca_projected_z;
-	std::vector<CvMat*> mp_neighbor_pca_eigenvec_x;						// [M] eigenvectors for covariant matrix
-	std::vector<CvMat*> mp_neighbor_pca_eigenvec_y;
-	std::vector<CvMat*> mp_neighbor_pca_eigenvec_z;
-	std::vector<std::vector<ANNcoord*> > m_neighbor_kdTree_ptr_x;			// [M] array of pointers to vectors required for ANNkd_tree
-	std::vector<std::vector<ANNcoord*> > m_neighbor_kdTree_ptr_y;			//ANNPoint*, 3 level
-	std::vector<std::vector<ANNcoord*> > m_neighbor_kdTree_ptr_z;
-	std::vector<ANNkd_tree*          > mp_neighbor_kdTree_x;	// [M] ANN kdTree
-	std::vector<ANNkd_tree*          > mp_neighbor_kdTree_y;	// ANNkd_tree, 3 level
-	std::vector<ANNkd_tree*          > mp_neighbor_kdTree_z;
+	vector<vector<ANNcoord> > m_neighbor_x;							// [M] original neighborhood vector required for texture optimization
+	vector<vector<ANNcoord> > m_neighbor_y;
+	vector<vector<ANNcoord> > m_neighbor_z;
+	vector<CvMat*> mp_neighbor_pca_average_x;						// [M] average of neighborhood vector
+	vector<CvMat*> mp_neighbor_pca_average_y;
+	vector<CvMat*> mp_neighbor_pca_average_z;
+	vector<CvMat*> mp_neighbor_pca_projected_x;						// [M] PCA-projected neighborhood data
+	vector<CvMat*> mp_neighbor_pca_projected_y;
+	vector<CvMat*> mp_neighbor_pca_projected_z;
+	vector<CvMat*> mp_neighbor_pca_eigenvec_x;						// [M] eigenvectors for covariant matrix
+	vector<CvMat*> mp_neighbor_pca_eigenvec_y;
+	vector<CvMat*> mp_neighbor_pca_eigenvec_z;
+	vector<vector<ANNcoord*> > m_neighbor_kdTree_ptr_x;				// [M] array of pointers to vectors required for ANNkd_tree
+	vector<vector<ANNcoord*> > m_neighbor_kdTree_ptr_y;				//ANNPoint*, 3 level
+	vector<vector<ANNcoord*> > m_neighbor_kdTree_ptr_z;
+	vector<ANNkd_tree*          > mp_neighbor_kdTree_x;	// [M] ANN kdTree
+	vector<ANNkd_tree*          > mp_neighbor_kdTree_y;	// ANNkd_tree, 3 level
+	vector<ANNkd_tree*          > mp_neighbor_kdTree_z;
 
 	// pseudocode-----------------------------------------------------------------
 	// volume[0] := initVolume(0);                                        % initialization
@@ -189,17 +190,22 @@ private:
 	static double PCA_RATIO_VARIANCE;			//0.95
 	static const double ErrorBound;				//Kopf used 2.0
 	static vector<short> ANNsearchk;				//search k nearest index
-	std::vector<std::vector<ANNidx> > m_volume_nearest_x_index;		// [M] size: TEXSIZE^3
-	std::vector<std::vector<ANNidx> > m_volume_nearest_y_index;		// [M] size: TEXSIZE^3
-	std::vector<std::vector<ANNidx> > m_volume_nearest_z_index;		// [M] size: TEXSIZE^3
-	std::vector<std::vector<ANNdist> > m_volume_nearest_x_dist;		// [M] size: TEXSIZE^3
-	std::vector<std::vector<ANNdist> > m_volume_nearest_y_dist;		// [M] size: TEXSIZE^3
-	std::vector<std::vector<ANNdist> > m_volume_nearest_z_dist;		// [M] size: TEXSIZE^3
+	vector<vector<ANNidx> > m_volume_nearest_x_index;		// [M] size: TEXSIZE^3
+	vector<vector<ANNidx> > m_volume_nearest_y_index;		// [M] size: TEXSIZE^3
+	vector<vector<ANNidx> > m_volume_nearest_z_index;		// [M] size: TEXSIZE^3
+	vector<vector<ANNdist> > m_volume_nearest_x_dist;		// [M] size: TEXSIZE^3
+	vector<vector<ANNdist> > m_volume_nearest_y_dist;		// [M] size: TEXSIZE^3
+	vector<vector<ANNdist> > m_volume_nearest_z_dist;		// [M] size: TEXSIZE^3
+	vector<vector<ANNdist> > m_volume_weight_x;
+	vector<vector<ANNdist> > m_volume_weight_y;
+	vector<vector<ANNdist> > m_volume_weight_z;
+
 	void searchVolume(int level);
 
+
 	// ----------- index histogram -------------
-	std::vector<std::vector<double> >  m_indexhistogram_exemplar;
-	std::vector<std::vector<double> >  m_indexhistogram_synthesis;
+	vector<vector<double> >  m_indexhistogram_exemplar;
+	vector<vector<double> >  m_indexhistogram_synthesis;
 	void initIndexHistogram(int level);
 	void updateIndexHistogram(int level, int orientation, const ANNidx oldannidx, const ANNidx newannidx);
 	ANNidx indexhistmatching_ann_index(int level, int orientation, ANNidxArray idxarray, ANNdistArray distarry);
@@ -208,38 +214,22 @@ private:
 
 	//========== phase 2: optimization ======================
 	void optimizeVolume(int level);
-	// random permutation (precomputed)
-	std::vector<std::vector<ANNidx> > m_permutation_xyz;				// [M] size: TEXSIZE^3
-	void initPermutation(int level);
-	// Gaussian fall-off function
-	static const double gaussiansigma;
-	std::vector<std::vector<double> > gaussiankernel;					// m level gaussian kernel
-	void InitGaussianKernel();
+
 
 	//---------- color histogram ---------------	
 	static const short NUM_HISTOGRAM_BIN;			// # of histogram bins
-	static std::vector<short> CHANNEL_MAXVALUE;	// for color histogram	
-	//double WEIGHT_HISTOGRAM;					// linear weight for histogram
-	vector<vector<vector<double> > > dimensional_histogram_exemplar;				// [level][ori][bin]	16
-	std::vector<std::vector<std::vector<double> > > m_histogram_exemplar;			// [level][ch][bin]		16
-	vector<vector<vector<double> > > m_histogram_synthesis;							// [level][ch][bin]		16
+	static short CHANNEL_MAXVALUE;	// for color histogram	
+	//vector<vector<vector<double> > > dimensional_histogram_exemplar;				// [level][ori][bin]	16
+	vector<vector<double> >  m_histogram_exemplar;									// [level][bin]		16
+	vector<vector<double> >  m_histogram_synthesis;									// [level][bin]		16
 
 	void calcHistogram_exemplar(int level);
 	void calcHistogram_synthesis(int level);
-	void updateHistogram_synthesis(int level, const std::vector<ANNcoord>& color_old, const std::vector<ANNcoord>& color_new);
+	void updateHistogram_synthesis(int level, const ANNcoord color_old, const ANNcoord color_new);
 	
-	//---------- position histogram ------------
-	vector<double> WEIGHT_POSITIONHISTOGRAM;
-	std::vector<std::vector<double> >  m_positionhistogram_exemplar;				//  multires * binsize(exemplar area)
-	std::vector<std::vector<double> >  m_positionhistogram_synthesis;				//  multires * binsize(exmeplar area)
-	std::vector<std::vector<ANNidx> > m_volume_position;		// volume_position record // [M] size: TEXSIZE^3
 	
-	void initPositionHistogram_exemplar(int level);
-	void initPositionHistogram_synthesis(int level);
-	void updatePositionHistogram_synthesis(int level, const ANNidx position_old, const ANNidx position_new);
-	void writeHistogram(int level, vector<double> &histogram, int rows, int cols, const string filename);
 	//discrete solver
-	int FindClosestColorIndex(int level, vector<ANNcoord>& colorset, vector<double>& weightset, ANNcoord referencecolor);	// return the index in colorset of the most similar color	
+	int FindClosestColorIndex(int level, vector<ANNcoord>& colorset, ANNcoord referencecolor);	// return the index in colorset of the most similar color	
 	
 	//----------- Dynamic thresholding ----------
 	static short DISCRETE_HISTOGRAM_BIN;						// for thresholding, discrete values. e.g. default256
@@ -251,11 +241,11 @@ private:
 
 	void DynamicThresholding(int level);//reassign values based on TI colorhis after optimize step
 	void calcaccHistogram(vector<double> &inputhis, vector<double> &acchis);
-	//Non-linear solver
-	void PolynomialInterpolation(vector<double>& Xv, vector<double>& Yv, vector<double>& X);
+	////Non-linear solver
+	//void PolynomialInterpolation(vector<double>& Xv, vector<double>& Yv, vector<double>& X);
 
-	void ProportionThreshold(vector<short>& Model, vector<short>& BinNum, vector<double>& Prob);
-	void ProportionThreshold(vector<ANNcoord>& Model, vector<short>& BinNum, vector<double>& Prob);
+	//void ProportionThreshold(vector<short>& Model, vector<short>& BinNum, vector<double>& Prob);
+	//void ProportionThreshold(vector<ANNcoord>& Model, vector<short>& BinNum, vector<double>& Prob);
 
 	//=============== distance map ===================
 	double porosityTI, porosityModel;
