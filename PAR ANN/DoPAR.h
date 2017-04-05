@@ -74,7 +74,7 @@ private:
 	void writeHistogram(int level, vector<float> &histogram, int rows, int cols, const string filename);
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////
-	static const int MULTIRES = 3;			// # of multi-resolution (0 -> MULTIRES - 1 :: coarsest -> finest)
+	static const int MULTIRES = 1;			// # of multi-resolution (0 -> MULTIRES - 1 :: coarsest -> finest)
 	static const int N[MULTIRES];
 	static ANNidx TEXSIZE[MULTIRES];			// size of input exemplar
 	static int D_NEIGHBOR[MULTIRES];		// dimension of neighborhood (:= 3 * (2 * N + 1)^2)
@@ -204,10 +204,12 @@ private:
 
 
 	// ----------- index histogram -------------
+	static vector<float> delta_histogram_synthesis, delta_histogram_exemplar;		//store the value when first initial histogram
+	static float perHisBin;													//store NUM_HISTOGRAM_BIN / CHANNEL_MAXVALUE
 	vector<vector<float> >  m_indexhistogram_exemplar;
 	vector<vector<float> >  m_indexhistogram_synthesis;
 	void initIndexHistogram(int level);
-	void updateIndexHistogram(int level, int orientation, const ANNidx oldannidx, const ANNidx newannidx);
+	void updateIndexHistogram(int level, const ANNidx oldannidx, const ANNidx newannidx);
 	ANNidx indexhistmatching_ann_index(int level, int orientation, ANNidxArray idxarray, ANNdistArray distarry);
 	bool FIRSTRUN = true;					// dont use random initial histogram. start counting from 0 for the first run.
 
@@ -231,7 +233,7 @@ private:
 	int FindClosestColorIndex(int level, vector<ANNcoord>& colorset, ANNcoord referencecolor);	// return the index in colorset of the most similar color	
 	
 	//----------- Dynamic thresholding ----------
-	static short DISCRETE_HISTOGRAM_BIN;						// for thresholding, discrete values. e.g. default256
+	const static short DISCRETE_HISTOGRAM_BIN;						// for thresholding, discrete values. e.g. default256
 	vector<vector<float> >  discrete_histogram_exemplar;			// [level][discretebin]	256
 	vector<vector<float> >  discrete_histogram_synthesis;			// [level][discretebin]	256
 	vector<vector<short> > existed_bin_exemplar;						//[level][<=max bin size]
