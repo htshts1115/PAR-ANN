@@ -66,6 +66,7 @@ DoPAR::DoPAR()
 	TIsDMmean.resize(MULTIRES, 0);
 	
 	ANNsearchk.resize(MULTIRES);
+	ErrorBound.resize(MULTIRES);
 	// [end] multi-res memory allocation---------------
 }
 
@@ -348,7 +349,7 @@ void DoPAR::ReadRunPar(string CurExeFile)
 	if (INDEXHIS_ON) parameterstring += "ih";
 	if (COLORHIS_ON) parameterstring += "ch";
 	//if (POSITIONHIS_ON) parameterstring += "ph";
-	if (DISCRETE_ON) parameterstring += "ds";
+	//if (DISCRETE_ON) parameterstring += "ds";
 	//if (GAUSSIANFALLOFF_ON) parameterstring += "g";
 	//if (PROPORTIONTHRESHOLD_ON) parameterstring += "pt";
 	if (DISCRETETHRESHOLD_ON) parameterstring += "dt";
@@ -601,7 +602,7 @@ void VectorFloatToMat(const vector<float>& in, Mat& out){
 
 
 //MULTIRES: larger number means finner level
-const int DoPAR::N[MULTIRES] = {4};		//Kopf{ 3, 4, 4 }; Chen{3,4,4}; Turner{5,5,5}	// neighborhood size: (2 * N + 1)^2
+const int DoPAR::N[MULTIRES] = {4, 4, 3};		//Kopf{ 3, 4, 4 }; Chen{4,4,3}; Turner{5,5,5}	// neighborhood size: (2 * N + 1)^2
 ANNidx DoPAR::TEXSIZE[MULTIRES];
 int DoPAR::D_NEIGHBOR[MULTIRES];
 int DoPAR::NEIGHBORSIZE[MULTIRES];
@@ -619,13 +620,12 @@ short DoPAR::ProjectDMapMaxBins;
 
 double DoPAR::PCA_RATIO_VARIANCE = 0.95;		//Kopf used 0.95
 
-const double DoPAR::ErrorBound = 2.0;			//Kopf used 2.0
+vector<double> DoPAR::ErrorBound;				//Kopf used 2.0
 
 vector<short> DoPAR::ANNsearchk;				//related to N[level]
 
-const short DoPAR::MAXITERATION = 15;
+const short DoPAR::MAXITERATION = 10;
 
-//const double DoPAR::gaussiansigma = 7.0;		//gaussian fall-off function in optimization phase, higher sigma means more uniform
 
 void DoPAR::DoANNOptimization(){
 	//if (NUM_CHANNEL>1){ cout << endl << "Error NUM_CHANNEL>1"; _getch(); exit(1); }
@@ -638,41 +638,40 @@ void DoPAR::DoANNOptimization(){
 		cout << endl << "=============level: " << curlevel << "===============";
 		globalenergy_new = 0.0; globalenergy_old = 10e9;
 		initPermutation(curlevel);
-		//initabsoluteneigh(curlevel);
-
+		//initabsoluteneigh(curlevel);	
+		FIRSTRUN = true;
 		int convergencecount(0), energyincreasecount(0);
-		for (int loop = 0; loop < MAXITERATION - MULTIRES; loop++){
+		if (EARLYTERMINATION_ON) {
+			float ANNsearchpercent = 0.75;
+			annMaxPtsVisit(ANNsearchpercent*TEXSIZE[curlevel] * TEXSIZE[curlevel] * TEXSIZE[curlevel]);
+			cout << endl << "EARLY_TERMINATION for ANNsearch is set to: " << ANNsearchpercent * 100 << "%";
+		}
+
+		for (int loop = 0; loop < MAXITERATION - curlevel*2; loop++){
 			cout << endl << "---------iteration: " << loop+1<<"------------";		
-			if (loop == 0) FIRSTRUN = true;
-			else FIRSTRUN = false;
-		
-	
+
 			searchVolume(curlevel);
 			optimizeVolume(curlevel);
 
-
-			if ((globalenergy_old - globalenergy_new)>0 && (globalenergy_old - globalenergy_new) / globalenergy_old < 0.025) convergencecount++;
+			
 			if (globalenergy_old - globalenergy_new <0) energyincreasecount++;
-			globalenergy_old = globalenergy_new;
+			else if ((globalenergy_old - globalenergy_new) / globalenergy_new < (0.01*(curlevel + 1))) convergencecount++;
 			if (energyincreasecount > 1) break;
-			if (convergencecount > MULTIRES-curlevel) break;	//if change <1% for twice, then mark as converge
+			else if (convergencecount > MULTIRES-curlevel) break;	//if change <1% for twice, then mark as converge
+			globalenergy_old = globalenergy_new;
 
 			//if (ITERATIVEGETDMAP_ON) outputmodel(curlevel);
 			//_getch();
-		}
+		}//loop in one level
 		if (curlevel >= MULTIRES-2) outputmodel(curlevel);
-		//_getch();
 
 		if (curlevel < MULTIRES - 1) {//level up
 			upsampleVolume(curlevel);		
-
-			FIRSTRUN = true;
 			calcHistogram_exemplar(curlevel + 1);
 			if (COLORHIS_ON || DISCRETETHRESHOLD_ON) calcHistogram_synthesis(curlevel + 1);
 			if (INDEXHIS_ON){
 				initIndexHistogram(curlevel + 1);
 			}
-
 			//release vector
 			cleardata(curlevel);
 		}
@@ -757,13 +756,13 @@ bool DoPAR::loadExemplar() {
 	porosityTI = (porosityxyz[0] + porosityxyz[1] + porosityxyz[2]) / 3.0;
 
 	//Generate DM TI or not	
-	char type;
+	char type1;
 	if (DISTANCEMAP_ON){		
 		do{
 			cout <<endl<< "Generate converted TI of DistanceModel? [y/n]";
-			cin >> type;
-		} while (!cin.fail() && type != 'y' && type != 'n');
-	}if (type == 'y') GenerateDMTI = true;
+			cin >> type1;
+		} while (!cin.fail() && type1 != 'y' && type1 != 'n');
+	}if (type1 == 'y') GenerateDMTI = true;
 
 
 	// build image pyramid
@@ -939,8 +938,10 @@ void DoPAR::calcNeighbor() {
 	//initialize kdtree for certain template/neighbourhood
 	cout << endl << "calcNeighbor...";
 	for (int level = 0; level < MULTIRES; ++level) {
-		//ANNsearchk now relates to neighbourhood size
+		// ============= ANNsearchk now relates to neighbourhood size =================
 		ANNsearchk[level] = N[level] * N[level];
+		ErrorBound[level] = 1.0*(level);
+
 
 		cout << endl << "level:" << level;
 		int numData = (TEXSIZE[level] - 2 * N[level]) * (TEXSIZE[level] - 2 * N[level]);
@@ -1043,17 +1044,17 @@ void DoPAR::calcNeighbor() {
 			printf("PCA reduction (y): %d -> %d\n", D_NEIGHBOR[level], dimPCA_y);
 			printf("PCA reduction (z): %d -> %d\n", D_NEIGHBOR[level], dimPCA_z);
 
-			if (level == 0){
-				do{
-					cout << endl << "PCA_RATIO_VARIANCE= " << PCA_RATIO_VARIANCE << " Modify or not? [y / n]";
-					cin >> type;
-				} while (!cin.fail() && type != 'y' && type != 'n');
-				if (type == 'y'){
-					cout << endl << "new PCA_RATIO_VARIANCE(e.g.0.99)= ";
-					cin >> PCA_RATIO_VARIANCE;
-				}
-			}
-		} while (type == 'y' && PCA_RATIO_VARIANCE<1.0/* && PCA_RATIO_VARIANCE>0.85*/);
+			//if (level == 0){
+			//	do{
+			//		cout << endl << "PCA_RATIO_VARIANCE= " << PCA_RATIO_VARIANCE << " Modify or not? [y / n]";
+			//		cin >> type;
+			//	} while (!cin.fail() && type != 'y' && type != 'n');
+			//	if (type == 'y'){
+			//		cout << endl << "new PCA_RATIO_VARIANCE(e.g.0.99)= ";
+			//		cin >> PCA_RATIO_VARIANCE;
+			//	}
+			//}
+		} while (type == 'y' && PCA_RATIO_VARIANCE<=1.0/* && PCA_RATIO_VARIANCE>0.85*/);
 
 		// Trim total eigenvectors into partial eigenvectors
 		if (mp_neighbor_pca_eigenvec_x[level] != NULL) cvReleaseMat(&mp_neighbor_pca_eigenvec_x[level]);
@@ -1167,6 +1168,7 @@ bool DoPAR::loadVolume(){
 	//load from Model, later can also load from file		//level 0
 	if (fileExists(modelFilename3D.c_str()) == true){	
 		vector<uchar> model = load3Dmodel(modelFilename3D.c_str());	
+		if (model.size() != TEXSIZE[0] * TEXSIZE[0] * TEXSIZE[0]) { cout << endl << "Loaded Model size=" << model.size() << " should be=" << TEXSIZE[0] * TEXSIZE[0] * TEXSIZE[0]; _getch(); exit(1); }
 
 		if (DISTANCEMAP_ON){
 			//============= Convert to distance model ==========================
@@ -1175,7 +1177,7 @@ bool DoPAR::loadVolume(){
 			bool binaryYN(true);
 			if (binaryYN) for (int i = 0; i < model.size(); i++){ if ((model[i] != 0 && model[i]!=1) && (model[i]<255 && model[i]>0)) { binaryYN = false; break; } }
 			if (binaryYN == false){
-				cout << endl << "Input autothresholdvalue for TIs (default=110): ";
+				cout << endl << "Input autothresholdvalue for LoadedModel (default=110): ";
 				cin >> autothresholdvalue;
 			}
 			for (ANNidx idx = 0; idx < model.size(); idx++){
@@ -1320,12 +1322,12 @@ void DoPAR::outputmodel(int level){
 	}
 	cout << endl << "output done.";
 }
-void DoPAR::writeHistogram(int level, vector<double> &hisvec, int rows, int cols, const string filename){
+void DoPAR::writeHistogram(int level, vector<float> &hisvec, int rows, int cols, const string filename){
 	if (filename.size() == 0) { cout << endl << "writeHistogram Error: empty filename"; return; };
 	if (hisvec.size() != rows*cols) { cout << endl << "writeHistogram Error: wrong size of hisvec"; return; };
 
-	Mat hist = Mat(rows, cols, CV_64FC1);
-	memcpy(hist.data, hisvec.data(), hisvec.size()*sizeof(double));	//float 32F, double 64F
+	Mat hist = Mat(rows, cols, CV_32FC1);
+	memcpy(hist.data, hisvec.data(), hisvec.size()*sizeof(float));	//float 32F, double 64F
 	hist *= TEXSIZE[level] * TEXSIZE[level] * TEXSIZE[level];
 	hist.convertTo(hist, CV_8UC1);	//convertTo just copy the value, no scaling
 
@@ -1388,7 +1390,7 @@ void DoPAR::cleardata(int level){
 //================= phase 1: search ===========================
 void DoPAR::searchVolume(int level) {
 	long time_start = clock();
-	const ANNdist min_dist = 0.0000001;
+	const ANNdist min_dist = 0.0000001f;
 	cout << endl <<"phase1:searching";
 	double global_energy_new = 0;
 
@@ -1454,9 +1456,9 @@ void DoPAR::searchVolume(int level) {
 		ANNdistArray ann_dist_z = new ANNdist[ANNsearchk[level]];
 		
 		// ANN search. error bound = 2.0; Kopf used 2.0
-		mp_neighbor_kdTree_x[level]->annkSearch(current_neighbor_x_projected->data.fl, ANNsearchk[level], ann_index_x, ann_dist_x, ErrorBound);
-		mp_neighbor_kdTree_y[level]->annkSearch(current_neighbor_y_projected->data.fl, ANNsearchk[level], ann_index_y, ann_dist_y, ErrorBound);
-		mp_neighbor_kdTree_z[level]->annkSearch(current_neighbor_z_projected->data.fl, ANNsearchk[level], ann_index_z, ann_dist_z, ErrorBound);
+		mp_neighbor_kdTree_x[level]->annkSearch(current_neighbor_x_projected->data.fl, ANNsearchk[level], ann_index_x, ann_dist_x, ErrorBound[level]);
+		mp_neighbor_kdTree_y[level]->annkSearch(current_neighbor_y_projected->data.fl, ANNsearchk[level], ann_index_y, ann_dist_y, ErrorBound[level]);
+		mp_neighbor_kdTree_z[level]->annkSearch(current_neighbor_z_projected->data.fl, ANNsearchk[level], ann_index_z, ann_dist_z, ErrorBound[level]);
 
 		// CV release
 		cvReleaseMat(&current_neighbor_x);
@@ -1548,7 +1550,7 @@ void DoPAR::initIndexHistogram(int level){
 	//count each volume
 	m_indexhistogram_synthesis[level].resize(numData);
 	m_indexhistogram_synthesis[level].assign(numData, 0.0);
-	double delta_histogram = 1.0 / (TEXSIZE[level] * TEXSIZE[level] * TEXSIZE[level]);
+	float delta_histogram = 1.0 / (TEXSIZE[level] * TEXSIZE[level] * TEXSIZE[level]);
 	for (ANNidx i = 0; i < TEXSIZE[level] * TEXSIZE[level] * TEXSIZE[level]; i++){
 		ANNidx binx = m_volume_nearest_x_index[level][i];
 		m_indexhistogram_synthesis[level][binx] += delta_histogram;
@@ -1563,7 +1565,7 @@ void DoPAR::initIndexHistogram(int level){
 void DoPAR::updateIndexHistogram(int level, int orientation, const ANNidx oldannidx, const ANNidx newannidx){
 	if (FIRSTRUN){
 		ANNidx newidx = newannidx + orientation*(TEXSIZE[level] - 2 * N[level]) * (TEXSIZE[level] - 2 * N[level]);
-		double delta_histogram = 1.0 / (TEXSIZE[level] * TEXSIZE[level] * TEXSIZE[level]);
+		float delta_histogram = 1.0 / (TEXSIZE[level] * TEXSIZE[level] * TEXSIZE[level]);
 		m_indexhistogram_synthesis[level][newidx] += delta_histogram;
 
 		return;
@@ -1571,19 +1573,19 @@ void DoPAR::updateIndexHistogram(int level, int orientation, const ANNidx oldann
 	
 	ANNidx newidx = newannidx + orientation*(TEXSIZE[level] - 2 * N[level]) * (TEXSIZE[level] - 2 * N[level]);
 	ANNidx oldidx = oldannidx + orientation*(TEXSIZE[level] - 2 * N[level]) * (TEXSIZE[level] - 2 * N[level]);
-	double delta_histogram = 1.0 / (TEXSIZE[level] * TEXSIZE[level] * TEXSIZE[level]);
+	float delta_histogram = 1.0 / (TEXSIZE[level] * TEXSIZE[level] * TEXSIZE[level]);
 	m_indexhistogram_synthesis[level][oldidx] -= delta_histogram;
 	m_indexhistogram_synthesis[level][newidx] += delta_histogram;	
 }
 ANNidx DoPAR::indexhistmatching_ann_index(int level, int orientation, ANNidxArray idxarray, ANNdistArray distarry){
 	ANNidx size = (TEXSIZE[level] - 2 * N[level]) * (TEXSIZE[level] - 2 * N[level]);
-	double stddev = 1.0 / ((TEXSIZE[level] - 2 * N[level]) * (TEXSIZE[level] - 2 * N[level]));
-	double probzero = gaussian_pdf(0.0, 0.0, stddev);
-	double dist_acc(0.0), weight_acc(0.0); 
-	double idx_acc(0.0);
+	float stddev = 1.0 / ((TEXSIZE[level] - 2 * N[level]) * (TEXSIZE[level] - 2 * N[level]));
+	float probzero = gaussian_pdf(0.0, 0.0, stddev);
+	float dist_acc(0.0), weight_acc(0.0);
+	float idx_acc(0.0);
 
 	//simple form works better: just select minimum frequency
-	vector<double> frequecyarray(ANNsearchk[level], 0.0);
+	vector<float> frequecyarray(ANNsearchk[level], 0.0);
 	for (int i = 0; i < ANNsearchk[level]; i++){
 		ANNidx idx = idxarray[i] + orientation*size;
 		frequecyarray[i] = m_indexhistogram_synthesis[level][idx];
@@ -1612,7 +1614,7 @@ void DoPAR::optimizeVolume(int level) {
 		ANNidx y = (i - z*Sxy)*dSx;
 		ANNidx x = i % TEXSIZE[level];
 
-		double weight_acc = 0.0;
+		ANNcoord weight_acc = 0.0;
 		ANNcoord color_acc(0.0);
 
 		if (level == MULTIRES - 1){
@@ -1623,8 +1625,8 @@ void DoPAR::optimizeVolume(int level) {
 			}
 		}
 
-		//colorset and its positionset [3*NEIGHBORSIZE]	//just for NUM_CHANNEL=1
-		vector<ANNcoord> colorset;	if (DISCRETE_ON) colorset.resize(3 * NEIGHBORSIZE[level], 10e5);		
+		////colorset and its positionset [3*NEIGHBORSIZE]	//just for NUM_CHANNEL=1
+		//vector<ANNcoord> colorset;	if (DISCRETE_ON) colorset.resize(3 * NEIGHBORSIZE[level], 10e5);		
 
 		ANNidx m = 0;	
 		//for every voxel's neighbourhood, in 3 orientations
@@ -1659,24 +1661,25 @@ void DoPAR::optimizeVolume(int level) {
 					color = p_neighbor[NEIGHBORSIZE[level] - 1 - m];	//index2 ~ m, index ~ NEIGHBORSIZE[level] - 1 - m; the position is symmetrical!
 					ANNdist weight = weights;
 					
-					//========discrete solver=================	
-					if (DISCRETE_ON) { colorset[ori*NEIGHBORSIZE[level] + m] = color; }//record each color and its position				
+					////========discrete solver=================	
+					//if (DISCRETE_ON) { colorset[ori*NEIGHBORSIZE[level] + m] = color; }//record each color and its position				
+					
 					// modify weight according to Color histogram matching
 					if (COLORHIS_ON){
-						double histogram_matching = 0.0;
-						double difference = 0.0;
-						double histogram_exemplar = 0.0;
-						double histogram_synthesis = 0.0;
+						float histogram_matching = 0.0;
+						float difference = 0.0;
+						float histogram_exemplar = 0.0;
+						float histogram_synthesis = 0.0;
 						int bin = (int)(color * NUM_HISTOGRAM_BIN / CHANNEL_MAXVALUE);
 
 						histogram_exemplar = m_histogram_exemplar[level][bin];					
 						histogram_synthesis = m_histogram_synthesis[level][bin];	
 						difference = histogram_synthesis - histogram_exemplar;
-						histogram_matching = max(0.0, histogram_synthesis - histogram_exemplar);		
+						histogram_matching = max(0.0f, histogram_synthesis - histogram_exemplar);		
 
 						////changed to gaussian distribution, std = accepted error
-						double ColourHisstddev = 0.02;  	// accept maximum stddev*3 error
-						double ColourHisgaussianprob(0.0);
+						ANNdist ColourHisstddev = 0.02;  	// accept maximum stddev*3 error
+						ANNdist ColourHisgaussianprob(0.0);
 						////increase weight when (positionhistogram_synthesis - positionhistogram_exemplar)<0	
 						//if (difference >= 0) ColourHisgaussianprob = gaussian_pdf(difference, 0.0, ColourHisstddev);
 						//else ColourHisgaussianprob = 2 * gaussian_pdf(0.0, 0.0, ColourHisstddev) - gaussian_pdf(-difference, 0.0, ColourHisstddev);
@@ -1701,13 +1704,12 @@ void DoPAR::optimizeVolume(int level) {
 		//least square solver
 		color_new = 1.0*color_acc / weight_acc;		
 			
-		//========discrete solver=================	
-		if (DISCRETE_ON){	
-			ANNidx position_old, position_new;//old & new position index for this voxel
-			int closestindex;
-			closestindex = FindClosestColorIndex(level, colorset, color_new);			
-			color_new = colorset[closestindex];		
-		}
+		////========discrete solver=================	
+		//if (DISCRETE_ON){				
+		//	int closestindex;
+		//	closestindex = FindClosestColorIndex(level, colorset, color_new);			
+		//	color_new = colorset[closestindex];		
+		//}
 		
 		//color histogram update
 		if (COLORHIS_ON || DISCRETETHRESHOLD_ON){
@@ -1737,8 +1739,8 @@ void DoPAR::calcHistogram_exemplar(int level) {
 	discrete_histogram_exemplar[level].clear();
 	if (DISCRETETHRESHOLD_ON /*|| PROPORTIONTHRESHOLD_ON*/) discrete_histogram_exemplar[level].resize(DISCRETE_HISTOGRAM_BIN, 0.0);		//[level][discretebin]
 
-	double dimensional_delta_histogram = 1.0 / (TEXSIZE[level] * TEXSIZE[level]);
-	double discrete_delta_histogram = 1.0 / (3 * TEXSIZE[level] * TEXSIZE[level]);
+	float dimensional_delta_histogram = 1.0 / (TEXSIZE[level] * TEXSIZE[level]);
+	float discrete_delta_histogram = 1.0 / (3 * TEXSIZE[level] * TEXSIZE[level]);
 	vector<ANNcoord>* p[3] = { &m_exemplar_x[level], &m_exemplar_y[level], &m_exemplar_z[level] };
 	for (int ori = 0; ori < 3; ++ori) {
 		for (int i = 0; i < TEXSIZE[level] * TEXSIZE[level]; ++i) {
@@ -1778,7 +1780,7 @@ void DoPAR::calcHistogram_synthesis(int level) {
 	discrete_histogram_synthesis[level].clear();
 	if (DISCRETETHRESHOLD_ON) discrete_histogram_synthesis[level].resize(DISCRETE_HISTOGRAM_BIN, 0.0);
 
-	double delta_histogram = 1.0 / (TEXSIZE[level] * TEXSIZE[level] * TEXSIZE[level]);
+	float delta_histogram = 1.0 / (TEXSIZE[level] * TEXSIZE[level] * TEXSIZE[level]);
 	for (int i = 0; i < TEXSIZE[level] * TEXSIZE[level] * TEXSIZE[level]; ++i) {
 		ANNcoord c = m_volume[level][i];
 		int bin = (int)(c * NUM_HISTOGRAM_BIN / CHANNEL_MAXVALUE);
@@ -1789,7 +1791,7 @@ void DoPAR::calcHistogram_synthesis(int level) {
 	}
 }
 void DoPAR::updateHistogram_synthesis(int level, const ANNcoord color_old, const ANNcoord color_new) {
-	double delta_histogram = 1. / (TEXSIZE[level] * TEXSIZE[level] * TEXSIZE[level]);
+	float delta_histogram = 1. / (TEXSIZE[level] * TEXSIZE[level] * TEXSIZE[level]);
 
 	int bin_old = (int)(color_old * NUM_HISTOGRAM_BIN / CHANNEL_MAXVALUE);
 	int bin_new = (int)(color_new * NUM_HISTOGRAM_BIN / CHANNEL_MAXVALUE);
@@ -1825,7 +1827,7 @@ int DoPAR::FindClosestColorIndex(int level, vector<ANNcoord> &color, ANNcoord re
 }
 
 //----------- Dynamic thresholding, worse than proportionthreshold ---------
-void DoPAR::calcaccHistogram(vector<double> &inputhis, vector<double> &acchis){
+void DoPAR::calcaccHistogram(vector<float> &inputhis, vector<float> &acchis){
 	if (inputhis.size() != acchis.size()) { cout << endl << "accHistogram size " << acchis.size() << " not match " << inputhis.size(); _getch(); }
 	acchis = inputhis;
 	for (int i = 1; i < inputhis.size(); i++){
@@ -1838,21 +1840,21 @@ void DoPAR::DynamicThresholding(int level){
 	//if (DISCRETE_HISTOGRAM_BIN != CHANNEL_MAXVALUE[0]) { cout << endl << "DISCRETE_HISTOGRAM_BIN=" << DISCRETE_HISTOGRAM_BIN << " only accept " << CHANNEL_MAXVALUE[0]; _getch(); }
 	
 	//first calculate accumulate histogram
-	vector<double> acchis_synthesis(DISCRETE_HISTOGRAM_BIN, 0.0);		//ch=0
+	vector<float> acchis_synthesis(DISCRETE_HISTOGRAM_BIN, 0.0);		//ch=0
 	calcaccHistogram(discrete_histogram_synthesis[level], acchis_synthesis);
 
 	//calc threshold value set
-	vector<double> thresholdvalue(existed_bin_exemplar[level].size()-1, 0.0);
+	vector<float> thresholdvalue(existed_bin_exemplar[level].size() - 1, 0.0);
 	//----------- Linear solver, not very accurate ----------------------
 	auto vectoriterator = upper_bound(acchis_synthesis.begin(), acchis_synthesis.end(), 0.0);
 	for (int i = 0; i < existed_bin_exemplar[level].size() - 1; i++){		//ignore the last threshold(should be max)
-		double acc = discrete_acchis_exemplar[level][existed_bin_exemplar[level][i]];
+		float acc = discrete_acchis_exemplar[level][existed_bin_exemplar[level][i]];
 		vectoriterator = upper_bound(acchis_synthesis.begin(), acchis_synthesis.end(), acc);
 		int upper = vectoriterator - acchis_synthesis.begin();
 		int lower = max(0, upper - 1);			//!should be lower_bound, but because the weighted average set is continuious, it is equal to upper-1
 		if (lower == 0) {/* cout << endl << endl << "up_acc - low_acc=0" << endl;  */thresholdvalue[i] = 0.0; continue; }
-		double up_acc = acchis_synthesis[upper];
-		double low_acc = acchis_synthesis[lower];
+		float up_acc = acchis_synthesis[upper];
+		float low_acc = acchis_synthesis[lower];
 		thresholdvalue[i] =  1.0*lower + (acc - low_acc) / (up_acc - low_acc);	//assume linear distribution within acchis_synthesis[lower,upper]	
 	}
 
@@ -2389,25 +2391,30 @@ void DoPAR::PrepareDMapProjection(vector<short>& TI1, vector<short>& TI2, vector
 	short minVal, maxVal, minVal1, minVal2, minVal3, maxVal1, maxVal2, maxVal3;	//total min, max for 3TIs; and separately
 	minVal = maxVal = TI1[0];	minVal1 = maxVal1 = TI1[0]; minVal2 = maxVal2 = TI2[0]; minVal3 = maxVal3 = TI3[0];
 	for (long idx = 0; idx < TI1.size(); ++idx) {
-		if (TI1[idx] < minVal) minVal = TI1[idx];
-		if (TI1[idx] > maxVal) maxVal = TI1[idx];
 		if (TI1[idx] < minVal1) minVal1 = TI1[idx];
 		if (TI1[idx] > maxVal1) maxVal1 = TI1[idx];
+		if (TI1[idx] == 0) { cout << endl << "DM1[" << idx << "]= 0!!"; _getch(); }
 	}cout << endl << "TI1: porosity= "<< PorosityX << " solid_min= " << minVal1 << " pore_max= " << maxVal1;	
 	for (long idx = 0; idx < TI2.size(); ++idx) {
-		if (TI2[idx] < minVal) minVal = TI2[idx];
-		if (TI2[idx] > maxVal) maxVal = TI2[idx];
 		if (TI2[idx] < minVal2) minVal2 = TI2[idx];
 		if (TI2[idx] > maxVal2) maxVal2 = TI2[idx];
+		if (TI2[idx] == 0) { cout << endl << "DM2[" << idx << "]= 0!!"; _getch(); }
 	}cout << endl << "TI2: porosity= " << PorosityY << " solid_min= " << minVal2 << " pore_max= " << maxVal2;
 	for (long idx = 0; idx < TI3.size(); ++idx) {
-		if (TI3[idx] < minVal) minVal = TI3[idx];
-		if (TI3[idx] > maxVal) maxVal = TI3[idx];
 		if (TI3[idx] < minVal3) minVal3 = TI3[idx];
 		if (TI3[idx] > maxVal3) maxVal3 = TI3[idx];
+		if (TI3[idx] == 0) { cout << endl << "DM3[" << idx << "]= 0!!"; _getch(); }
 	}cout << endl << "TI3: porosity= " << PorosityZ << " solid_min= " << minVal3 << " pore_max= " << maxVal3;
 
+	//minVal = min(minVal1, min(minVal2, minVal3));
+	//maxVal = max(maxVal1, max(maxVal2, maxVal3));
+
+	minVal = max(minVal1, max(minVal2, minVal3));
+	maxVal = min(maxVal1, min(maxVal2, maxVal3));
+	
+	
 	ProjectDMapMaxBins = -minVal + maxVal;
+
 	ProjectDMapGap = ceil(1.0*(DISCRETE_HISTOGRAM_BIN - 1) / (ProjectDMapMaxBins + 1));
 
 	//compress minVal, maxVal, reducing the dimension. e.g.-1,-2,-3-->-1; -4,-5,-6-->-2...
@@ -2450,13 +2457,13 @@ void DoPAR::ProjectDMap(vector<short>& DMap, int level){
 }
 
 void DoPAR::calcstddev(int level){
-	double sum = accumulate(m_volume[level].begin(), m_volume[level].end(), 0.0);
-	double mean = sum / m_volume[level].size();
+	float sum = accumulate(m_volume[level].begin(), m_volume[level].end(), 0.0);
+	float mean = sum / m_volume[level].size();
 
 	vector<ANNcoord> diff(m_volume[level].size());
-	transform(m_volume[level].begin(), m_volume[level].end(), diff.begin(), [mean](double x) { return x - mean; });
-	double sq_sum = inner_product(diff.begin(), diff.end(), diff.begin(), 0.0);
-	double stdev = sqrt(sq_sum / m_volume[level].size());
+	transform(m_volume[level].begin(), m_volume[level].end(), diff.begin(), [mean](float x) { return x - mean; });
+	float sq_sum = inner_product(diff.begin(), diff.end(), diff.begin(), 0.0);
+	float stdev = sqrt(sq_sum / m_volume[level].size());
 
 	cout << endl << "mean=" << mean << " stdev=" << stdev << " size=" << m_volume[level].size();
 }

@@ -29,7 +29,7 @@ int main(int argc, const char* argv[])
 ////#include <fstream>						// file I/O
 ////#include "ANN/ANN.h"					// ANN declarations
 ////
-////using namespace std;					// make std:: accessible
+////using namespace std;					// make  accessible
 ////
 //////----------------------------------------------------------------------
 ////// ann_sample

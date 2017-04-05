@@ -71,34 +71,34 @@ private:
 	void InitRandomVolume(int level);
 	void upsampleVolume(int level);
 	void outputmodel(int level);
-	void writeHistogram(int level, vector<double> &histogram, int rows, int cols, const string filename);
+	void writeHistogram(int level, vector<float> &histogram, int rows, int cols, const string filename);
+
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////
-	static const int MULTIRES = 1;			// # of multi-resolution (0 -> MULTIRES - 1 :: coarsest -> finest)
+	static const int MULTIRES = 3;			// # of multi-resolution (0 -> MULTIRES - 1 :: coarsest -> finest)
 	static const int N[MULTIRES];
 	static ANNidx TEXSIZE[MULTIRES];			// size of input exemplar
 	static int D_NEIGHBOR[MULTIRES];		// dimension of neighborhood (:= 3 * (2 * N + 1)^2)
 	static int NEIGHBORSIZE[MULTIRES];		// size: (2 * N + 1) * (2 * N + 1)
 
 	static const bool INDEXHIS_ON = true;				// Index Histogram in search step
-
-	static const bool DISCRETETHRESHOLD_ON = false;		// dynamic thresholding in optimize step. 
+	static const bool COLORHIS_ON = true;				// Colour Histogram in optimize step
 
 	static const bool DISTANCEMAP_ON = false;			// convert to distance map model
 
-	static const bool COLORHIS_ON = false;				// Colour Histogram in optimize step
-	static const bool DISCRETE_ON = false;				// discrete solver in optimize step
-
-	//wrong
+	static const bool DISCRETETHRESHOLD_ON = false;		// dynamic thresholding in optimize step. 	will slightly affect quality. dont use in double peak distribution
+	
+	//Discarded. Wrong or poor performance
+	//static const bool DISCRETE_ON = false;			// discrete solver in optimize step
 	//static const bool PROPORTIONTHRESHOLD_ON = false;	// ProportionThreshold()  not good when DM is not exact DistanceMap
 	//static const bool LINEARTRANSFORM_ON = false;		//transform weighted average to have same mean and dev as TI
 	//static const bool POSITIONHIS_ON = false;			// Position Histogram	in optimize step
 	//static const bool GAUSSIANFALLOFF_ON = false;		// gaussian fall off weight in optimize step
-	//static const bool ITERATIVEGETDMAP_ON = false;		//convert to 3D DMap every iteration, to correct DM values
+	//static const bool ITERATIVEGETDMAP_ON = false;	//convert to 3D DMap every iteration, to correct DM values
 	
-	//experimental
+	//experimental	
+	static const bool EARLYTERMINATION_ON = false;		// terminate ANN search when max points has benn visited. Careful.
 	//bool COUTCH_ON = false;
-	static const bool COLORSELECT_ON = false;
-	static const bool HYBRID_DMGREY_ON = false;			//Testing! For finnest resolution use grey image not DM
+	//static const bool HYBRID_DMGREY_ON = false;		//For finnest resolution use grey image not DM
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -130,10 +130,10 @@ private:
 		y = index / size;
 		return ((y + N[level])*TEXSIZE[level] + (x + N[level]));
 	}
-	inline double gaussian_pdf(double x, double mean, double stddev)
+	inline float gaussian_pdf(float x, float mean, float stddev)
 	{
-		static const double inv_sqrt_2pi = 0.398942280401432677939946;
-		double a = (x - mean) / stddev;
+		static const float inv_sqrt_2pi = 0.398942280401433;
+		float a = (x - mean) / stddev;
 		return inv_sqrt_2pi / stddev * exp(-0.5 * a * a);
 	}
 	
@@ -187,8 +187,8 @@ private:
 	static const short MAXITERATION;				//max iteration time
 
 	//=========== phase 1: search ===========================
-	static double PCA_RATIO_VARIANCE;			//0.95
-	static const double ErrorBound;				//Kopf used 2.0
+	static double PCA_RATIO_VARIANCE;				//0.95
+	static vector<double> ErrorBound;						//Kopf used 2.0
 	static vector<short> ANNsearchk;				//search k nearest index
 	vector<vector<ANNidx> > m_volume_nearest_x_index;		// [M] size: TEXSIZE^3
 	vector<vector<ANNidx> > m_volume_nearest_y_index;		// [M] size: TEXSIZE^3
@@ -204,8 +204,8 @@ private:
 
 
 	// ----------- index histogram -------------
-	vector<vector<double> >  m_indexhistogram_exemplar;
-	vector<vector<double> >  m_indexhistogram_synthesis;
+	vector<vector<float> >  m_indexhistogram_exemplar;
+	vector<vector<float> >  m_indexhistogram_synthesis;
 	void initIndexHistogram(int level);
 	void updateIndexHistogram(int level, int orientation, const ANNidx oldannidx, const ANNidx newannidx);
 	ANNidx indexhistmatching_ann_index(int level, int orientation, ANNidxArray idxarray, ANNdistArray distarry);
@@ -220,30 +220,28 @@ private:
 	static const short NUM_HISTOGRAM_BIN;			// # of histogram bins
 	static short CHANNEL_MAXVALUE;	// for color histogram	
 	//vector<vector<vector<double> > > dimensional_histogram_exemplar;				// [level][ori][bin]	16
-	vector<vector<double> >  m_histogram_exemplar;									// [level][bin]		16
-	vector<vector<double> >  m_histogram_synthesis;									// [level][bin]		16
+	vector<vector<float> >  m_histogram_exemplar;									// [level][bin]		16
+	vector<vector<float> >  m_histogram_synthesis;									// [level][bin]		16
 
 	void calcHistogram_exemplar(int level);
 	void calcHistogram_synthesis(int level);
-	void updateHistogram_synthesis(int level, const ANNcoord color_old, const ANNcoord color_new);
-	
+	void updateHistogram_synthesis(int level, const ANNcoord color_old, const ANNcoord color_new);	
 	
 	//discrete solver
 	int FindClosestColorIndex(int level, vector<ANNcoord>& colorset, ANNcoord referencecolor);	// return the index in colorset of the most similar color	
 	
 	//----------- Dynamic thresholding ----------
 	static short DISCRETE_HISTOGRAM_BIN;						// for thresholding, discrete values. e.g. default256
-	vector<vector<double> >  discrete_histogram_exemplar;			// [level][discretebin]	256
-	vector<vector<double> >  discrete_histogram_synthesis;			// [level][discretebin]	256
+	vector<vector<float> >  discrete_histogram_exemplar;			// [level][discretebin]	256
+	vector<vector<float> >  discrete_histogram_synthesis;			// [level][discretebin]	256
 	vector<vector<short> > existed_bin_exemplar;						//[level][<=max bin size]
-	vector<vector<double>> existed_histogram_examplar;				//[level][<=max bin size]
-	vector<vector<double>> discrete_acchis_exemplar;							//[level][bin]
+	vector<vector<float>> existed_histogram_examplar;				//[level][<=max bin size]
+	vector<vector<float>> discrete_acchis_exemplar;							//[level][bin]
 
 	void DynamicThresholding(int level);//reassign values based on TI colorhis after optimize step
-	void calcaccHistogram(vector<double> &inputhis, vector<double> &acchis);
+	void calcaccHistogram(vector<float> &inputhis, vector<float> &acchis);
 	////Non-linear solver
 	//void PolynomialInterpolation(vector<double>& Xv, vector<double>& Yv, vector<double>& X);
-
 	//void ProportionThreshold(vector<short>& Model, vector<short>& BinNum, vector<double>& Prob);
 	//void ProportionThreshold(vector<ANNcoord>& Model, vector<short>& BinNum, vector<double>& Prob);
 
