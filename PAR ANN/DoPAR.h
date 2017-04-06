@@ -73,6 +73,9 @@ private:
 	void outputmodel(int level);
 	void writeHistogram(int level, vector<float> &histogram, int rows, int cols, const string filename);
 
+	//release data
+	void cleardata(int level);
+
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////
 	static const int MULTIRES = 1;			// # of multi-resolution (0 -> MULTIRES - 1 :: coarsest -> finest)
 	static const int N[MULTIRES];
@@ -83,7 +86,7 @@ private:
 	static const bool INDEXHIS_ON = true;				// Index Histogram in search step
 	static const bool COLORHIS_ON = true;				// Colour Histogram in optimize step
 
-	static const bool DISTANCEMAP_ON = false;			// convert to distance map model
+	static const bool DISTANCEMAP_ON = true;			// convert to distance map model
 
 	static const bool DISCRETETHRESHOLD_ON = false;		// dynamic thresholding in optimize step. 	will slightly affect quality. dont use in double peak distribution
 	
@@ -106,21 +109,21 @@ private:
 	void init();
 
 	inline ANNidx trimIndex(int level, ANNidx index, bool isToroidal = true) {
-		if (isToroidal) {
-			while (index < 0) index += TEXSIZE[level];
+		//if (isToroidal) {
+			if (index < 0) index += TEXSIZE[level];
 			return index % TEXSIZE[level];
-		}
-		else {//mirror
-			while (true) {
-				if (index < 0) index = -index;
-				if (TEXSIZE[level] <= index) {
-					index = 2 * (TEXSIZE[level] - 1) - index;
-					continue;
-				}
-				break;
-			}
-			return index;
-		}
+		//}
+		//else {//mirror
+		//	while (true) {
+		//		if (index < 0) index = -index;
+		//		if (TEXSIZE[level] <= index) {
+		//			index = 2 * (TEXSIZE[level] - 1) - index;
+		//			continue;
+		//		}
+		//		break;
+		//	}
+		//	return index;
+		//}
 	}
 	inline ANNidx convertIndexANN(int level, ANNidx index){
 		//convert ANNSearch m_volume_nearest_x_index to m_volume index
@@ -130,9 +133,9 @@ private:
 		y = index / size;
 		return ((y + N[level])*TEXSIZE[level] + (x + N[level]));
 	}
+	static const float inv_sqrt_2pi;
 	inline float gaussian_pdf(float x, float mean, float stddev)
-	{
-		static const float inv_sqrt_2pi = 0.398942280401433;
+	{		
 		float a = (x - mean) / stddev;
 		return inv_sqrt_2pi / stddev * exp(-0.5 * a * a);
 	}
@@ -265,10 +268,9 @@ private:
 	void PrepareDMapProjection(vector<short>& TI1, vector<short>& TI2, vector<short>& TI3, int level);
 	void ProjectDMap(vector<short>& DMap, int level);
 	
-	//release data
-	void cleardata(int level);
+	void BimodalRedistribution(vector<short>& Res);
 
 
-	void calcstddev(int level);
+
 };
 

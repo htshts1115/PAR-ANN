@@ -9,6 +9,13 @@ int main(int argc, const char* argv[])
 	//cout << endl << "double=" << sizeof(double) << " float=" << sizeof(float) << " short=" << sizeof(short) << " int=" << sizeof(int) << " long=" << sizeof(long); _getch();
 	//double 8, float 4, short 2, int 4, long 4;
 
+	//for (std::vector<char>::size_type sz = 1;; sz *= 2)
+	//{
+	//	std::cerr << "attempting sz = " << sz << '\n';
+	//	std::vector<char> v(sz);
+	//}
+	//_getch();
+
 	string CurWorkExeFile = argv[0];
 
 	DoPAR DoItNow;
