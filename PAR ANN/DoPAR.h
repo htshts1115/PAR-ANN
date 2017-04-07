@@ -147,11 +147,9 @@ private:
 	bool loadExemplar();
 	void calcNeighbor();
 
-	//void initabsoluteneigh(int level);
-	//vector<ANNidx> RelativeIdx_x, RelativeIdx_y, RelativeIdx_z;		// size: (2*N[level]+1)^2
 	// random permutation (precomputed)
-	vector<ANNidx>	 m_permutation_xyz;								// [M] size: TEXSIZE[level]^3
-	void initPermutation(int level);
+	//vector<ANNidx>	 m_permutation_xyz;								// [M] size: TEXSIZE[level]^3
+	//void initPermutation(int level);
 
 	// PCA-projected neighborhood vector
 	vector<vector<ANNcoord> > m_neighbor_x;							// [M] original neighborhood vector required for texture optimization
@@ -227,8 +225,8 @@ private:
 	vector<vector<float> >  m_histogram_exemplar;									// [level][bin]		16
 	vector<vector<float> >  m_histogram_synthesis;									// [level][bin]		16
 
-	void calcHistogram_exemplar(int level);
-	void calcHistogram_synthesis(int level);
+	void initHistogram_exemplar(int level);
+	void initHistogram_synthesis(int level);
 	void updateHistogram_synthesis(int level, const ANNcoord color_old, const ANNcoord color_new);	
 	
 	//discrete solver
