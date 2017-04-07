@@ -71,7 +71,7 @@ private:
 	void InitRandomVolume(int level);
 	void upsampleVolume(int level);
 	void outputmodel(int level);
-	void writeHistogram(int level, vector<float> &histogram, int rows, int cols, const string filename);
+	void writeIndexHistogram(int level, vector<float> &histogram, int rows, int cols, const string filename);
 
 	//release data
 	void cleardata(int level);
@@ -84,6 +84,7 @@ private:
 
 	static const bool INDEXHIS_ON = true;				// Index Histogram in search step
 	static const bool COLORHIS_ON = true;				// Colour Histogram in optimize step
+	static const bool BIMODAL_ON = true;				// Using bimodal TI
 
 	static const bool DISTANCEMAP_ON = false;			// convert to distance map model
 
@@ -188,7 +189,7 @@ private:
 
 	//=========== phase 1: search ===========================
 	static double PCA_RATIO_VARIANCE;				//0.95
-	static vector<double> ErrorBound;						//Kopf used 2.0
+	static double ErrorBound;						//Kopf used 2.0
 	static vector<short> ANNsearchk;				//search k nearest index
 	vector<vector<ANNidx> > m_volume_nearest_x_index;		// [M] size: TEXSIZE^3
 	vector<vector<ANNidx> > m_volume_nearest_y_index;		// [M] size: TEXSIZE^3
@@ -206,12 +207,11 @@ private:
 	// ----------- index histogram -------------
 	static vector<float> delta_histogram_synthesis, delta_histogram_exemplar;		//store the value when first initial histogram
 	static float perHisBin;													//store NUM_HISTOGRAM_BIN / CHANNEL_MAXVALUE
-	vector<vector<float> >  m_indexhistogram_exemplar;
 	vector<vector<float> >  m_indexhistogram_synthesis;
-	void initIndexHistogram(int level);
+	void initIndexHistogram();
 	void updateIndexHistogram(int level, const ANNidx oldannidx, const ANNidx newannidx);
-	int indexhistmatching_ann_index(int level, int orientation, ANNidxArray idxarray, ANNdistArray distarry);
-	bool FIRSTRUN = true;					// dont use random initial histogram. start counting from 0 for the first run.
+	int indexhistmatching_ann_index(int level, int orientation, ANNidxArray& idxarray);
+	bool FIRSTRUN;					// dont use random initial histogram. start counting from 0 for the first run.
 
 
 	//========== phase 2: optimization ======================
@@ -225,6 +225,7 @@ private:
 	vector<vector<float> >  m_histogram_exemplar;									// [level][bin]		16
 	vector<vector<float> >  m_histogram_synthesis;									// [level][bin]		16
 
+	void calcTempHistogram(vector<ANNcoord>& model, vector<short>& existedbin, vector<float>& existedbinHis);
 	void initHistogram_exemplar(int level);
 	void initHistogram_synthesis(int level);
 	void updateHistogram_synthesis(int level, const ANNcoord color_old, const ANNcoord color_new);	
@@ -244,8 +245,8 @@ private:
 	void calcaccHistogram(vector<float> &inputhis, vector<float> &acchis);
 	////Non-linear solver
 	//void PolynomialInterpolation(vector<double>& Xv, vector<double>& Yv, vector<double>& X);
-	//void ProportionThreshold(vector<short>& Model, vector<short>& BinNum, vector<double>& Prob);
-	//void ProportionThreshold(vector<ANNcoord>& Model, vector<short>& BinNum, vector<double>& Prob);
+	void ProportionThreshold(vector<short>& Model, vector<short> BinNum, vector<float> Prob);
+	
 
 	//=============== distance map ===================
 	double porosityTI, porosityModel;
