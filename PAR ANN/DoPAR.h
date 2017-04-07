@@ -77,16 +77,15 @@ private:
 	void cleardata(int level);
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////
-	static const int MULTIRES = 1;			// # of multi-resolution (0 -> MULTIRES - 1 :: coarsest -> finest)
+	static const int MULTIRES = 4;				// # of multi-resolution (0 -> MULTIRES - 1 :: coarsest -> finest)
 	static const int N[MULTIRES];
 	static ANNidx TEXSIZE[MULTIRES];			// size of input exemplar
-	static int D_NEIGHBOR[MULTIRES];		// dimension of neighborhood (:= 3 * (2 * N + 1)^2)
-	static int NEIGHBORSIZE[MULTIRES];		// size: (2 * N + 1) * (2 * N + 1)
+	static int D_NEIGHBOR[MULTIRES];			// (2 * N + 1) * (2 * N + 1)
 
 	static const bool INDEXHIS_ON = true;				// Index Histogram in search step
 	static const bool COLORHIS_ON = true;				// Colour Histogram in optimize step
 
-	static const bool DISTANCEMAP_ON = true;			// convert to distance map model
+	static const bool DISTANCEMAP_ON = false;			// convert to distance map model
 
 	static const bool DISCRETETHRESHOLD_ON = false;		// dynamic thresholding in optimize step. 	will slightly affect quality. dont use in double peak distribution
 	
@@ -213,7 +212,7 @@ private:
 	vector<vector<float> >  m_indexhistogram_synthesis;
 	void initIndexHistogram(int level);
 	void updateIndexHistogram(int level, const ANNidx oldannidx, const ANNidx newannidx);
-	ANNidx indexhistmatching_ann_index(int level, int orientation, ANNidxArray idxarray, ANNdistArray distarry);
+	int indexhistmatching_ann_index(int level, int orientation, ANNidxArray idxarray, ANNdistArray distarry);
 	bool FIRSTRUN = true;					// dont use random initial histogram. start counting from 0 for the first run.
 
 
@@ -268,7 +267,7 @@ private:
 	void PrepareDMapProjection(vector<short>& TI1, vector<short>& TI2, vector<short>& TI3, int level);
 	void ProjectDMap(vector<short>& DMap, int level);
 	
-	void BimodalRedistribution(vector<short>& Res);
+	void BimodalRedistribution(vector<short>& Res, string filename);
 
 
 
