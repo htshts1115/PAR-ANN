@@ -569,25 +569,25 @@ void DoPAR::GetStarted(string CurExeFile)
 	DoANNOptimization();
 }
 
-void VectorShortToMat(const vector<short>& in, Mat& out)
-{
-	vector<short>::const_iterator it = in.begin();
-	MatIterator_<int> jt, end;
-	jt = out.begin<int>();
-	for (; it != in.end(); ++it) { *jt++ = (int)(*it); }
-}
-void VectorDoubleToMat(const vector<double>& in, Mat& out){
-	vector<double>::const_iterator it = in.begin();
-	MatIterator_<double> jt, end;
-	jt = out.begin<double>();
-	for (; it != in.end(); ++it) { *jt++ = (double)(*it); }
-}
-void VectorFloatToMat(const vector<float>& in, Mat& out){
-	vector<float>::const_iterator it = in.begin();
-	MatIterator_<float> jt, end;
-	jt = out.begin<float>();
-	for (; it != in.end(); ++it) { *jt++ = (float)(*it); }
-}
+//void VectorShortToMat(const vector<short>& in, Mat& out)
+//{
+//	vector<short>::const_iterator it = in.begin();
+//	MatIterator_<int> jt, end;
+//	jt = out.begin<int>();
+//	for (; it != in.end(); ++it) { *jt++ = (int)(*it); }
+//}
+//void VectorDoubleToMat(const vector<double>& in, Mat& out){
+//	vector<double>::const_iterator it = in.begin();
+//	MatIterator_<double> jt, end;
+//	jt = out.begin<double>();
+//	for (; it != in.end(); ++it) { *jt++ = (double)(*it); }
+//}
+//void VectorFloatToMat(const vector<float>& in, Mat& out){
+//	vector<float>::const_iterator it = in.begin();
+//	MatIterator_<float> jt, end;
+//	jt = out.begin<float>();
+//	for (; it != in.end(); ++it) { *jt++ = (float)(*it); }
+//}
 void calcstddev(int level, vector<float>& floatvector){
 	float sum = accumulate(floatvector.begin(), floatvector.end(), 0.0);
 	float mean = sum / floatvector.size();
@@ -606,7 +606,7 @@ const float DoPAR::inv_sqrt_2pi = 0.398942280401433f;
 ///========================== 190217 Kopf. optimization based =====================
 
 //MULTIRES: larger number means finner level
-const int DoPAR::N[MULTIRES] = {4,4,4,4};		//Kopf{ 3, 4, 4 }; Chen{4,3,2}; Turner{5,5,5}	// neighborhood size: (2 * N + 1)^2
+const int DoPAR::N[MULTIRES] = {4,4,4,2};		//Kopf{ 3, 4, 4 }; Chen{4,3,2}; Turner{5,5,5}	// neighborhood size: (2 * N + 1)^2
 ANNidx DoPAR::TEXSIZE[MULTIRES];
 int DoPAR::D_NEIGHBOR[MULTIRES];
 
@@ -625,7 +625,7 @@ vector<double>DoPAR::ProjectDMapCompressRatio;
 short DoPAR::ProjectDMapMaxBins;
 
 double DoPAR::PCA_RATIO_VARIANCE = 0.95;		//Kopf used 0.95
-double DoPAR::ErrorBound = 2.0;				//Kopf used 2.0, we use different for multi levels
+vector<double> DoPAR::ErrorBound;				//Kopf used 2.0, we use different for multi levels
 vector<short> DoPAR::ANNsearchk;				//related to N[level]
 
 const short DoPAR::MAXITERATION = 15;
@@ -675,7 +675,6 @@ void DoPAR::DoANNOptimization(){
 		if (curlevel < MULTIRES - 1) {//level up
 			FIRSTRUN = true;
 			upsampleVolume(curlevel);		
-			initHistogram_exemplar(curlevel + 1);
 			if (COLORHIS_ON || DISCRETETHRESHOLD_ON) { initHistogram_synthesis(curlevel + 1); }
 			//release vector
 			cleardata(curlevel);
@@ -704,22 +703,31 @@ void DoPAR::init() {
 	}	
 
 
-	initHistogram_exemplar(0);
+	initHistogram_exemplar();
 	FIRSTRUN = true;
 	if (COLORHIS_ON || DISCRETETHRESHOLD_ON) initHistogram_synthesis(0);
 	if (INDEXHIS_ON)	{ initIndexHistogram();}
 
-	if (DISTANCEMAP_ON){	
-		vector<short> BimodalDM = vector<short>(m_exemplar_x[0].begin(), m_exemplar_x[0].end());	
+	//=========== Bimodal Transform ===============
+	if (DISTANCEMAP_ON && BIMODAL_ON){	
+		vector<short> BimodalDM = vector<short>(m_exemplar_x[MULTIRES-1].begin(), m_exemplar_x[MULTIRES - 1].end());
 		BimodalRedistribution(BimodalDM, "BimodalDM1.png");
 
-		BimodalDM = vector<short>(m_exemplar_y[0].begin(), m_exemplar_y[0].end());
+		BimodalDM = vector<short>(m_exemplar_y[MULTIRES - 1].begin(), m_exemplar_y[MULTIRES - 1].end());
 		BimodalRedistribution(BimodalDM, "BimodalDM2.png");
 
-		BimodalDM = vector<short>(m_exemplar_z[0].begin(), m_exemplar_z[0].end());
+		BimodalDM = vector<short>(m_exemplar_z[MULTIRES - 1].begin(), m_exemplar_z[MULTIRES - 1].end());
 		BimodalRedistribution(BimodalDM, "BimodalDM3.png");
 
-		cout << endl << "Bimodal DM outputed."; _getch();
+		cout << endl << "Bimodal DM outputed."; 
+
+		//=========== Bimodal Transform ===============
+		if (fileExists(modelFilename3D.c_str()) == true) {
+			vector<short> tempshort(m_volume[0].begin(), m_volume[0].end());
+			BimodalRedistribution3D(tempshort, outputfilename);
+			cout << endl << "Bimodal 3D input transformed."; 
+		}
+		_getch();
 	}
 }
 
@@ -733,6 +741,11 @@ void DoPAR::init() {
 //}
 
 bool DoPAR::loadExemplar() {
+	//exemplar_x --> YZ, exemplar_y --> ZX, exemplar_z --> XY
+	//using imagej, XY slice is XY, ememplar_z
+	//ZX slice can be attained by: 1. reslice top + flip virtical 2. then rotate 90 degrees left
+	//YZ slice is done by: reslice left
+
 	//---------------convert Mat to IplImage*---------------	
 	Mat matxy = cv::imread(FNameXY, CV_LOAD_IMAGE_GRAYSCALE); // ti grayscale
 	Mat matxz = cv::imread(FNameXZ, CV_LOAD_IMAGE_GRAYSCALE);
@@ -854,7 +867,7 @@ bool DoPAR::loadExemplar() {
 				if (type == 'y') {
 					cout << endl << "Input autothresholdvalue for TIs (default=108): ";
 					cin >> autothresholdvalue;
-				}			
+				}		
 			}
 
 			/*if (type == 'y') */BinariseThreshold(shortx, tempchar, autothresholdvalue);
@@ -882,23 +895,23 @@ bool DoPAR::loadExemplar() {
 			m_exemplar_z[level] = vector<ANNcoord>(shortz.begin(), shortz.end());
 
 			//draw distance model
-			if (GenerateDMTI){
+			if (GenerateDMTI && level == MULTIRES-1){
 				ostringstream name;
 
 				Mat DM1 = Mat(TEXSIZE[level], TEXSIZE[level], CV_8UC1);
-				VectorShortToMat(shortx, DM1);			
+				DM1 = Mat(shortx, true).reshape(1, DM1.rows);
 				name << "DM1_S" << Solid_Upper[level] << "P" << Pore_Lower[level];	if (MULTIRES > 1) name << "_L" << level;		
 				name << ".png";
 				imwrite(name.str(), DM1);	name.str(""); //name.clear();not necessary
 
 				Mat DM2 = Mat(TEXSIZE[level], TEXSIZE[level], CV_8UC1);
-				VectorShortToMat(shorty, DM2);
+				DM2 = Mat(shorty, true).reshape(1, DM2.rows);
 				name << "DM2_S" << Solid_Upper[level] << "P" << Pore_Lower[level];	if (MULTIRES > 1) name << "_L" << level;
 				name << ".png";
 				imwrite(name.str(), DM2);	name.str("");
 
 				Mat DM3 = Mat(TEXSIZE[level], TEXSIZE[level], CV_8UC1);
-				VectorShortToMat(shortz, DM3);
+				DM3 = Mat(shortz, true).reshape(1, DM3.rows);
 				name << "DM3_S"	<< Solid_Upper[level] << "P" << Pore_Lower[level]; if (MULTIRES > 1) name << "_L" << level;				
 				name << ".png";
 				imwrite(name.str(), DM3);	name.str("");
@@ -940,10 +953,15 @@ bool DoPAR::loadExemplar() {
 void DoPAR::calcNeighbor() {
 	//initialize kdtree for certain template/neighbourhood
 	cout << endl << "calcNeighbor...";
-	for (int level = 0; level < MULTIRES; ++level) {
-		// ============= ANNsearchk now relates to neighbourhood size =================
-		ANNsearchk[level] = max(13, (N[level]+1)*(N[level]+1));
-		//ANNsearchk[level] = 15;
+	for (int level = 0; level < MULTIRES; ++level) {		
+		// ============= ANNsearchk & ErrorBound now relates to neighbourhood size =================
+		ANNsearchk.resize(MULTIRES);
+		ANNsearchk[level] = max(13.0, (N[level])*(N[level])*(MULTIRES-level)*0.5);	
+		if (!INDEXHIS_ON) ANNsearchk[level] = 1;
+		ErrorBound.resize(MULTIRES);
+		ErrorBound[level] = max(2.0, (level+1)*1.0);									
+		if (!INDEXHIS_ON) ErrorBound[level] = 1.0;
+
 
 		cout << endl << "level:" << level;
 		int numData = (TEXSIZE[level] - 2 * N[level]) * (TEXSIZE[level] - 2 * N[level]);
@@ -1117,19 +1135,19 @@ void DoPAR::calcNeighbor() {
 			cvBackProjectPCA(mp_neighbor_pca_projected_x[level], mp_neighbor_pca_average_x[level], mp_neighbor_pca_eigenvec_x[level], backproject_x);	
 			Mat backprojectMat_x = cvarrToMat(backproject_x);			
 			Mat PCAbackprojectDM1 = Mat(TEXSIZE[level], TEXSIZE[level], CV_8UC1);
-			VectorFloatToMat(m_exemplar_x[level], PCAbackprojectDM1);
+			PCAbackprojectDM1 = Mat(m_exemplar_x[level], true).reshape(1, PCAbackprojectDM1.rows);
 
 			CvMat* backproject_y = cvCreateMat(numData, D_NEIGHBOR[level], CV_32F);
 			cvBackProjectPCA(mp_neighbor_pca_projected_y[level], mp_neighbor_pca_average_y[level], mp_neighbor_pca_eigenvec_y[level], backproject_y);
 			Mat backprojectMat_y = cvarrToMat(backproject_y);
 			Mat PCAbackprojectDM2 = Mat(TEXSIZE[level], TEXSIZE[level], CV_8UC1);
-			VectorFloatToMat(m_exemplar_y[level], PCAbackprojectDM2);
+			PCAbackprojectDM2 = Mat(m_exemplar_y[level], true).reshape(1, PCAbackprojectDM2.rows);
 
 			CvMat* backproject_z = cvCreateMat(numData, D_NEIGHBOR[level], CV_32F);
 			cvBackProjectPCA(mp_neighbor_pca_projected_z[level], mp_neighbor_pca_average_z[level], mp_neighbor_pca_eigenvec_z[level], backproject_z);
 			Mat backprojectMat_z = cvarrToMat(backproject_z);
 			Mat PCAbackprojectDM3 = Mat(TEXSIZE[level], TEXSIZE[level], CV_8UC1);
-			VectorFloatToMat(m_exemplar_z[level], PCAbackprojectDM3);
+			PCAbackprojectDM3 = Mat(m_exemplar_z[level], true).reshape(1, PCAbackprojectDM3.rows);
 
 			int row = 0; 
 			int cols = 0.5*((2 * N[level] + 1)*(2 * N[level] + 1) - 1);
@@ -1172,13 +1190,14 @@ bool DoPAR::loadVolume(){
 	if (fileExists(modelFilename3D.c_str()) == true){	
 		vector<uchar> model = load3Dmodel(modelFilename3D.c_str());	
 		if (model.size() != TEXSIZE[0] * TEXSIZE[0] * TEXSIZE[0]) { cout << endl << "Loaded Model size=" << model.size() << " should be=" << TEXSIZE[0] * TEXSIZE[0] * TEXSIZE[0]; _getch(); exit(1); }
+		else cout << endl << "3D model loaded.";
 
 		if (DISTANCEMAP_ON){
 			//============= Convert to distance model ==========================
 			long PoreNum = 0;
 			short autothresholdvalue(0);
 			bool binaryYN(true);
-			if (binaryYN) for (int i = 0; i < model.size(); i++){ if ((model[i] != 0 && model[i]!=1) && (model[i]<255 && model[i]>0)) { binaryYN = false; break; } }
+			if (binaryYN) for (int i = 0; i < model.size(); i++){ if ((model[i] != 0 && model[i]!=1) && (model[i]!=255 && model[i]!=0)) { binaryYN = false; break; } }
 			if (binaryYN == false){
 				cout << endl << "Input autothresholdvalue for LoadedModel (default=110): ";
 				cin >> autothresholdvalue;
@@ -1333,8 +1352,7 @@ void DoPAR::writeIndexHistogram(int level, vector<float> &hisvec, int rows, int 
 	if (hisvec.size() != rows*cols) { cout << endl << "writeIndexHistogram Error: wrong size of hisvec"; return; };
 
 	Mat hist = Mat(rows, cols, CV_32FC1);
-	VectorFloatToMat(hisvec, hist);
-	//memcpy(hist.data, hisvec.data(), hisvec.size()*sizeof(float));	//float 32F, double 64F
+	hist = Mat(hisvec, true).reshape(1, hist.rows);
 	
 	//hist *= TEXSIZE[level] * TEXSIZE[level] * TEXSIZE[level];	
 	hist.convertTo(hist, CV_8UC1);	//convertTo just copy the value, no scaling
@@ -1495,9 +1513,9 @@ void DoPAR::searchVolume(int level) {
 
 
 			// ANN search. error bound = 2.0; Kopf used 2.0
-			mp_neighbor_kdTree_x[level]->annkSearch(current_neighbor_x_projected->data.fl, ANNsearchk[level], ann_index_x, ann_dist_x, ErrorBound);
-			mp_neighbor_kdTree_y[level]->annkSearch(current_neighbor_y_projected->data.fl, ANNsearchk[level], ann_index_y, ann_dist_y, ErrorBound);
-			mp_neighbor_kdTree_z[level]->annkSearch(current_neighbor_z_projected->data.fl, ANNsearchk[level], ann_index_z, ann_dist_z, ErrorBound);
+			mp_neighbor_kdTree_x[level]->annkSearch(current_neighbor_x_projected->data.fl, ANNsearchk[level], ann_index_x, ann_dist_x, ErrorBound[level]);
+			mp_neighbor_kdTree_y[level]->annkSearch(current_neighbor_y_projected->data.fl, ANNsearchk[level], ann_index_y, ann_dist_y, ErrorBound[level]);
+			mp_neighbor_kdTree_z[level]->annkSearch(current_neighbor_z_projected->data.fl, ANNsearchk[level], ann_index_z, ann_dist_z, ErrorBound[level]);
 
 			// CV release
 			cvReleaseMat(&current_neighbor_x);
@@ -1797,44 +1815,48 @@ void DoPAR::calcTempHistogram(vector<ANNcoord>& model, vector<short>& existedbin
 		}
 	}
 }
-void DoPAR::initHistogram_exemplar(int level) {
-	m_histogram_exemplar[level].clear();
-	m_histogram_exemplar[level].resize(NUM_HISTOGRAM_BIN, 0);
+void DoPAR::initHistogram_exemplar() {
+	m_histogram_exemplar.resize(MULTIRES);
+	for (int level = 0; level < MULTIRES; level++) {
+		m_histogram_exemplar[level].clear();
+		m_histogram_exemplar[level].resize(NUM_HISTOGRAM_BIN, 0);
 
-	discrete_histogram_exemplar[level].clear();
-	if (DISCRETETHRESHOLD_ON || DISTANCEMAP_ON) discrete_histogram_exemplar[level].resize(DISCRETE_HISTOGRAM_BIN, 0.0);		//[level][discretebin]
+		discrete_histogram_exemplar[level].clear();
+		if (DISCRETETHRESHOLD_ON || DISTANCEMAP_ON) discrete_histogram_exemplar[level].resize(DISCRETE_HISTOGRAM_BIN, 0.0);		//[level][discretebin]
 
-	float discrete_delta_histogram = delta_histogram_exemplar[level];
-	vector<ANNcoord>* p[3] = { &m_exemplar_x[level], &m_exemplar_y[level], &m_exemplar_z[level] };
-	for (int ori = 0; ori < 3; ++ori) {
-		for (int i = 0; i < TEXSIZE[level] * TEXSIZE[level]; ++i) {
-			ANNcoord c = (*p[ori])[ i];
-			if (COLORHIS_ON){					
-				int bin = (int)(c * perHisBin);
-				m_histogram_exemplar[level][bin] += discrete_delta_histogram;
-			}
-			if (DISCRETETHRESHOLD_ON || DISTANCEMAP_ON) discrete_histogram_exemplar[level][(int)c] += discrete_delta_histogram;
-		}
-	}
-	// calc accumulate histogram (discrete)
-	if (DISCRETETHRESHOLD_ON || DISTANCEMAP_ON){
-		discrete_acchis_exemplar[level].resize(DISCRETE_HISTOGRAM_BIN, 0.0);
-		calcaccHistogram(discrete_histogram_exemplar[level], discrete_acchis_exemplar[level]);
-	}
-	// record existed colorset (discrete)
-	if (DISCRETETHRESHOLD_ON || DISTANCEMAP_ON){
-		existed_bin_exemplar[level].clear();
-		existed_histogram_examplar[level].clear();
-		for (int c = 0; c < DISCRETE_HISTOGRAM_BIN; c++){
-			if (discrete_histogram_exemplar[level][c] > 0.0) {
-				existed_bin_exemplar[level].push_back(c);
-				existed_histogram_examplar[level].push_back(discrete_histogram_exemplar[level][c]);
+		float discrete_delta_histogram = delta_histogram_exemplar[level];
+		vector<ANNcoord>* p[3] = { &m_exemplar_x[level], &m_exemplar_y[level], &m_exemplar_z[level] };
+		for (int ori = 0; ori < 3; ++ori) {
+			for (int i = 0; i < TEXSIZE[level] * TEXSIZE[level]; ++i) {
+				ANNcoord c = (*p[ori])[i];
+				if (COLORHIS_ON) {
+					int bin = (int)(c * perHisBin);
+					m_histogram_exemplar[level][bin] += discrete_delta_histogram;
+				}
+				if (DISCRETETHRESHOLD_ON || DISTANCEMAP_ON) discrete_histogram_exemplar[level][(int)c] += discrete_delta_histogram;
 			}
 		}
+		// calc accumulate histogram (discrete)
+		if (DISCRETETHRESHOLD_ON || DISTANCEMAP_ON) {
+			discrete_acchis_exemplar[level].resize(DISCRETE_HISTOGRAM_BIN, 0.0);
+			calcaccHistogram(discrete_histogram_exemplar[level], discrete_acchis_exemplar[level]);
+		}
+		// record existed colorset (discrete)
+		if (DISCRETETHRESHOLD_ON || DISTANCEMAP_ON) {
+			existed_bin_exemplar[level].clear();
+			existed_histogram_examplar[level].clear();
+			for (int c = 0; c < DISCRETE_HISTOGRAM_BIN; c++) {
+				if (discrete_histogram_exemplar[level][c] > 0.0) {
+					existed_bin_exemplar[level].push_back(c);
+					existed_histogram_examplar[level].push_back(discrete_histogram_exemplar[level][c]);
+				}
+			}
+		}
+
 	}
 
-	//for (int i = 0; i < existed_bin_exemplar[level].size(); i++){
-	//	cout << endl << existed_bin_exemplar[level][i] << "     " << existed_histogram_examplar[level][i];
+	//for (int i = 0; i < existed_bin_exemplar[MULTIRES-1].size(); i++){
+	//	cout << endl << existed_bin_exemplar[MULTIRES-1][i] << "     " << existed_histogram_examplar[MULTIRES-1][i];
 	//}_getch();
 }
 void DoPAR::initHistogram_synthesis(int level) {
@@ -2466,19 +2488,20 @@ void DoPAR::BimodalRedistribution(vector<short>& Res, string filename){
 	//Redistribute DM, so that it has double peak distribution, each side has similar proportion
 	//Requires discrete_histogram_exemplar and accumulation function
 	//So it should be called after initHistogram_exemplar()
-	//Level = 0!
+	
+	//!!!Level = MULTIRES-1!!!!
 
-	float s1 = discrete_histogram_exemplar[0][Solid_Upper[0]];
-	float p1 = discrete_histogram_exemplar[0][Pore_Lower[0]];
+	float s1 = discrete_histogram_exemplar[MULTIRES - 1][Solid_Upper[MULTIRES-1]];
+	float p1 = discrete_histogram_exemplar[MULTIRES - 1][Pore_Lower[MULTIRES - 1]];
 	float binprop = min(s1, p1);
 	vector<short> thresholdbin;
 	short halfbin(255);
 
 	// calc accumulate histogram (discrete)
 	vector<float> acchis(256, 0.0f);
-	calcaccHistogram(discrete_histogram_exemplar[0], acchis);
+	calcaccHistogram(discrete_histogram_exemplar[MULTIRES - 1], acchis);
 
-	cout << endl << binprop;
+	//cout << endl << binprop;
 
 	//first half
 	float curacc(0.0f);
@@ -2488,7 +2511,7 @@ void DoPAR::BimodalRedistribution(vector<short>& Res, string filename){
 		int b1 = i - acchis.begin(), b0 = b1 -1;
 		float value1 = acchis[b1], value0 = acchis[b0];
 
-		if (b1 >= Solid_Upper[0]) { thresholdbin.push_back(Solid_Upper[0] - 1); curacc = acchis[thresholdbin[bin]]; break; }
+		if (b1 >= Solid_Upper[MULTIRES - 1]) { thresholdbin.push_back(Solid_Upper[MULTIRES - 1] - 1); curacc = acchis[thresholdbin[bin]]; break; }
 		else if (abs(value1 - curacc) > abs(value0 - curacc)){
 			if (bin - 1 < 0) { thresholdbin.push_back(b0); curacc = acchis[thresholdbin[bin]];	}
 			else if (thresholdbin[bin - 1] != b0) { thresholdbin.push_back(b0);	curacc = acchis[thresholdbin[bin]]; }
@@ -2496,16 +2519,16 @@ void DoPAR::BimodalRedistribution(vector<short>& Res, string filename){
 		}
 		else { thresholdbin.push_back(b1); curacc = acchis[thresholdbin[bin]]; }
 
-		cout << " b1=" << b1 << " " << thresholdbin[bin];
+		//cout << " b1=" << b1 << " " << thresholdbin[bin];
 	
-		if (thresholdbin[bin] == Solid_Upper[0] - 1) break;
+		if (thresholdbin[bin] == Solid_Upper[MULTIRES - 1] - 1) break;
 	}
 	//push back twice Solid_Upper, in order to have a wieder gap between solid&pore
-	thresholdbin.push_back(Solid_Upper[0]); thresholdbin.push_back(Solid_Upper[0]);
-	thresholdbin.push_back(Pore_Lower[0]);
+	thresholdbin.push_back(Solid_Upper[MULTIRES - 1]); thresholdbin.push_back(Solid_Upper[MULTIRES - 1]);
+	thresholdbin.push_back(Pore_Lower[MULTIRES - 1]);
 	//second half
-	curacc = acchis[Pore_Lower[0]];
-	for (int bin = thresholdbin.size(); bin< ceil(1.0f / binprop); bin++){
+	curacc = acchis[Pore_Lower[MULTIRES - 1]];
+	for (int bin = thresholdbin.size(); bin< 20; bin++){
 		curacc += binprop;
 		auto i = lower_bound(acchis.begin(), acchis.end(), curacc);
 		int b1 = i - acchis.begin(), b0 = b1 - 1;
@@ -2523,13 +2546,12 @@ void DoPAR::BimodalRedistribution(vector<short>& Res, string filename){
 	}
 	//find half
 	for (int bin = 0; bin < thresholdbin.size(); bin++)
-		if (acchis[thresholdbin[bin]] > 0.5f) { halfbin = bin; break; }
+		if (acchis[thresholdbin[bin]] >= 0.5f) { halfbin = bin; break; }
 
 
 	// thresholdbin is done. now decide bingap & peakgap
 	const short bingap = 6;
 	short peakgap = 255 - bingap*(thresholdbin.size() - 2);
-	//cout << endl << "binnum = " << thresholdbin.size() <<"   bingap = " << bingap << "   peakgap = " << peakgap;
 	short Redis_Solid_Upper(0), Redis_Pore_Lower(0);
 
 
@@ -2539,18 +2561,20 @@ void DoPAR::BimodalRedistribution(vector<short>& Res, string filename){
 		int num = i - thresholdbin.begin();
 				
 		if (num <= halfbin) { 
-			if (thresholdbin[num] == Solid_Upper[0]) Redis_Solid_Upper = num*bingap;
-			else if (thresholdbin[num] == Pore_Lower[0]) Redis_Pore_Lower = num*bingap;
+			if (thresholdbin[num] == Solid_Upper[MULTIRES - 1]) Redis_Solid_Upper = num*bingap;
+			else if (thresholdbin[num] == Pore_Lower[MULTIRES - 1]) Redis_Pore_Lower = num*bingap;
 			Res[m] = num*bingap; 
 		}
 		else {
-			if (thresholdbin[num] == Solid_Upper[0]) Redis_Solid_Upper = (num - 1)*bingap + peakgap;
-			else if (thresholdbin[num] == Pore_Lower[0]) Redis_Pore_Lower = (num - 1)*bingap + peakgap;
+			if (thresholdbin[num] == Solid_Upper[MULTIRES - 1]) Redis_Solid_Upper = (num - 1)*bingap + peakgap;
+			else if (thresholdbin[num] == Pore_Lower[MULTIRES - 1]) Redis_Pore_Lower = (num - 1)*bingap + peakgap;
 			Res[m] = (num - 1)*bingap + peakgap;
 		}
+
+		if (Res[m] == 5) { cout << endl << "num=" << num; _getch(); }
 	}
 
-	cout << endl << "\nRedis_Solid_Upper= "<< Redis_Solid_Upper<<"    Redis_Pore_Lower= "<< Redis_Pore_Lower;
+	cout << endl << "\nRedis_Solid_Upper= "<< Redis_Solid_Upper<<"  Redis_Pore_Lower= "<< Redis_Pore_Lower << "  Halfbin= "<< thresholdbin[halfbin];
 	cout << endl << "\nThresholded bins: ";
 	for (int i = 0; i < thresholdbin.size(); i++){
 		cout << " "<< thresholdbin[i];
@@ -2562,10 +2586,117 @@ void DoPAR::BimodalRedistribution(vector<short>& Res, string filename){
 	}
 
 	// Write Bimodal image	
-	Mat BimodalMat = Mat(TEXSIZE[0], TEXSIZE[0], CV_8UC1);
-	VectorShortToMat(Res, BimodalMat);
+	Mat BimodalMat = Mat(TEXSIZE[MULTIRES-1], TEXSIZE[MULTIRES-1], CV_8UC1);
+	BimodalMat = Mat(Res, true).reshape(1, BimodalMat.rows);
 	
 	string tempoutputfilename = filename;
 	tempoutputfilename = filename.substr(0, filename.find('.')) + "_S" + to_string(Redis_Solid_Upper) + "P" + to_string(Redis_Pore_Lower) + ".png";
 	imwrite(tempoutputfilename, BimodalMat);
+}
+void DoPAR::BimodalRedistribution3D(vector<short>& Res, string filename) {
+	//Redistribute DM, so that it has double peak distribution, each side has similar proportion
+	//Requires discrete_histogram_exemplar and accumulation function
+	//So it should be called after initHistogram_exemplar()
+	
+	//!!!!OUTPUT MODEL Level = 0!!!!!
+
+	float s1 = discrete_histogram_exemplar[MULTIRES - 1][Solid_Upper[MULTIRES - 1]];
+	float p1 = discrete_histogram_exemplar[MULTIRES - 1][Pore_Lower[MULTIRES - 1]];
+	float binprop = min(s1, p1);
+	vector<short> thresholdbin;
+	short halfbin(255);
+
+	// calc accumulate histogram (discrete)
+	vector<float> acchis(256, 0.0f);
+	calcaccHistogram(discrete_histogram_exemplar[MULTIRES - 1], acchis);
+
+	//cout << endl << binprop;
+
+	//first half
+	float curacc(0.0f);
+	for (int bin = 0; bin< ceil(1.0f / binprop); bin++) {
+		curacc += binprop;
+		auto i = lower_bound(acchis.begin(), acchis.end(), curacc);
+		int b1 = i - acchis.begin(), b0 = b1 - 1;
+		float value1 = acchis[b1], value0 = acchis[b0];
+
+		if (b1 >= Solid_Upper[MULTIRES - 1]) { thresholdbin.push_back(Solid_Upper[MULTIRES - 1] - 1); curacc = acchis[thresholdbin[bin]]; break; }
+		else if (abs(value1 - curacc) > abs(value0 - curacc)) {
+			if (bin - 1 < 0) { thresholdbin.push_back(b0); curacc = acchis[thresholdbin[bin]]; }
+			else if (thresholdbin[bin - 1] != b0) { thresholdbin.push_back(b0);	curacc = acchis[thresholdbin[bin]]; }
+			else bin--;
+		}
+		else { thresholdbin.push_back(b1); curacc = acchis[thresholdbin[bin]]; }
+
+		//cout << " b1=" << b1 << " " << thresholdbin[bin];
+
+		if (thresholdbin[bin] == Solid_Upper[MULTIRES - 1] - 1) break;
+	}
+	//push back twice Solid_Upper, in order to have a wieder gap between solid&pore
+	thresholdbin.push_back(Solid_Upper[MULTIRES - 1]); thresholdbin.push_back(Solid_Upper[MULTIRES - 1]);
+	thresholdbin.push_back(Pore_Lower[MULTIRES - 1]);
+	//second half
+	curacc = acchis[Pore_Lower[MULTIRES - 1]];
+	for (int bin = thresholdbin.size(); bin< 20; bin++) {
+		curacc += binprop;
+		auto i = lower_bound(acchis.begin(), acchis.end(), curacc);
+		int b1 = i - acchis.begin(), b0 = b1 - 1;
+		float value1 = acchis[b1], value0 = acchis[b0];
+
+		if (value1 >= 0.9999999f) { thresholdbin.push_back(255); curacc = acchis[thresholdbin[bin]]; }
+		else if (abs(value1 - curacc) > abs(value0 - curacc)) {
+			if (bin - 1 < 0) { thresholdbin.push_back(b0); curacc = acchis[thresholdbin[bin]]; }
+			else if (thresholdbin[bin - 1] != b0) { thresholdbin.push_back(b0);	curacc = acchis[thresholdbin[bin]]; }
+			else bin--;
+		}
+		else { thresholdbin.push_back(b1); curacc = acchis[thresholdbin[bin]]; }
+
+		if (thresholdbin[bin] >= 255) break;
+	}
+	//find half
+	for (int bin = 0; bin < thresholdbin.size(); bin++)
+		if (acchis[thresholdbin[bin]] >= 0.5f) { halfbin = bin; break; }
+
+
+	// thresholdbin is done. now decide bingap & peakgap
+	const short bingap = 6;
+	short peakgap = 255 - bingap*(thresholdbin.size() - 2);
+	short Redis_Solid_Upper(0), Redis_Pore_Lower(0);
+
+
+	//========= redistribute DM	=============
+	for (ANNidx m = 0; m < Res.size(); m++) {
+		auto i = lower_bound(thresholdbin.begin(), thresholdbin.end(), Res[m]);
+		int num = i - thresholdbin.begin();
+
+		if (num <= halfbin) {
+			if (thresholdbin[num] == Solid_Upper[MULTIRES - 1]) Redis_Solid_Upper = num*bingap;
+			else if (thresholdbin[num] == Pore_Lower[MULTIRES - 1]) Redis_Pore_Lower = num*bingap;
+			Res[m] = num*bingap;
+		}
+		else {
+			if (thresholdbin[num] == Solid_Upper[MULTIRES - 1]) Redis_Solid_Upper = (num - 1)*bingap + peakgap;
+			else if (thresholdbin[num] == Pore_Lower[MULTIRES - 1]) Redis_Pore_Lower = (num - 1)*bingap + peakgap;
+			Res[m] = (num - 1)*bingap + peakgap;
+		}
+
+		if (Res[m] == 5) { cout << endl << "num=" << num; _getch(); }
+	}
+
+	//cout << endl << "\nRedis_Solid_Upper= " << Redis_Solid_Upper << "  Redis_Pore_Lower= " << Redis_Pore_Lower << "  Halfbin= " << thresholdbin[halfbin];
+	cout << endl << "\nThresholded bins: ";
+	for (int i = 0; i < thresholdbin.size(); i++) {
+		cout << " " << thresholdbin[i];
+	}
+	cout << endl << "Redistributed bins: ";
+	for (int i = 0; i < thresholdbin.size(); i++) {
+		if (i <= halfbin) 	cout << " " << i*bingap;
+		else cout << " " << (i - 1)*bingap + peakgap;
+	}
+
+	// Write Bimodal 3D model	
+	vector<uchar> tempmodel = vector<uchar>(Res.begin(), Res.end());
+	string tempoutputfilename = filename;
+	tempoutputfilename = filename.substr(0, filename.find('.')) + "_S" + to_string(Redis_Solid_Upper) + "P" + to_string(Redis_Pore_Lower) + ".RAW";
+	Write(outputpath + tempoutputfilename, tempmodel);
 }

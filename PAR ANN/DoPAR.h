@@ -189,7 +189,7 @@ private:
 
 	//=========== phase 1: search ===========================
 	static double PCA_RATIO_VARIANCE;				//0.95
-	static double ErrorBound;						//Kopf used 2.0
+	static vector<double> ErrorBound;						//Kopf used 2.0
 	static vector<short> ANNsearchk;				//search k nearest index
 	vector<vector<ANNidx> > m_volume_nearest_x_index;		// [M] size: TEXSIZE^3
 	vector<vector<ANNidx> > m_volume_nearest_y_index;		// [M] size: TEXSIZE^3
@@ -226,7 +226,7 @@ private:
 	vector<vector<float> >  m_histogram_synthesis;									// [level][bin]		16
 
 	void calcTempHistogram(vector<ANNcoord>& model, vector<short>& existedbin, vector<float>& existedbinHis);
-	void initHistogram_exemplar(int level);
+	void initHistogram_exemplar();
 	void initHistogram_synthesis(int level);
 	void updateHistogram_synthesis(int level, const ANNcoord color_old, const ANNcoord color_new);	
 	
@@ -266,9 +266,9 @@ private:
 	void PrepareDMapProjection(vector<short>& TI1, vector<short>& TI2, vector<short>& TI3, int level);
 	void ProjectDMap(vector<short>& DMap, int level);
 	
+	//=========== Bimodal Transform ===============
 	void BimodalRedistribution(vector<short>& Res, string filename);
-
-
+	void BimodalRedistribution3D(vector<short>& Res, string filename);
 
 };
 
