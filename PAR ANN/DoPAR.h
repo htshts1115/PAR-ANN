@@ -86,7 +86,7 @@ private:
 	static const bool COLORHIS_ON = true;				// Colour Histogram in optimize step
 	static const bool BIMODAL_ON = true;				// Using bimodal TI
 
-	static const bool DISTANCEMAP_ON = false;			// convert to distance map model
+	static const bool DISTANCEMAP_ON = true;			// convert to distance map model
 
 	static const bool DISCRETETHRESHOLD_ON = false;		// dynamic thresholding in optimize step. 	will slightly affect quality. dont use in double peak distribution
 	
@@ -250,13 +250,10 @@ private:
 
 	//=============== distance map ===================
 	double porosityTI, porosityModel;
-	static vector<short> Solid_Upper;			//Redistribute DMap Model. Use same Solid_Upper,Pore_Lower for 3TIs and loaded model
-	static vector<short> Pore_Lower;
-	static vector<short> DistanceThreshold;		//Binarise DM, use the same threshold.
-	static short ProjectDMapGap;
-	static short ProjectDMapMaxBins;
-	static vector<double> ProjectDMapCompressRatio;//Redistribute DMap Model. Use same (projection)ratio for 3TIs and loaded model
-	vector<double> TIsDMmean;
+	static float Solid_Upper;			//Redistribute DMap Model. Use same Solid_Upper,Pore_Lower for 3TIs and loaded model
+	static float Pore_Lower;
+	static short DistanceThreshold;		//Binarise DM, use the same threshold.
+	static vector<short> ProjectDMapMaxBins;
 	bool GenerateDMTI = false;
 
 	vector<unsigned short> BarDMap(short tSx, short tSy, short tSz, vector<char>& OImg);
@@ -265,10 +262,11 @@ private:
 	void BinariseThreshold(vector<short>& DMap, vector<char>& Binarised, short threshold);
 	void PrepareDMapProjection(vector<short>& TI1, vector<short>& TI2, vector<short>& TI3, int level);
 	void ProjectDMap(vector<short>& DMap, int level);
+	void NooutputDM(vector<short>& TI1, vector<short>& TI2, vector<short>& TI3);
 	
 	//=========== Bimodal Transform ===============
-	void BimodalRedistribution(vector<short>& Res, string filename);
-	void BimodalRedistribution3D(vector<short>& Res, string filename);
+	void BimodalRedistribution(vector<float>& Res, string filename);
+	void BimodalRedistribution3D(vector<float>& Res, string filename);
 
 };
 

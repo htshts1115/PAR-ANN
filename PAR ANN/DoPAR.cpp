@@ -30,13 +30,10 @@ DoPAR::DoPAR()
 	mp_neighbor_kdTree_x.resize(MULTIRES, NULL);
 	mp_neighbor_kdTree_y.resize(MULTIRES, NULL);
 	mp_neighbor_kdTree_z.resize(MULTIRES, NULL);
-	m_histogram_exemplar.resize(MULTIRES);
-	//dimensional_histogram_exemplar.resize(MULTIRES);
-
-	discrete_histogram_exemplar.resize(MULTIRES);
+	
 	discrete_histogram_synthesis.resize(MULTIRES);
-
 	m_histogram_synthesis.resize(MULTIRES);
+
 	//m_positionhistogram_exemplar.resize(MULTIRES);
 	//m_positionhistogram_synthesis.resize(MULTIRES);
 	m_volume.resize(MULTIRES);
@@ -50,20 +47,10 @@ DoPAR::DoPAR()
 	m_volume_weight_x.resize(MULTIRES);
 	m_volume_weight_y.resize(MULTIRES);
 	m_volume_weight_z.resize(MULTIRES);
-
 	
 	//absoluteneigh.resize(MULTIRES);
 	m_indexhistogram_synthesis.resize(MULTIRES);
-	discrete_acchis_exemplar.resize(MULTIRES);
-	existed_bin_exemplar.resize(MULTIRES);
-	existed_histogram_examplar.resize(MULTIRES);
 
-	Solid_Upper.resize(MULTIRES, 0);
-	Pore_Lower.resize(MULTIRES, 0);
-	DistanceThreshold.resize(MULTIRES, 0);
-	ProjectDMapCompressRatio.resize(MULTIRES, 0);
-	TIsDMmean.resize(MULTIRES, 0);
-	
 	ANNsearchk.resize(MULTIRES);
 	// [end] multi-res memory allocation---------------
 }
@@ -606,7 +593,7 @@ const float DoPAR::inv_sqrt_2pi = 0.398942280401433f;
 ///========================== 190217 Kopf. optimization based =====================
 
 //MULTIRES: larger number means finner level
-const int DoPAR::N[MULTIRES] = {4,4,4,2};		//Kopf{ 3, 4, 4 }; Chen{4,3,2}; Turner{5,5,5}	// neighborhood size: (2 * N + 1)^2
+const int DoPAR::N[MULTIRES] = {1,1,1,1};		//Kopf{ 3, 4, 4 }; Chen{4,3,2}; Turner{5,5,5}	// neighborhood size: (2 * N + 1)^2
 ANNidx DoPAR::TEXSIZE[MULTIRES];
 int DoPAR::D_NEIGHBOR[MULTIRES];
 
@@ -617,12 +604,10 @@ float DoPAR::perHisBin;
 vector<float> DoPAR::delta_histogram_exemplar;
 vector<float> DoPAR::delta_histogram_synthesis;
 
-vector<short> DoPAR::Solid_Upper;				//for redistribute distancemap model. e.g. 192: 0-192 solid
-vector<short> DoPAR::Pore_Lower;				//for redistribute distancemap model
-vector<short> DoPAR::DistanceThreshold;			//for binarise distance model.  DistanceThreshold=(Solid_Upper+Pore_Lower)/2
-short DoPAR::ProjectDMapGap;
-vector<double>DoPAR::ProjectDMapCompressRatio;
-short DoPAR::ProjectDMapMaxBins;
+float DoPAR::Solid_Upper;				//for redistribute distancemap model. e.g. 192: 0-192 solid
+float DoPAR::Pore_Lower;				//for redistribute distancemap model
+short DoPAR::DistanceThreshold;			//for binarise distance model.  DistanceThreshold=(Solid_Upper+Pore_Lower)/2
+vector<short> DoPAR::ProjectDMapMaxBins;
 
 double DoPAR::PCA_RATIO_VARIANCE = 0.95;		//Kopf used 0.95
 vector<double> DoPAR::ErrorBound;				//Kopf used 2.0, we use different for multi levels
@@ -691,7 +676,7 @@ void DoPAR::init() {
 
 	if (!loadVolume()) return;
 	
-	calcNeighbor();
+	if (!(DISTANCEMAP_ON && BIMODAL_ON)) calcNeighbor();
 	
 	//initial delta_histogram
 	perHisBin = 1.0f * NUM_HISTOGRAM_BIN / CHANNEL_MAXVALUE;
@@ -705,26 +690,22 @@ void DoPAR::init() {
 
 	initHistogram_exemplar();
 	FIRSTRUN = true;
-	if (COLORHIS_ON || DISCRETETHRESHOLD_ON) initHistogram_synthesis(0);
+	if ((COLORHIS_ON || DISCRETETHRESHOLD_ON) && !DISTANCEMAP_ON) initHistogram_synthesis(0);
 	if (INDEXHIS_ON)	{ initIndexHistogram();}
 
 	//=========== Bimodal Transform ===============
 	if (DISTANCEMAP_ON && BIMODAL_ON){	
-		vector<short> BimodalDM = vector<short>(m_exemplar_x[MULTIRES-1].begin(), m_exemplar_x[MULTIRES - 1].end());
-		BimodalRedistribution(BimodalDM, "BimodalDM1.png");
+		BimodalRedistribution(m_exemplar_x[MULTIRES - 1], "BimodalDM1.png");
 
-		BimodalDM = vector<short>(m_exemplar_y[MULTIRES - 1].begin(), m_exemplar_y[MULTIRES - 1].end());
-		BimodalRedistribution(BimodalDM, "BimodalDM2.png");
+		BimodalRedistribution(m_exemplar_y[MULTIRES - 1], "BimodalDM2.png");
 
-		BimodalDM = vector<short>(m_exemplar_z[MULTIRES - 1].begin(), m_exemplar_z[MULTIRES - 1].end());
-		BimodalRedistribution(BimodalDM, "BimodalDM3.png");
+		BimodalRedistribution(m_exemplar_z[MULTIRES - 1], "BimodalDM3.png");
 
 		cout << endl << "Bimodal DM outputed."; 
 
 		//=========== Bimodal Transform ===============
 		if (fileExists(modelFilename3D.c_str()) == true) {
-			vector<short> tempshort(m_volume[0].begin(), m_volume[0].end());
-			BimodalRedistribution3D(tempshort, outputfilename);
+			BimodalRedistribution3D(m_volume[0], outputfilename);
 			cout << endl << "Bimodal 3D input transformed."; 
 		}
 		_getch();
@@ -837,17 +818,12 @@ bool DoPAR::loadExemplar() {
 				vector<short> shortz = vector<short>(m_exemplar_z[level].begin(), m_exemplar_z[level].end());
 				ProportionThreshold(shortz, TempExistedBinZ, TempExistedBinHisZ);
 				m_exemplar_z[level] = vector<ANNcoord>(shortz.begin(), shortz.end());
-
-				//Mat DM1 = Mat(TEXSIZE[level], TEXSIZE[level], CV_8UC1);
-				//VectorShortToMat(shortx, DM1);
-				//imwrite("testshrinkedDM_l"+to_string(level)+ ".png", DM1);
 			}
 		}
 
-		
-
+	
 		//============= Convert to distance model ==========================
-		if (DISTANCEMAP_ON){
+		if (DISTANCEMAP_ON && level == MULTIRES - 1){
 			vector<char> tempchar(TEXSIZE[level] * TEXSIZE[level]);	
 			vector<short> shortx(m_exemplar_x[level].begin(), m_exemplar_x[level].end());
 			vector<short> shorty(m_exemplar_y[level].begin(), m_exemplar_y[level].end());
@@ -873,51 +849,52 @@ bool DoPAR::loadExemplar() {
 			/*if (type == 'y') */BinariseThreshold(shortx, tempchar, autothresholdvalue);
 			//else tempchar = BinariseImg(shortx, porosityxyz[0]);			//BinariseImg has problem!!! will generate small dots in big pores.
 			shortx = GetDMap(TEXSIZE[level], TEXSIZE[level], 1, tempchar, 2, false);
-
-			/*if (type == 'y')*/ BinariseThreshold(shorty, tempchar, autothresholdvalue);
-			//else tempchar = BinariseImg(shorty, porosityxyz[1]);
+			
+			BinariseThreshold(shorty, tempchar, autothresholdvalue);
 			shorty = GetDMap(TEXSIZE[level], TEXSIZE[level], 1, tempchar, 2, false);
 			
-			/*if (type == 'y') */BinariseThreshold(shortz, tempchar, autothresholdvalue);
-			//else tempchar = BinariseImg(shortz, porosityxyz[2]);
+			BinariseThreshold(shortz, tempchar, autothresholdvalue);
 			shortz = GetDMap(TEXSIZE[level], TEXSIZE[level], 1, tempchar, 2, false);
 			
-			//Decide solid_upper && pore_lower based on 3TIs
-			PrepareDMapProjection(shortx, shorty, shortz, level);
+			bool outputDM(true);
+			if (outputDM) {
+				//Decide solid_upper && pore_lower based on 3TIs
+				PrepareDMapProjection(shortx, shorty, shortz, level);
+				//redistribute distance values
+				ProjectDMap(shortx, level);
+				ProjectDMap(shorty, level);
+				ProjectDMap(shortz, level);
+			}
+			//else {
+			//	NooutputDM(shortx, shorty, shortz);			//unknown bug
+			//}
 
-			//redistribute distance values
-			ProjectDMap(shortx, level);
-			ProjectDMap(shorty, level);
-			ProjectDMap(shortz, level);
 
 			m_exemplar_x[level] = vector<ANNcoord>(shortx.begin(), shortx.end());
 			m_exemplar_y[level] = vector<ANNcoord>(shorty.begin(), shorty.end());
 			m_exemplar_z[level] = vector<ANNcoord>(shortz.begin(), shortz.end());
 
 			//draw distance model
-			if (GenerateDMTI && level == MULTIRES-1){
+			if (GenerateDMTI && level == MULTIRES - 1 && outputDM){
 				ostringstream name;
 
 				Mat DM1 = Mat(TEXSIZE[level], TEXSIZE[level], CV_8UC1);
 				DM1 = Mat(shortx, true).reshape(1, DM1.rows);
-				name << "DM1_S" << Solid_Upper[level] << "P" << Pore_Lower[level];	if (MULTIRES > 1) name << "_L" << level;		
+				name << "DM1_S" << (short)Solid_Upper << "P" << (short)Pore_Lower;	//if (MULTIRES > 1) name << "_L" << level;		
 				name << ".png";
 				imwrite(name.str(), DM1);	name.str(""); //name.clear();not necessary
 
 				Mat DM2 = Mat(TEXSIZE[level], TEXSIZE[level], CV_8UC1);
 				DM2 = Mat(shorty, true).reshape(1, DM2.rows);
-				name << "DM2_S" << Solid_Upper[level] << "P" << Pore_Lower[level];	if (MULTIRES > 1) name << "_L" << level;
+				name << "DM2_S" << (short)Solid_Upper << "P" << (short)Pore_Lower;	//if (MULTIRES > 1) name << "_L" << level;
 				name << ".png";
 				imwrite(name.str(), DM2);	name.str("");
 
 				Mat DM3 = Mat(TEXSIZE[level], TEXSIZE[level], CV_8UC1);
 				DM3 = Mat(shortz, true).reshape(1, DM3.rows);
-				name << "DM3_S"	<< Solid_Upper[level] << "P" << Pore_Lower[level]; if (MULTIRES > 1) name << "_L" << level;				
+				name << "DM3_S"	<< (short)Solid_Upper << "P" << (short)Pore_Lower; //if (MULTIRES > 1) name << "_L" << level;				
 				name << ".png";
 				imwrite(name.str(), DM3);	name.str("");
-
-				// ============ Redistribute DM, to make double peak distribution ==============
-
 			}
 		}
 		
@@ -1254,7 +1231,7 @@ void DoPAR::upsampleVolume(int level) {
 	if (DISTANCEMAP_ON){
 		tempchar.resize(m_volume[level].size());
 		shortmodel = vector<short>(m_volume[level].begin(), m_volume[level].end());
-		BinariseThreshold(shortmodel, tempchar, Solid_Upper[level]);				//[0,1]	
+		BinariseThreshold(shortmodel, tempchar, Solid_Upper);				//[0,1]	
 		for_each(tempchar.rbegin(), tempchar.rend(), [&](char n) { porosity += n; });
 		porosity /= tempchar.size();
 		//cout << endl << "porosity=" << porosity; _getch();
@@ -1339,7 +1316,7 @@ void DoPAR::outputmodel(int level){
 		vector<char> tempchar(tempmodel.size());
 		//output an extra binary model
 		vector<short> shortmodel(tempmodel.begin(), tempmodel.end());
-		BinariseThreshold(shortmodel, tempchar, Solid_Upper[level]);
+		BinariseThreshold(shortmodel, tempchar, Solid_Upper);
 		//BinariseImg(shortmodel, porosityTI);
 		tempmodel = vector<uchar>(tempchar.begin(), tempchar.end());
 		tempoutputfilename = tempoutputfilename.substr(0, tempoutputfilename.find('.')) + "_binary.RAW";
@@ -1817,12 +1794,35 @@ void DoPAR::calcTempHistogram(vector<ANNcoord>& model, vector<short>& existedbin
 }
 void DoPAR::initHistogram_exemplar() {
 	m_histogram_exemplar.resize(MULTIRES);
-	for (int level = 0; level < MULTIRES; level++) {
-		m_histogram_exemplar[level].clear();
+	existed_histogram_examplar.resize(MULTIRES);
+	existed_bin_exemplar.resize(MULTIRES);
+	discrete_histogram_exemplar.resize(MULTIRES);
+	discrete_acchis_exemplar.resize(MULTIRES);
+
+	for (int level = MULTIRES-1; level >= 0; level--) {
 		m_histogram_exemplar[level].resize(NUM_HISTOGRAM_BIN, 0);
 
-		discrete_histogram_exemplar[level].clear();
-		if (DISCRETETHRESHOLD_ON || DISTANCEMAP_ON) discrete_histogram_exemplar[level].resize(DISCRETE_HISTOGRAM_BIN, 0.0);		//[level][discretebin]
+		//if (DISCRETETHRESHOLD_ON || DISTANCEMAP_ON) discrete_histogram_exemplar[level].resize(DISCRETE_HISTOGRAM_BIN, 0.0);		//[level][discretebin]
+		if (DISCRETETHRESHOLD_ON || DISTANCEMAP_ON && level == MULTIRES - 1) {
+			if (m_exemplar_x[level].size() != m_exemplar_y[level].size() || m_exemplar_x[level].size() != m_exemplar_z[level].size()) {
+				cout << endl << "m_exemplar size not match"; _getch(); exit(1);
+			}
+			else {
+				auto maxi1 = max_element(m_exemplar_x[level].begin(), m_exemplar_x[level].end());
+				auto maxi2 = max_element(m_exemplar_y[level].begin(), m_exemplar_y[level].end());
+				auto maxi3 = max_element(m_exemplar_z[level].begin(), m_exemplar_z[level].end());
+				short maxvalue = max(m_exemplar_x[level][maxi1 - m_exemplar_x[level].begin()], max(m_exemplar_y[level][maxi2 - m_exemplar_y[level].begin()], m_exemplar_z[level][maxi3 - m_exemplar_z[level].begin()]));
+
+				discrete_histogram_exemplar[level].resize(maxvalue + 1, 0.0);
+
+				discrete_acchis_exemplar[level].resize(discrete_histogram_exemplar[level].size(), 0.0);
+
+				existed_bin_exemplar[level].reserve(discrete_histogram_exemplar[level].size());
+
+				existed_histogram_examplar[level].reserve(discrete_histogram_exemplar[level].size());
+			}
+		}
+
 
 		float discrete_delta_histogram = delta_histogram_exemplar[level];
 		vector<ANNcoord>* p[3] = { &m_exemplar_x[level], &m_exemplar_y[level], &m_exemplar_z[level] };
@@ -1833,36 +1833,33 @@ void DoPAR::initHistogram_exemplar() {
 					int bin = (int)(c * perHisBin);
 					m_histogram_exemplar[level][bin] += discrete_delta_histogram;
 				}
-				if (DISCRETETHRESHOLD_ON || DISTANCEMAP_ON) discrete_histogram_exemplar[level][(int)c] += discrete_delta_histogram;
+				if (DISCRETETHRESHOLD_ON || DISTANCEMAP_ON && level == MULTIRES - 1) discrete_histogram_exemplar[level][(int)c] += discrete_delta_histogram;
 			}
 		}
-		// calc accumulate histogram (discrete)
-		if (DISCRETETHRESHOLD_ON || DISTANCEMAP_ON) {
-			discrete_acchis_exemplar[level].resize(DISCRETE_HISTOGRAM_BIN, 0.0);
+
+		if ((DISCRETETHRESHOLD_ON || DISTANCEMAP_ON) && level==MULTIRES-1 ) {
+			// calc accumulate histogram (discrete)
 			calcaccHistogram(discrete_histogram_exemplar[level], discrete_acchis_exemplar[level]);
-		}
-		// record existed colorset (discrete)
-		if (DISCRETETHRESHOLD_ON || DISTANCEMAP_ON) {
-			existed_bin_exemplar[level].clear();
-			existed_histogram_examplar[level].clear();
-			for (int c = 0; c < DISCRETE_HISTOGRAM_BIN; c++) {
+
+			// record existed colorset (discrete)
+			for (int c = 0; c < discrete_histogram_exemplar[level].size(); c++) {
 				if (discrete_histogram_exemplar[level][c] > 0.0) {
 					existed_bin_exemplar[level].push_back(c);
 					existed_histogram_examplar[level].push_back(discrete_histogram_exemplar[level][c]);
 				}
 			}
 		}
-
 	}
 
+	cout << endl << "initHistogram_exemplar done.";
 	//for (int i = 0; i < existed_bin_exemplar[MULTIRES-1].size(); i++){
 	//	cout << endl << existed_bin_exemplar[MULTIRES-1][i] << "     " << existed_histogram_examplar[MULTIRES-1][i];
 	//}_getch();
 }
 void DoPAR::initHistogram_synthesis(int level) {
-	m_histogram_synthesis[level].clear();
+	//m_histogram_synthesis[level].clear();
 	m_histogram_synthesis[level].resize(NUM_HISTOGRAM_BIN, 0.0);
-	discrete_histogram_synthesis[level].clear();
+	//discrete_histogram_synthesis[level].clear();
 	if (DISCRETETHRESHOLD_ON) discrete_histogram_synthesis[level].resize(DISCRETE_HISTOGRAM_BIN, 0.0);
 
 	float delta_histogram = delta_histogram_synthesis[level];
@@ -1892,8 +1889,8 @@ int DoPAR::FindClosestColorIndex(int level, vector<ANNcoord> &color, ANNcoord re
 	//return the final index
 	
 	if (DISTANCEMAP_ON) { 
-		if (referencecolor < Solid_Upper[level]) referencecolor = floor(referencecolor);
-		if (referencecolor > Pore_Lower[level]) referencecolor = ceil(referencecolor);
+		if (referencecolor < Solid_Upper) referencecolor = floor(referencecolor);
+		if (referencecolor > Pore_Lower) referencecolor = ceil(referencecolor);
 	}
 
 	auto i = min_element(begin(color), end(color), [=](ANNcoord x, ANNcoord y)
@@ -1912,7 +1909,7 @@ void DoPAR::calcaccHistogram(vector<float> &inputhis, vector<float> &acchis){
 	for (int i = 1; i < inputhis.size(); i++){
 		acchis[i] += acchis[i-1];
 	}
-	if (acchis[acchis.size() - 1] > 1.0001 || acchis[acchis.size() - 1] < 0.9999) { cout << endl << "Error: acchis max=" << acchis[acchis.size() - 1]; _getch(); }
+	if (acchis[acchis.size() - 1] > 1.001 || acchis[acchis.size() - 1] < 0.999) { cout << endl << "Error: acchis max=" << acchis[acchis.size() - 1]; _getch(); }
 }
 void DoPAR::DynamicThresholding(int level){
 	//if (PROPORTIONTHRESHOLD_ON) { cout << endl << "PROPORTIONTHRESHOLD_ON"; _getch(); }
@@ -2019,7 +2016,7 @@ void DoPAR::ProportionThreshold(vector<short>& Model, vector<short> BinNum, vect
 	if (Model.size() == 0) { cout << endl << "shortmodel.size=" << Model.size(); _getch(); return; }
 	double check_sum_Prob(0.0); 
 	for_each(Prob.rbegin(), Prob.rend(), [&](double n) { check_sum_Prob += n; });
-	if (check_sum_Prob > 1.00001 || check_sum_Prob < 0.99999) { cout << endl << "check_sum_Prob=" << check_sum_Prob; _getch(); return; }
+	if (check_sum_Prob > 1.001 || check_sum_Prob < 0.999) { cout << endl << "check_sum_Prob=" << check_sum_Prob; _getch(); return; }
 
 
 	short MinVal = Model[0];
@@ -2221,19 +2218,30 @@ vector<short> DoPAR::GetDMap(short Sx, short Sy, short Sz, vector<char>& OImg, c
 			else
 				DMap[idx] = tDMap[idx];
 
-			if (tDMap[idx] > MaxDis)
-				MaxDis = tDMap[idx];
+			//if (tDMap[idx] > MaxDis)
+			//     MaxDis = tDMap[idx]; 
+
+			if (DMap[idx] > MaxDis)
+				MaxDis = DMap[idx];
 		}
+
+		tDMap.clear();
 
 		if (!DisValYN) {
 			vector<bool> UsedYN(MaxDis + 1, false);
-			for (long idx = 0; idx < tDMap.size(); ++idx) {
-				if (tDMap[idx] > 0) {
-					UsedYN[tDMap[idx]] = true;
+			//for (long idx = 0; idx < tDMap.size(); ++idx) {
+			//     if (tDMap[idx] > 0) {
+			//           UsedYN[tDMap[idx]] = true; 
+			//     }
+			//}
+
+			//tDMap.clear(); 
+
+			for (long idx = 0; idx < DMap.size(); ++idx) {
+				if (DMap[idx] > 0) {
+					UsedYN[DMap[idx]] = true;
 				}
 			}
-
-			tDMap.clear();
 
 			vector<long> DisSeq(MaxDis + 1, -1);
 
@@ -2278,19 +2286,29 @@ vector<short> DoPAR::GetDMap(short Sx, short Sy, short Sz, vector<char>& OImg, c
 			else
 				DMap[idx] = -1L * tDMap[idx];
 
-			if (tDMap[idx] > MaxDis)
-				MaxDis = tDMap[idx];
+			//if (tDMap[idx] > MaxDis)
+			//     MaxDis = tDMap[idx];
+
+			if (-DMap[idx] > MaxDis)
+				MaxDis = -DMap[idx];
 		}
+
+		tDMap.clear();
 
 		if (!DisValYN) {
 			vector<bool> UsedYN(MaxDis + 1, false);
-			for (long idx = 0; idx < tDMap.size(); ++idx) {
-				if (tDMap[idx] > 0) {
-					UsedYN[tDMap[idx]] = true;
+			//for (long idx = 0; idx < tDMap.size(); ++idx) {
+			//     if (tDMap[idx] > 0) {
+			//           UsedYN[tDMap[idx]] = true;
+			//     }
+			//}
+
+			//tDMap.clear();
+			for (long idx = 0; idx < DMap.size(); ++idx) {
+				if (DMap[idx] < 0) {
+					UsedYN[-DMap[idx]] = true;
 				}
 			}
-
-			tDMap.clear();
 
 			vector<long> DisSeq(MaxDis + 1, -1);
 
@@ -2309,6 +2327,7 @@ vector<short> DoPAR::GetDMap(short Sx, short Sy, short Sz, vector<char>& OImg, c
 	}//DM_Type == 1 || DM_Type == 2
 
 	return DMap;
+
 }
 vector<char> DoPAR::BinariseImg(vector<short>& DMap, double TPorosity){
 	//(1) Distance map: Pores have the most largest values
@@ -2408,9 +2427,13 @@ void DoPAR::BinariseThreshold(vector<short>& DMap, vector<char>& Binarised, shor
 		else Binarised[i] = 1;
 	}
 }
-void DoPAR::PrepareDMapProjection(vector<short>& TI1, vector<short>& TI2, vector<short>& TI3, int level){
+void DoPAR::PrepareDMapProjection(vector<short>& TI1, vector<short>& TI2, vector<short>& TI3, int level) {
 	//dynamically decide solid_upper, pore_lower && DistanceThreshold
 	//compute RedistributeRatio for 3TI
+	ProjectDMapMaxBins.resize(MULTIRES);
+
+	//testDM
+	//int pore1count(0), solid1count(0);
 
 	short minVal, maxVal, minVal1, minVal2, minVal3, maxVal1, maxVal2, maxVal3;	//total min, max for 3TIs; and separately
 	minVal = maxVal = TI1[0];	minVal1 = maxVal1 = TI1[0]; minVal2 = maxVal2 = TI2[0]; minVal3 = maxVal3 = TI3[0];
@@ -2418,7 +2441,7 @@ void DoPAR::PrepareDMapProjection(vector<short>& TI1, vector<short>& TI2, vector
 		if (TI1[idx] < minVal1) minVal1 = TI1[idx];
 		if (TI1[idx] > maxVal1) maxVal1 = TI1[idx];
 		if (TI1[idx] == 0) { cout << endl << "DM1[" << idx << "]= 0!!"; _getch(); }
-	}cout << endl << "TI1: porosity= "<< PorosityX << " solid_min= " << minVal1 << " pore_max= " << maxVal1;	
+	}cout << endl << "TI1: porosity= " << PorosityX << " solid_min= " << minVal1 << " pore_max= " << maxVal1;
 	for (long idx = 0; idx < TI2.size(); ++idx) {
 		if (TI2[idx] < minVal2) minVal2 = TI2[idx];
 		if (TI2[idx] > maxVal2) maxVal2 = TI2[idx];
@@ -2436,82 +2459,114 @@ void DoPAR::PrepareDMapProjection(vector<short>& TI1, vector<short>& TI2, vector
 	//minVal = max(minVal1, max(minVal2, minVal3));
 	//maxVal = min(maxVal1, min(maxVal2, maxVal3));		//choose min(max) and max(min) would cause 0 and 255 to have too high values sometimes.
 
-	minVal = 1.0 / 3.0* (minVal1 + minVal2 + minVal3);	
+	minVal = 1.0 / 3.0* (minVal1 + minVal2 + minVal3);
 	maxVal = 1.0 / 3.0* (maxVal1 + maxVal2 + maxVal3);	//choose average would reduce the above influence.
-	
-	
-	ProjectDMapMaxBins = -minVal + maxVal +1;
 
-	ProjectDMapGap = ceil(2.0*(DISCRETE_HISTOGRAM_BIN - 1) / (ProjectDMapMaxBins));
+	ProjectDMapMaxBins[level] = -minVal + maxVal;
 
-	//compress minVal, maxVal, reducing the dimension. e.g.-1,-2,-3-->-1; -4,-5,-6-->-2...
-	//ProjectDMapCompressRatio[level] = 1.0*(maxVal - minVal) / ProjectDMapMaxBins;
-	ProjectDMapCompressRatio[level] = 1.0;
+	if (level == MULTIRES - 1) {
+		float bingap = 1.0*DISCRETE_HISTOGRAM_BIN / ProjectDMapMaxBins[level];
+		short peakgap = ceil(2 * bingap);
 
-	Solid_Upper[level] = (-minVal * (DISCRETE_HISTOGRAM_BIN - 1 - ProjectDMapGap)) / ProjectDMapMaxBins;
-	Pore_Lower[level] = Solid_Upper[level] + ProjectDMapGap;
-	//Pore_Lower[level] = (DISCRETE_HISTOGRAM_BIN - 1)* ( 1 - maxVal / ProjectDMapMaxBins);
-
-	DistanceThreshold[level] = 0.5*(Solid_Upper[level] + Pore_Lower[level]);
-
-	//cout << endl << "ProjectDMapMaxBins= " << ProjectDMapMaxBins << " ProjectDMapGap= " << ProjectDMapGap /*<< " ProjectDMapCompressRatio= " << ProjectDMapCompressRatio[level]*/;
-	cout << endl << "Solid_Upper= " << Solid_Upper[level] << "  Pore_Lower= " << Pore_Lower[level];
+		Solid_Upper = (- 1 -minVal) * bingap;
+		Pore_Lower = Solid_Upper + peakgap;
+		DistanceThreshold = 0.5*(Solid_Upper + Pore_Lower);
+		cout << endl << "Solid_Upper= " << Solid_Upper << "  Pore_Lower= " << Pore_Lower;
+	}
 }
 void DoPAR::ProjectDMap(vector<short>& DMap, int level){
 	//linear projection for DMap
 	//solid: [minVal,-1] to [solid_upper, 1]  ;  pore: [1,maxVal] to [DISCRETE_HISTOGRAM_BIN, pore_lower] Note the order has been reversed!
 	//if requires to have same ratio for solid and pore, use the bigger compress ratio
 	
-	//const bool equalratio = true;
-	//const bool reversemodel = false;	
-	////Use same ratio for three TIs, so no need to calculate again.
-	double binsize = (DISCRETE_HISTOGRAM_BIN - 1.0 - ProjectDMapGap) / ProjectDMapMaxBins;
-
-	//cout << endl << "Solid_Upper= " << Solid_Upper[level] << "  Pore_Lower= " << Pore_Lower[level];
-
+	float bingap = 1.0* DISCRETE_HISTOGRAM_BIN / ProjectDMapMaxBins[level];
+	
 	for (long idx = 0; idx < DMap.size(); ++idx){
-		//if (!reversemodel){
 		if (DMap[idx] > 0) { 
-			DMap[idx] = ceil(((DMap[idx] - 1) / ProjectDMapCompressRatio[level])*binsize) + Pore_Lower[level];
+			DMap[idx] = Pore_Lower + ((DMap[idx] - 1.0)*bingap);
 			if (DMap[idx] > DISCRETE_HISTOGRAM_BIN - 1) DMap[idx] = DISCRETE_HISTOGRAM_BIN - 1; 
 		}
 		else if (DMap[idx] < 0) { 
-			DMap[idx] = Solid_Upper[level] - ceil(((-DMap[idx] - 1) / ProjectDMapCompressRatio[level]) *binsize);
+			DMap[idx] = Solid_Upper - ((-DMap[idx] - 1.0) * bingap);
 			if (DMap[idx] < 0) DMap[idx] = 0; 
 		}
-		
-		//cout << DMap[idx] <<",";
 	}
 }
 
-void DoPAR::BimodalRedistribution(vector<short>& Res, string filename){
+void DoPAR::NooutputDM(vector<short>& TI1, vector<short>& TI2, vector<short>& TI3)
+{	//transfer DM to 0~-min+max. input TI1,TI2,TI3, output TI1,TI2,TI3
+	//do not resize to 256, just use it for Bimodal transform
+
+	short minVal, maxVal, minVal1, minVal2, minVal3, maxVal1, maxVal2, maxVal3;	//total min, max for 3TIs; and separately
+	minVal = maxVal = TI1[0];	minVal1 = maxVal1 = TI1[0]; minVal2 = maxVal2 = TI2[0]; minVal3 = maxVal3 = TI3[0];
+	for (long idx = 0; idx < TI1.size(); ++idx) {
+		if (TI1[idx] < minVal1) minVal1 = TI1[idx];
+		if (TI1[idx] > maxVal1) maxVal1 = TI1[idx];
+		if (TI1[idx] == 0) { cout << endl << "DM1[" << idx << "]= 0!!"; _getch(); }
+	}cout << endl << "TI1: porosity= " << PorosityX << " solid_min= " << minVal1 << " pore_max= " << maxVal1;
+	for (long idx = 0; idx < TI2.size(); ++idx) {
+		if (TI2[idx] < minVal2) minVal2 = TI2[idx];
+		if (TI2[idx] > maxVal2) maxVal2 = TI2[idx];
+		if (TI2[idx] == 0) { cout << endl << "DM2[" << idx << "]= 0!!"; _getch(); }
+	}cout << endl << "TI2: porosity= " << PorosityY << " solid_min= " << minVal2 << " pore_max= " << maxVal2;
+	for (long idx = 0; idx < TI3.size(); ++idx) {
+		if (TI3[idx] < minVal3) minVal3 = TI3[idx];
+		if (TI3[idx] > maxVal3) maxVal3 = TI3[idx];
+		if (TI3[idx] == 0) { cout << endl << "DM3[" << idx << "]= 0!!"; _getch(); }
+	}cout << endl << "TI3: porosity= " << PorosityZ << " solid_min= " << minVal3 << " pore_max= " << maxVal3;
+
+	minVal = min(minVal1, min(minVal2, minVal3));
+	maxVal = max(maxVal1, max(maxVal2, maxVal3));
+
+	
+	Solid_Upper = (-1 - minVal);
+	Pore_Lower = (1 - minVal);
+	DistanceThreshold = 0.5*(Solid_Upper + Pore_Lower);
+
+	for (int i = 0; i < TI1.size(); i++) TI1[i] -= minVal;
+	for (int j = 0; j < TI2.size(); j++) TI2[j] -= minVal;
+	for (int k = 0; k < TI3.size(); k++) TI3[k] -= minVal;
+}
+
+
+void DoPAR::BimodalRedistribution(vector<float>& Res, string filename){
 	//Redistribute DM, so that it has double peak distribution, each side has similar proportion
 	//Requires discrete_histogram_exemplar and accumulation function
 	//So it should be called after initHistogram_exemplar()
 	
 	//!!!Level = MULTIRES-1!!!!
 
-	float s1 = discrete_histogram_exemplar[MULTIRES - 1][Solid_Upper[MULTIRES-1]];
-	float p1 = discrete_histogram_exemplar[MULTIRES - 1][Pore_Lower[MULTIRES - 1]];
+	float s1 = discrete_histogram_exemplar[MULTIRES - 1][Solid_Upper];
+	float p1 = discrete_histogram_exemplar[MULTIRES - 1][Pore_Lower];
 	float binprop = min(s1, p1);
-	vector<short> thresholdbin;
-	short halfbin(255);
+	vector<short> thresholdbin;	
+	thresholdbin.reserve(ceil(1.0 / binprop)*2);
+	short halfbin(0);
 
 	// calc accumulate histogram (discrete)
-	vector<float> acchis(256, 0.0f);
+	vector<float> acchis(discrete_histogram_exemplar[MULTIRES - 1].size(), 0.0f);
 	calcaccHistogram(discrete_histogram_exemplar[MULTIRES - 1], acchis);
-
-	//cout << endl << binprop;
+	
+	cout << endl << "Solid_Upper=" << Solid_Upper << " prop="<< s1 <<" acc="<< acchis[Solid_Upper] 
+	<< endl	<< " Pore_Lower=" << Pore_Lower <<" prop="<<p1 <<" acc=" << acchis[Pore_Lower] ;
 
 	//first half
 	float curacc(0.0f);
-	for (int bin = 0; bin< ceil(1.0f / binprop); bin++){
+	bool firsthalfdone = false;
+	for (int bin = 0; bin< 2*ceil(1.0f / binprop); bin++){
 		curacc += binprop;
 		auto i = lower_bound(acchis.begin(), acchis.end(), curacc);
 		int b1 = i - acchis.begin(), b0 = b1 -1;
 		float value1 = acchis[b1], value0 = acchis[b0];
 
-		if (b1 >= Solid_Upper[MULTIRES - 1]) { thresholdbin.push_back(Solid_Upper[MULTIRES - 1] - 1); curacc = acchis[thresholdbin[bin]]; break; }
+		if (b1 >= (int)Solid_Upper) {
+			if (discrete_histogram_exemplar[MULTIRES - 1][Solid_Upper - 1]>0) {
+				thresholdbin.push_back(Solid_Upper - 1);
+				curacc = acchis[thresholdbin[bin]];
+			}
+			firsthalfdone = true;
+			break; 
+		}
 		else if (abs(value1 - curacc) > abs(value0 - curacc)){
 			if (bin - 1 < 0) { thresholdbin.push_back(b0); curacc = acchis[thresholdbin[bin]];	}
 			else if (thresholdbin[bin - 1] != b0) { thresholdbin.push_back(b0);	curacc = acchis[thresholdbin[bin]]; }
@@ -2519,22 +2574,26 @@ void DoPAR::BimodalRedistribution(vector<short>& Res, string filename){
 		}
 		else { thresholdbin.push_back(b1); curacc = acchis[thresholdbin[bin]]; }
 
-		//cout << " b1=" << b1 << " " << thresholdbin[bin];
-	
-		if (thresholdbin[bin] == Solid_Upper[MULTIRES - 1] - 1) break;
+		//cout << " b1=" << b1 << " " << thresholdbin[bin];	
+		if (firsthalfdone || thresholdbin[bin] == (short)Solid_Upper - 1) break;
 	}
 	//push back twice Solid_Upper, in order to have a wieder gap between solid&pore
-	thresholdbin.push_back(Solid_Upper[MULTIRES - 1]); thresholdbin.push_back(Solid_Upper[MULTIRES - 1]);
-	thresholdbin.push_back(Pore_Lower[MULTIRES - 1]);
+	thresholdbin.push_back(Solid_Upper); thresholdbin.push_back(Solid_Upper);
+	thresholdbin.push_back(Pore_Lower);
 	//second half
-	curacc = acchis[Pore_Lower[MULTIRES - 1]];
-	for (int bin = thresholdbin.size(); bin< 20; bin++){
+	bool secondhalf = false;
+	curacc = acchis[Pore_Lower];
+	for (int bin = thresholdbin.size(); bin< 2*ceil(1.0f / binprop); bin++){
 		curacc += binprop;
 		auto i = lower_bound(acchis.begin(), acchis.end(), curacc);
 		int b1 = i - acchis.begin(), b0 = b1 - 1;
 		float value1 = acchis[b1], value0 = acchis[b0];
 
-		if (value1 >= 0.9999999f) {thresholdbin.push_back(255); curacc = acchis[thresholdbin[bin]];}
+		if (value1 >= 0.99f || value0>= 0.99f) {
+			thresholdbin.push_back(acchis.size()-1);
+			curacc = acchis[thresholdbin[bin]];
+			secondhalf = true;
+		}
 		else if (abs(value1 - curacc) > abs(value0 - curacc)) {
 			if (bin - 1 < 0) { thresholdbin.push_back(b0); curacc = acchis[thresholdbin[bin]]; }
 			else if (thresholdbin[bin - 1] != b0) { thresholdbin.push_back(b0);	curacc = acchis[thresholdbin[bin]]; }
@@ -2542,7 +2601,7 @@ void DoPAR::BimodalRedistribution(vector<short>& Res, string filename){
 		}
 		else { thresholdbin.push_back(b1); curacc = acchis[thresholdbin[bin]]; }
 
-		if (thresholdbin[bin] >= 255) break;
+		if (secondhalf) break;
 	}
 	//find half
 	for (int bin = 0; bin < thresholdbin.size(); bin++)
@@ -2550,8 +2609,21 @@ void DoPAR::BimodalRedistribution(vector<short>& Res, string filename){
 
 
 	// thresholdbin is done. now decide bingap & peakgap
-	const short bingap = 6;
-	short peakgap = 255 - bingap*(thresholdbin.size() - 2);
+	short peakgap;
+	float bingap;
+	//bool DMnogap = false;
+	//if (!DMnogap) {
+	//	bingap = 6;
+	//	peakgap = 255 - bingap*(thresholdbin.size() - 2);
+	//}
+	//else {
+	//	bingap = 256 / (thresholdbin.size() - 1);
+	//	peakgap = bingap;
+	//}
+
+	peakgap = 100;
+	bingap = (255.0 - peakgap) / (thresholdbin.size() - 2);
+
 	short Redis_Solid_Upper(0), Redis_Pore_Lower(0);
 
 
@@ -2561,20 +2633,28 @@ void DoPAR::BimodalRedistribution(vector<short>& Res, string filename){
 		int num = i - thresholdbin.begin();
 				
 		if (num <= halfbin) { 
-			if (thresholdbin[num] == Solid_Upper[MULTIRES - 1]) Redis_Solid_Upper = num*bingap;
-			else if (thresholdbin[num] == Pore_Lower[MULTIRES - 1]) Redis_Pore_Lower = num*bingap;
+			//if (thresholdbin[num] == Solid_Upper) Redis_Solid_Upper = num*bingap;
+			//else if (thresholdbin[num] == Pore_Lower) Redis_Pore_Lower = num*bingap;
 			Res[m] = num*bingap; 
 		}
 		else {
-			if (thresholdbin[num] == Solid_Upper[MULTIRES - 1]) Redis_Solid_Upper = (num - 1)*bingap + peakgap;
-			else if (thresholdbin[num] == Pore_Lower[MULTIRES - 1]) Redis_Pore_Lower = (num - 1)*bingap + peakgap;
+			//if (thresholdbin[num] == Solid_Upper) Redis_Solid_Upper = (num - 1)*bingap + peakgap;
+			//else if (thresholdbin[num] == Pore_Lower) Redis_Pore_Lower = (num - 1)*bingap + peakgap;
 			Res[m] = (num - 1)*bingap + peakgap;
 		}
-
-		if (Res[m] == 5) { cout << endl << "num=" << num; _getch(); }
 	}
+	auto s = lower_bound(thresholdbin.begin(), thresholdbin.end(), Solid_Upper);
+	short rs = s - thresholdbin.begin();
+	if (rs <= halfbin) Redis_Solid_Upper = rs*bingap;
+	else Redis_Solid_Upper= (rs - 1)*bingap + peakgap;
 
-	cout << endl << "\nRedis_Solid_Upper= "<< Redis_Solid_Upper<<"  Redis_Pore_Lower= "<< Redis_Pore_Lower << "  Halfbin= "<< thresholdbin[halfbin];
+	auto p = lower_bound(thresholdbin.begin(), thresholdbin.end(), Pore_Lower);
+	short rp = p - thresholdbin.begin();
+	if (rp <= halfbin) Redis_Pore_Lower = rp*bingap;
+	else Redis_Pore_Lower = (rp - 1)*bingap + peakgap;
+
+
+	cout << endl << "Redis_Solid_Upper= "<< Redis_Solid_Upper<<"  Redis_Pore_Lower= "<< Redis_Pore_Lower << "  Halfbin= "<< thresholdbin[halfbin];
 	cout << endl << "\nThresholded bins: ";
 	for (int i = 0; i < thresholdbin.size(); i++){
 		cout << " "<< thresholdbin[i];
@@ -2593,34 +2673,44 @@ void DoPAR::BimodalRedistribution(vector<short>& Res, string filename){
 	tempoutputfilename = filename.substr(0, filename.find('.')) + "_S" + to_string(Redis_Solid_Upper) + "P" + to_string(Redis_Pore_Lower) + ".png";
 	imwrite(tempoutputfilename, BimodalMat);
 }
-void DoPAR::BimodalRedistribution3D(vector<short>& Res, string filename) {
+void DoPAR::BimodalRedistribution3D(vector<float>& Res, string filename) {
 	//Redistribute DM, so that it has double peak distribution, each side has similar proportion
 	//Requires discrete_histogram_exemplar and accumulation function
 	//So it should be called after initHistogram_exemplar()
 	
 	//!!!!OUTPUT MODEL Level = 0!!!!!
 
-	float s1 = discrete_histogram_exemplar[MULTIRES - 1][Solid_Upper[MULTIRES - 1]];
-	float p1 = discrete_histogram_exemplar[MULTIRES - 1][Pore_Lower[MULTIRES - 1]];
+	float s1 = discrete_histogram_exemplar[MULTIRES - 1][Solid_Upper];
+	float p1 = discrete_histogram_exemplar[MULTIRES - 1][Pore_Lower];
 	float binprop = min(s1, p1);
 	vector<short> thresholdbin;
-	short halfbin(255);
+	thresholdbin.reserve(ceil(1.0 / binprop) + 3);
+	short halfbin(0);
 
 	// calc accumulate histogram (discrete)
-	vector<float> acchis(256, 0.0f);
+	vector<float> acchis(discrete_histogram_exemplar[MULTIRES - 1].size(), 0.0f);
 	calcaccHistogram(discrete_histogram_exemplar[MULTIRES - 1], acchis);
 
-	//cout << endl << binprop;
+	cout << endl << "Solid_Upper=" << Solid_Upper << " prop=" << s1 << " acc=" << acchis[Solid_Upper]
+		<< endl << " Pore_Lower=" << Pore_Lower << " prop=" << p1 << " acc=" << acchis[Pore_Lower];
 
 	//first half
 	float curacc(0.0f);
+	bool firsthalfdone = false;
 	for (int bin = 0; bin< ceil(1.0f / binprop); bin++) {
 		curacc += binprop;
 		auto i = lower_bound(acchis.begin(), acchis.end(), curacc);
 		int b1 = i - acchis.begin(), b0 = b1 - 1;
 		float value1 = acchis[b1], value0 = acchis[b0];
 
-		if (b1 >= Solid_Upper[MULTIRES - 1]) { thresholdbin.push_back(Solid_Upper[MULTIRES - 1] - 1); curacc = acchis[thresholdbin[bin]]; break; }
+		if (b1 >= Solid_Upper) {
+			if (discrete_histogram_exemplar[MULTIRES - 1][Solid_Upper - 1]>0) {
+				thresholdbin.push_back(Solid_Upper - 1);
+				curacc = acchis[thresholdbin[bin]];
+			}
+			firsthalfdone = true;
+			break;
+		}
 		else if (abs(value1 - curacc) > abs(value0 - curacc)) {
 			if (bin - 1 < 0) { thresholdbin.push_back(b0); curacc = acchis[thresholdbin[bin]]; }
 			else if (thresholdbin[bin - 1] != b0) { thresholdbin.push_back(b0);	curacc = acchis[thresholdbin[bin]]; }
@@ -2628,22 +2718,26 @@ void DoPAR::BimodalRedistribution3D(vector<short>& Res, string filename) {
 		}
 		else { thresholdbin.push_back(b1); curacc = acchis[thresholdbin[bin]]; }
 
-		//cout << " b1=" << b1 << " " << thresholdbin[bin];
-
-		if (thresholdbin[bin] == Solid_Upper[MULTIRES - 1] - 1) break;
+		//cout << " b1=" << b1 << " " << thresholdbin[bin];	
+		if (firsthalfdone) break;
 	}
 	//push back twice Solid_Upper, in order to have a wieder gap between solid&pore
-	thresholdbin.push_back(Solid_Upper[MULTIRES - 1]); thresholdbin.push_back(Solid_Upper[MULTIRES - 1]);
-	thresholdbin.push_back(Pore_Lower[MULTIRES - 1]);
+	thresholdbin.push_back(Solid_Upper); thresholdbin.push_back(Solid_Upper);
+	thresholdbin.push_back(Pore_Lower);
 	//second half
-	curacc = acchis[Pore_Lower[MULTIRES - 1]];
-	for (int bin = thresholdbin.size(); bin< 20; bin++) {
+	bool secondhalf = false;
+	curacc = acchis[Pore_Lower];
+	for (int bin = thresholdbin.size(); bin< ceil(1.0f / binprop); bin++) {
 		curacc += binprop;
 		auto i = lower_bound(acchis.begin(), acchis.end(), curacc);
 		int b1 = i - acchis.begin(), b0 = b1 - 1;
 		float value1 = acchis[b1], value0 = acchis[b0];
 
-		if (value1 >= 0.9999999f) { thresholdbin.push_back(255); curacc = acchis[thresholdbin[bin]]; }
+		if (value1 >= 0.99f) {
+			thresholdbin.push_back(acchis.size() - 1);
+			curacc = acchis[thresholdbin[bin]];
+			secondhalf = true;
+		}
 		else if (abs(value1 - curacc) > abs(value0 - curacc)) {
 			if (bin - 1 < 0) { thresholdbin.push_back(b0); curacc = acchis[thresholdbin[bin]]; }
 			else if (thresholdbin[bin - 1] != b0) { thresholdbin.push_back(b0);	curacc = acchis[thresholdbin[bin]]; }
@@ -2651,7 +2745,7 @@ void DoPAR::BimodalRedistribution3D(vector<short>& Res, string filename) {
 		}
 		else { thresholdbin.push_back(b1); curacc = acchis[thresholdbin[bin]]; }
 
-		if (thresholdbin[bin] >= 255) break;
+		if (secondhalf) break;
 	}
 	//find half
 	for (int bin = 0; bin < thresholdbin.size(); bin++)
@@ -2659,8 +2753,21 @@ void DoPAR::BimodalRedistribution3D(vector<short>& Res, string filename) {
 
 
 	// thresholdbin is done. now decide bingap & peakgap
-	const short bingap = 6;
-	short peakgap = 255 - bingap*(thresholdbin.size() - 2);
+	short peakgap;
+	float bingap;
+	//bool DMnogap = false;
+	//if (!DMnogap) {
+	//	bingap = 6;
+	//	peakgap = 255 - bingap*(thresholdbin.size() - 2);
+	//}
+	//else {
+	//	bingap = 256 / (thresholdbin.size() - 1);
+	//	peakgap = bingap;
+	//}
+
+	peakgap = 100;
+	bingap = (255.0 - peakgap) / (thresholdbin.size() - 2);
+
 	short Redis_Solid_Upper(0), Redis_Pore_Lower(0);
 
 
@@ -2670,20 +2777,23 @@ void DoPAR::BimodalRedistribution3D(vector<short>& Res, string filename) {
 		int num = i - thresholdbin.begin();
 
 		if (num <= halfbin) {
-			if (thresholdbin[num] == Solid_Upper[MULTIRES - 1]) Redis_Solid_Upper = num*bingap;
-			else if (thresholdbin[num] == Pore_Lower[MULTIRES - 1]) Redis_Pore_Lower = num*bingap;
+			//if (thresholdbin[num] == Solid_Upper) Redis_Solid_Upper = num*bingap;
+			//else if (thresholdbin[num] == Pore_Lower) Redis_Pore_Lower = num*bingap;
 			Res[m] = num*bingap;
 		}
 		else {
-			if (thresholdbin[num] == Solid_Upper[MULTIRES - 1]) Redis_Solid_Upper = (num - 1)*bingap + peakgap;
-			else if (thresholdbin[num] == Pore_Lower[MULTIRES - 1]) Redis_Pore_Lower = (num - 1)*bingap + peakgap;
+			//if (thresholdbin[num] == Solid_Upper) Redis_Solid_Upper = (num - 1)*bingap + peakgap;
+			//else if (thresholdbin[num] == Pore_Lower) Redis_Pore_Lower = (num - 1)*bingap + peakgap;
 			Res[m] = (num - 1)*bingap + peakgap;
 		}
-
-		if (Res[m] == 5) { cout << endl << "num=" << num; _getch(); }
 	}
+	auto s = lower_bound(thresholdbin.begin(), thresholdbin.end(), Solid_Upper);
+	Redis_Solid_Upper = thresholdbin[s - thresholdbin.begin()];
+	auto p = lower_bound(thresholdbin.begin(), thresholdbin.end(), Pore_Lower);
+	Redis_Pore_Lower = thresholdbin[p - thresholdbin.begin()];
 
-	//cout << endl << "\nRedis_Solid_Upper= " << Redis_Solid_Upper << "  Redis_Pore_Lower= " << Redis_Pore_Lower << "  Halfbin= " << thresholdbin[halfbin];
+
+	cout << endl << "Redis_Solid_Upper= " << Redis_Solid_Upper << "  Redis_Pore_Lower= " << Redis_Pore_Lower << "  Halfbin= " << thresholdbin[halfbin];
 	cout << endl << "\nThresholded bins: ";
 	for (int i = 0; i < thresholdbin.size(); i++) {
 		cout << " " << thresholdbin[i];
