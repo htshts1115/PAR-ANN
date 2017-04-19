@@ -5,31 +5,29 @@
 /* Specify working directory (e.g. d:\test\)
 /* Note: last character is '\' !!
 /*=============================================
-/*C:\Users\Tianshen Huang\Documents\PRM\PAR\PAR ANN\x64\Release\
-C:\Users\Tianshen Huang\Documents\PRM\PAR\PAR ANN\x64\Release\C2\2DTIs\
-/*C:\Users\Tianshen Huang\Documents\PRM\PAR\PAR ANN\x64\Release\ICCR\Two-scaleB\TIs\
-/*C:\Users\Tianshen Huang\Documents\PRM\PAR\PAR ANN\x64\Release\ICCR\Two-scale100
-/*C:\Users\Tianshen Huang\Documents\PRM\PAR\PAR ANN\x64\Release\Berea400\TI\
-/*C:\Users\Tianshen Huang\Documents\PRM\PAR\PAR ANN\x64\Release\Berea_100\TIs\
-/*C:\Users\Tianshen Huang\Documents\PRM\PAR\PAR ANN\x64\Release\old\Berea200_D4s025_xy_his112\TIs\
+/*C:\Users\Tianshen Huang\Documents\PRM\PAR\PAR ANN\x64\Release\Two-scale-C\TIs\
+//C:\Users\Tianshen Huang\Documents\PRM\PAR\PAR ANN\x64\Release\Berea_300-400\TI\Berea_256\
+//C:\Users\Tianshen Huang\Documents\PRM\PAR\PAR ANN\x64\Release\C2\2DTIs\
+/*C:\Users\Tianshen Huang\Documents\PRM\PAR\PAR ANN\x64\Release\C1\TIs\
+/*C:\Users\Tianshen Huang\Documents\PRM\PAR\PAR ANN\x64\Release\Shanbhag_layer\TIs\
+//C:\Users\Tianshen Huang\Documents\PRM\PAR\PAR ANN\x64\Release\OlaCoquina\TIs\
+//C:\Users\Tianshen Huang\Documents\PRM\PAR\PAR ANN\x64\Release\unstable&fractures\TIs
+C:\Users\Tianshen Huang\Documents\PRM\PAR\PAR ANN\x64\Release\CrossScale\TIs\
+//C:\Users\Tianshen Huang\Documents\PRM\PAR\PAR ANN\x64\Release\Berea_300-400\testDMnogap\
 /*=============================================
 /* Specify training images in XY, XZ and YZ-plane
 /*=============================================
-/*C2_100_xy_50.png, C2_100_xz_50.png, C2_100_yz_50.png
-/*C2_400_xy_200.png, C2_400_xz_200.png, C2_400_yz_200.png
-/*C2_s5_xy_200.png, C2_s5_xz_200.png, C2_s5_yz_200.png
-C2_400_xy_200_doublepeak238.png, C2_400_xz_200_doublepeak238.png, C2_400_yz_200_doublepeak238.png
-/*C2_200_xy_100_doublepeak218.png, C2_200_xz_100_doublepeak218.png, C2_200_yz_100_doublepeak218.png
-/*Berea_100_xy_101.png, Berea_100_xz_101.png, Berea_100_yz_101.png
-/*DM1_doublepeak.png, DM2_doublepeak.png, DM3_doublepeak.png
-/*DM1_equalization.png, DM2_equalization.png, DM3_equalization.png
-/*Berea_100_xy_101_220230240.png, Berea_100_xz_101_220230240.png,Berea_100_yz_101_220230240.png
-/*Two-scale200_YZ.png, Two-scale200_YZ.png, Two-scale200_YZ.png
-/*Two-scale200_XZ.png, Two-scale200_XZ.png, Two-scale200_XZ.png
-/*Berea_50_D4_bin_xy.png, Berea_50_D4_bin_xz.png, Berea_50_D4_bin_yz.png
-/*Two-scaleB_XY2_400.png, Two-scaleB_XZ2_400.png, Two-scaleB_YZ2_400.png
-/*Berea400_XY_200.png, Berea400_XZ_200.png, Berea400_YZ_200.png
-/*zebra.png, zebra_y.png, zebra_z.png
+/*TwoscaleC_256_BimodalDM1_S231P243.png, TwoscaleC_256_BimodalDM2_S231P243.png, TwoscaleC_256_BimodalDM3_S231P243.png
+//C2_256_BimodalDM1_S231P243.png, C2_256_BimodalDM2_S231P243.png, C2_256_BimodalDM3_S231P243.png
+/*C1_256_BimodalDM1_S225P237.png, C1_256_BimodalDM2_S225P237.png,  C1_256_BimodalDM3_S225P237.png
+//Berea_256_BimodalDM1_S231P243.png, Berea_256_BimodalDM2_S231P243.png, Berea_256_BimodalDM3_S231P243.png
+/*Shanbhag_256_BimodalDM1_S237P249.png,Shanbhag_256_BimodalDM1_S237P249.png,Shanbhag_256_BimodalDM1_S237P249.png
+//OlaCoquina3_256_BimodalDM1_S56P207.png, OlaCoquina3_256_BimodalDM2_S56P207.png, OlaCoquina3_256_BimodalDM3_S56P207.png
+micro_256_BimodalDM1_S243P251.png, micro_256_BimodalDM2_S243P251.png, micro_256_BimodalDM3_S243P251.png
+//micro_256_YZ.png, micro_256_ZX.png, micro_256_XY.png
+//macro_256_BimodalDM1_S219P227.png, macro_256_BimodalDM2_S219P227.png, macro_256_BimodalDM3_S219P227.png
+//C2_256_YZ_128.png, C2_256_ZX_128.png, C2_256_XY_128.png
+//Fractures_256_BimodalDM1_S243P255.png, Fractures_256_BimodalDM1_S243P255.png,Fractures_256_BimodalDM1_S243P255.png
 /*=============================================
 /* Output directory, by default empty meaning in working directory; with parameters
 /*=============================================
@@ -37,18 +35,16 @@ C:\Users\Tianshen Huang\Documents\PRM\PAR\PAR ANN\x64\Release\
 /*=============================================
 /* Specify 3D model 
 /*=============================================
-/*C2_200_455DM.RAW
-/*C2_400_50.raw
-/*C2_100_50.raw
-C2_50_input_doublepeak238.raw
-/*C2_200_100_doublepeak244.raw
-/*Berea_100_101_equalization.raw 
-/*Berea_100_101.raw
-/*Berea_100_101_220230240.raw
-/*Berea_50_D4_bin.raw
-/*Berea400_200.raw
-/*zebra.raw
-/*Two-scale200_YZ.raw
-/*Two-scaleB_400.raw
-/*s50_220230240.raw
+/*TwoscaleC_256_Bimodal_S231P243.raw
+/*TwoscaleB_256_Bimodal_S213P225.raw
+//C2_256_Bimodal_S231P243.raw
+//C2_32_input_S231P243.raw
+/*C1_256_Bimodal_S225P237.raw
+/*Shanbhag_256_Bimodal_S237P249.raw
+//Berea_256_Bimodal_S231P243.raw
+//nogap_S168P210.raw
+//OlaCoquina3_256_BimodalDM1_S56P207.raw
+micro_256_Bimodal_S243P251.raw
+//macro_256_BimodalDM1_S219P227.raw
+//Fractures_256_Bimodal_S243P255.raw
 /*=============================================

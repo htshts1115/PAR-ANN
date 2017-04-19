@@ -82,9 +82,9 @@ private:
 	static ANNidx TEXSIZE[MULTIRES];			// size of input exemplar
 	static int D_NEIGHBOR[MULTIRES];			// (2 * N + 1) * (2 * N + 1)
 
-	static const bool INDEXHIS_ON = true;				// Index Histogram in search step
-	static const bool COLORHIS_ON = true;				// Colour Histogram in optimize step
-	static const bool BIMODAL_ON = true;				// Using bimodal TI
+	static const bool INDEXHIS_ON = false;				// Index Histogram in search step
+	static const bool COLORHIS_ON = false;				// Colour Histogram in optimize step
+	static const bool BIMODAL_ON = false;				// Using bimodal TI
 
 	static const bool DISTANCEMAP_ON = true;			// convert to distance map model
 
