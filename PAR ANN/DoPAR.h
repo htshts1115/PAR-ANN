@@ -71,22 +71,23 @@ private:
 	void InitRandomVolume(int level);
 	void upsampleVolume(int level);
 	void outputmodel(int level);
+	void DynamicThreshold(int level);
 	void writeIndexHistogram(int level, vector<float> &histogram, int rows, int cols, const string filename);
 
 	//release data
 	void cleardata(int level);
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////
-	static const int MULTIRES = 4;				// # of multi-resolution (0 -> MULTIRES - 1 :: coarsest -> finest)
+	static const int MULTIRES = 1;				// # of multi-resolution (0 -> MULTIRES - 1 :: coarsest -> finest)
 	static const int N[MULTIRES];
 	static ANNidx TEXSIZE[MULTIRES];			// size of input exemplar
 	static int D_NEIGHBOR[MULTIRES];			// (2 * N + 1) * (2 * N + 1)
 
-	static const bool INDEXHIS_ON = false;				// Index Histogram in search step
-	static const bool COLORHIS_ON = false;				// Colour Histogram in optimize step
-	static const bool BIMODAL_ON = false;				// Using bimodal TI
+	static const bool INDEXHIS_ON = true;				// Index Histogram in search step
+	static const bool COLORHIS_ON = true;				// Colour Histogram in optimize step
+	static const bool BIMODAL_ON = true;				// Using bimodal TI
 
-	static const bool DISTANCEMAP_ON = true;			// convert to distance map model
+	static const bool DISTANCEMAP_ON = false;			// convert to distance map model
 
 	static const bool DISCRETETHRESHOLD_ON = false;		// dynamic thresholding in optimize step. 	will slightly affect quality. dont use in double peak distribution
 	
@@ -194,9 +195,9 @@ private:
 	vector<vector<ANNidx> > m_volume_nearest_x_index;		// [M] size: TEXSIZE^3
 	vector<vector<ANNidx> > m_volume_nearest_y_index;		// [M] size: TEXSIZE^3
 	vector<vector<ANNidx> > m_volume_nearest_z_index;		// [M] size: TEXSIZE^3
-	vector<vector<ANNdist> > m_volume_nearest_x_dist;		// [M] size: TEXSIZE^3
-	vector<vector<ANNdist> > m_volume_nearest_y_dist;		// [M] size: TEXSIZE^3
-	vector<vector<ANNdist> > m_volume_nearest_z_dist;		// [M] size: TEXSIZE^3
+	//vector<vector<ANNdist> > m_volume_nearest_x_dist;		// [M] size: TEXSIZE^3
+	//vector<vector<ANNdist> > m_volume_nearest_y_dist;		// [M] size: TEXSIZE^3
+	//vector<vector<ANNdist> > m_volume_nearest_z_dist;		// [M] size: TEXSIZE^3
 	vector<vector<ANNdist> > m_volume_weight_x;
 	vector<vector<ANNdist> > m_volume_weight_y;
 	vector<vector<ANNdist> > m_volume_weight_z;

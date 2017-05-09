@@ -6,16 +6,6 @@
 
 int main(int argc, const char* argv[])
 {
-	//cout << endl << "double=" << sizeof(double) << " float=" << sizeof(float) << " short=" << sizeof(short) << " int=" << sizeof(int) << " long=" << sizeof(long); _getch();
-	//double 8, float 4, short 2, int 4, long 4;
-
-	//for (std::vector<char>::size_type sz = 1;; sz *= 2)
-	//{
-	//	std::cerr << "attempting sz = " << sz << '\n';
-	//	std::vector<char> v(sz);
-	//}
-	//_getch();
-
 	string CurWorkExeFile = argv[0];
 
 	DoPAR DoItNow;
@@ -27,6 +17,44 @@ int main(int argc, const char* argv[])
 
 	return 0;
 }
+
+////--------------check address
+
+//vector<int> list = { 0,1,2,3,4,5,6,7,8,9 };
+//int* testnei = &list[4];
+//int testint = testnei[3];
+//int testint2 = list[7];
+//cout << endl << "test1=" << testint << " test2=" << testint2;
+//_getch();
+
+////---------------check memory usage-----------
+
+//cout << endl << "double=" << sizeof(double) << " float=" << sizeof(float) << " short=" << sizeof(short) << " int=" << sizeof(int) << " long=" << sizeof(long); _getch();
+//double 8, float 4, short 2, int 4, long 4;
+
+//for (std::vector<char>::size_type sz = 1;; sz *= 2)
+//{
+//	std::cerr << "attempting sz = " << sz << '\n';
+//	std::vector<char> v(sz);
+//}	//crash at 18GB
+//_getch();
+
+//int main(int argc, char* argv[])
+//{
+//	double *x = new double[536870912];
+//
+//	cout << "memory allocated" << endl;
+//
+//	for (long int i = 0; i < 536870912; i++)
+//	{
+//		cout << i << endl;
+//		x[i] = 0;
+//	}
+//
+//	delete[] x;
+//	return 0;
+//}
+
 
 ////--------------ANN sample------------------
 

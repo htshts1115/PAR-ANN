@@ -41,9 +41,9 @@ DoPAR::DoPAR()
 	m_volume_nearest_x_index.resize(MULTIRES);
 	m_volume_nearest_y_index.resize(MULTIRES);
 	m_volume_nearest_z_index.resize(MULTIRES);
-	m_volume_nearest_x_dist.resize(MULTIRES);
-	m_volume_nearest_y_dist.resize(MULTIRES);
-	m_volume_nearest_z_dist.resize(MULTIRES);
+	//m_volume_nearest_x_dist.resize(MULTIRES);
+	//m_volume_nearest_y_dist.resize(MULTIRES);
+	//m_volume_nearest_z_dist.resize(MULTIRES);
 	m_volume_weight_x.resize(MULTIRES);
 	m_volume_weight_y.resize(MULTIRES);
 	m_volume_weight_z.resize(MULTIRES);
@@ -299,26 +299,22 @@ void DoPAR::ReadRunPar(string CurExeFile)
 	//	Identical3DYN = true;
 
 	outputpath = workpath;
+	//if (ResLines.size() > ++Row) {
+	//	vector<string> ParV;
+	//	GetNextRowParameters(Row, ResLines, ParV);
+	//	if (ParV.size() > 0) outputpath = ResLines[Row];
+	//	CreateDirectoryA(outputpath.c_str(), NULL); //ofstream cannot create folder!
+	//}
+
 	if (ResLines.size() > ++Row) {
 		vector<string> ParV;
 		GetNextRowParameters(Row, ResLines, ParV);
-		//if (ParV.size() > 0) PARx = atoi(ParV[0].c_str());
-		//if (ParV.size() > 1) PARy = atoi(ParV[1].c_str());
-		//if (ParV.size() > 2) PARz = atoi(ParV[2].c_str());
-		//PARxy = PARx*PARy;
-		//GetNextRowParameters(++Row, ResLines, ParV);
-		if (ParV.size() > 0) outputpath = ResLines[Row];
-		CreateDirectoryA(outputpath.c_str(), NULL); //ofstream cannot create folder!
-		//if (PARx < 3 || PARy < 3 || PARz < 1)
-		//{
-		//	cout << endl;
-		//	cout << endl << "====================================================";
-		//	cout << endl << " Inappropriate dimensionns for resultant 3D model !";
-		//	cout << endl << " (" << PARx << "x" << PARy << "x" << PARz << ")";
-		//	cout << endl << "====================================================";
-		//	cout << endl;
-		//	_getch(); exit(1);
-		//}
+		if (BIMODAL_ON && !DISTANCEMAP_ON) {
+			if (ParV.size() > 0) {
+				if (ParV.size() > 0) {  Solid_Upper = atoi(ParV[0].c_str()); }
+				if (ParV.size() > 1) { Pore_Lower = atoi(ParV[1].c_str()); }
+			}
+		}
 	}
 
 	//----------read 3D model
@@ -593,7 +589,7 @@ const float DoPAR::inv_sqrt_2pi = 0.398942280401433f;
 ///========================== 190217 Kopf. optimization based =====================
 
 //MULTIRES: larger number means finner level
-const int DoPAR::N[MULTIRES] = {1,1,1,1};		//Kopf{ 3, 4, 4 }; Chen{4,3,2}; Turner{5,5,5}	// neighborhood size: (2 * N + 1)^2
+const int DoPAR::N[MULTIRES] = {1};		//Kopf{ 3, 4, 4 }; Chen{4,3,2}; Turner{5,5,5}	// neighborhood size: (2 * N + 1)^2
 ANNidx DoPAR::TEXSIZE[MULTIRES];
 int DoPAR::D_NEIGHBOR[MULTIRES];
 
@@ -640,6 +636,7 @@ void DoPAR::DoANNOptimization(){
 			else FIRSTRUN = false;
 
 			searchVolume(curlevel);
+			cout << endl << "optimize:";
 			optimizeVolume(curlevel);
 		
 			if (globalenergy_old - globalenergy_new <0) energyincreasecount++;
@@ -649,10 +646,11 @@ void DoPAR::DoANNOptimization(){
 			else if (convergencecount > (MULTIRES-curlevel)) break;	//if change <1% for twice, then mark as converge		
 
 		}//loop in one level
+
 		if (curlevel >= MULTIRES - 1) {//draw histogram graph && ouput model
 			int cols = TEXSIZE[curlevel];
 			int rows = 3 * cols;		
-			if (INDEXHIS_ON) writeIndexHistogram(curlevel, m_indexhistogram_synthesis[curlevel], 3 * (cols - 2 * N[curlevel]), cols - 2 * N[curlevel], "IndexHis_" + parameterstring + "_L" + to_string(curlevel) + ".png");
+			//if (INDEXHIS_ON) writeIndexHistogram(curlevel, m_indexhistogram_synthesis[curlevel], 3 * (cols - 2 * N[curlevel]), cols - 2 * N[curlevel], "IndexHis_" + parameterstring + "_L" + to_string(curlevel) + ".png");
 
 			outputmodel(curlevel);
 		}
@@ -764,7 +762,7 @@ bool DoPAR::loadExemplar() {
 		if (TEXSIZE[MULTIRES - 1] % (ANNidx)pow(2, MULTIRES - 1) != 0) { cout << endl << "TI size not right for multi-level"; _getch(); exit(1); }
 		
 		// [begin] memory allocation -------------------------------------------
-		m_exemplar_x[level].resize(TEXSIZE[level] * TEXSIZE[level]);
+		m_exemplar_x[level].resize(TEXSIZE[level] * TEXSIZE[level]);	
 		m_exemplar_y[level].resize(TEXSIZE[level] * TEXSIZE[level]);
 		m_exemplar_z[level].resize(TEXSIZE[level] * TEXSIZE[level]);
 		m_neighbor_x[level].resize(D_NEIGHBOR[level] * (TEXSIZE[level] - 2 * N[level]) * (TEXSIZE[level] - 2 * N[level]));
@@ -774,9 +772,9 @@ bool DoPAR::loadExemplar() {
 		m_volume_nearest_x_index[level].resize(TEXSIZE[level] * TEXSIZE[level] * TEXSIZE[level]);
 		m_volume_nearest_y_index[level].resize(TEXSIZE[level] * TEXSIZE[level] * TEXSIZE[level]);
 		m_volume_nearest_z_index[level].resize(TEXSIZE[level] * TEXSIZE[level] * TEXSIZE[level]);
-		m_volume_nearest_x_dist[level].resize(TEXSIZE[level] * TEXSIZE[level] * TEXSIZE[level]);
-		m_volume_nearest_y_dist[level].resize(TEXSIZE[level] * TEXSIZE[level] * TEXSIZE[level]);
-		m_volume_nearest_z_dist[level].resize(TEXSIZE[level] * TEXSIZE[level] * TEXSIZE[level]);
+		//m_volume_nearest_x_dist[level].resize(TEXSIZE[level] * TEXSIZE[level] * TEXSIZE[level]);
+		//m_volume_nearest_y_dist[level].resize(TEXSIZE[level] * TEXSIZE[level] * TEXSIZE[level]);
+		//m_volume_nearest_z_dist[level].resize(TEXSIZE[level] * TEXSIZE[level] * TEXSIZE[level]);
 		m_volume_weight_x[level].resize(TEXSIZE[level] * TEXSIZE[level] * TEXSIZE[level]);
 		m_volume_weight_y[level].resize(TEXSIZE[level] * TEXSIZE[level] * TEXSIZE[level]);
 		m_volume_weight_z[level].resize(TEXSIZE[level] * TEXSIZE[level] * TEXSIZE[level]);
@@ -1300,24 +1298,59 @@ void DoPAR::upsampleVolume(int level) {
 }
 
 void DoPAR::outputmodel(int level){
+	if (BIMODAL_ON && !DISTANCEMAP_ON) {
+		DynamicThreshold(level);
+	}
+
 	vector<uchar> tempmodel;
 	tempmodel = vector<uchar>(m_volume[level].begin(), m_volume[level].end());
 	string tempoutputfilename = outputfilename;
-	if (MULTIRES>1) tempoutputfilename = outputfilename.substr(0, outputfilename.find('.')) + "_L" + to_string(level) + ".RAW";
+	//if (MULTIRES>1) tempoutputfilename = outputfilename.substr(0, outputfilename.find('.')) + "_L" + to_string(level) + ".RAW";	
+	
 	Write(outputpath + tempoutputfilename, tempmodel);
-	//============= Convert to binary model [leve]==========================
-	if (DISTANCEMAP_ON){
-		vector<char> tempchar(tempmodel.size());
-		//output an extra binary model
-		vector<short> shortmodel(tempmodel.begin(), tempmodel.end());
-		BinariseThreshold(shortmodel, tempchar, Solid_Upper);
-		//BinariseImg(shortmodel, porosityTI);
-		tempmodel = vector<uchar>(tempchar.begin(), tempchar.end());
-		tempoutputfilename = tempoutputfilename.substr(0, tempoutputfilename.find('.')) + "_binary.RAW";
-		Write(outputpath + tempoutputfilename, tempmodel);
-	}
+
+	////============= Convert to binary model [leve]==========================
+	//if (DISTANCEMAP_ON){
+	//	vector<char> tempchar(tempmodel.size());
+	//	//output an extra binary model
+	//	vector<short> shortmodel(tempmodel.begin(), tempmodel.end());
+	//	BinariseThreshold(shortmodel, tempchar, Solid_Upper);
+	//	//BinariseImg(shortmodel, porosityTI);
+	//	tempmodel = vector<uchar>(tempchar.begin(), tempchar.end());
+	//	tempoutputfilename = tempoutputfilename.substr(0, tempoutputfilename.find('.')) + "_binary.RAW";
+	//	Write(outputpath + tempoutputfilename, tempmodel);
+	//}
 	cout << endl << "output done.";
 }
+void DoPAR::DynamicThreshold(int level) {
+	long TIporecount(0);
+	for (long i = 0; i < m_exemplar_x[MULTIRES - 1].size(); i++)  if (m_exemplar_x[MULTIRES - 1][i] >= Pore_Lower) TIporecount++;
+	for (long i = 0; i < m_exemplar_y[MULTIRES - 1].size(); i++)  if (m_exemplar_y[MULTIRES - 1][i] >= Pore_Lower) TIporecount++;
+	for (long i = 0; i < m_exemplar_z[MULTIRES - 1].size(); i++)  if (m_exemplar_z[MULTIRES - 1][i] >= Pore_Lower) TIporecount++;
+	
+	float TIporosity = TIporecount*1.0 / (m_exemplar_x[level].size() + m_exemplar_y[level].size() + m_exemplar_z[level].size());
+	
+	long Modelporecount(0), lastporecount(0), Idealporecount(TIporosity*m_volume[level].size());
+	short thresholdvalue = Solid_Upper-1;
+	do {		
+		lastporecount = Modelporecount;
+		
+		thresholdvalue++;
+		Modelporecount = 0;
+		for (long i = 0; i < m_volume[level].size(); i++) {
+			if (m_volume[level][i] > thresholdvalue) Modelporecount++;
+		}	
+	} while (abs(Modelporecount - Idealporecount) < abs(lastporecount - Idealporecount) && thresholdvalue<Pore_Lower);
+	
+	thresholdvalue -= 1;
+	for (long i = 0; i < m_volume[level].size(); i++) {
+		if (m_volume[level][i] > thresholdvalue) m_volume[level][i] = 255;
+		else m_volume[level][i] = 0;
+	}
+
+	cout<<endl<<"DynamicThreshold solid_upper="<<thresholdvalue;
+}
+
 void DoPAR::writeIndexHistogram(int level, vector<float> &hisvec, int rows, int cols, const string filename){
 	if (filename.size() == 0) { cout << endl << "writeIndexHistogram Error: empty filename"; return; };
 	if (hisvec.size() != rows*cols) { cout << endl << "writeIndexHistogram Error: wrong size of hisvec"; return; };
@@ -1359,9 +1392,9 @@ void DoPAR::cleardata(int level){
 	m_volume_nearest_x_index[level].clear();
 	m_volume_nearest_y_index[level].clear();
 	m_volume_nearest_z_index[level].clear();
-	m_volume_nearest_x_dist[level].clear();
-	m_volume_nearest_y_dist[level].clear();
-	m_volume_nearest_z_dist[level].clear();
+	//m_volume_nearest_x_dist[level].clear();
+	//m_volume_nearest_y_dist[level].clear();
+	//m_volume_nearest_z_dist[level].clear();
 	m_volume_weight_x[level].clear();
 	m_volume_weight_y[level].clear();
 	m_volume_weight_z[level].clear();
@@ -1404,11 +1437,10 @@ void DoPAR::searchVolume(int level) {
 	//========For index histogram counting, shuffle the order. ========
 	srand(time(NULL)); //jzy
 	vector<bool> AccYN(Size, false);
-	vector<long> RemIdxLst;
+	vector<long> RemIdxLst;	RemIdxLst.reserve(0.1*Sx*Sy*Sz);
 	long RemIIdx = -1;
 	//shuffle(m_permutation_xyz.begin(), m_permutation_xyz.end(), mersennetwistergenerator);
 	
-
 	//==========multiple nearest index, position control=========
 	ANNidxArray ann_index_x = new ANNidx[ANNsearchk[level]];
 	ANNidxArray ann_index_y = new ANNidx[ANNsearchk[level]];
@@ -1416,6 +1448,23 @@ void DoPAR::searchVolume(int level) {
 	ANNdistArray ann_dist_x = new ANNdist[ANNsearchk[level]];
 	ANNdistArray ann_dist_y = new ANNdist[ANNsearchk[level]];
 	ANNdistArray ann_dist_z = new ANNdist[ANNsearchk[level]];
+
+	//===========obtain current neighborhood_x from volume, no need to new every loop====
+	CvMat* current_neighbor_x = cvCreateMat(1, D_NEIGHBOR[level], CV_32F); //rows = 1, cols = dimesnion
+	CvMat* current_neighbor_y = cvCreateMat(1, D_NEIGHBOR[level], CV_32F);
+	CvMat* current_neighbor_z = cvCreateMat(1, D_NEIGHBOR[level], CV_32F);
+	// PCA projection
+	int dimPCA_x = mp_neighbor_pca_eigenvec_x[level]->rows;	//computed already
+	int dimPCA_y = mp_neighbor_pca_eigenvec_y[level]->rows;
+	int dimPCA_z = mp_neighbor_pca_eigenvec_z[level]->rows;
+	//===========no need to new every loop=============
+	//project current_neighbor_x to current_neighbor_x_projected, dimension = dimPCA_x
+	CvMat* current_neighbor_x_projected = cvCreateMat(1, dimPCA_x, CV_32F);
+	CvMat* current_neighbor_y_projected = cvCreateMat(1, dimPCA_y, CV_32F);
+	CvMat* current_neighbor_z_projected = cvCreateMat(1, dimPCA_z, CV_32F);
+
+	//===========Remove m_volume_nearest_x_dist[level][i];no need to store them=======
+	ANNdist nearest_x_dist, nearest_y_dist, nearest_z_dist;
 
 	ANNidx displayprocess = -1;
 	ANNidx JCntNum = Size / 10.0 + 1;
@@ -1442,10 +1491,10 @@ void DoPAR::searchVolume(int level) {
 			AccYN[i] = true;
 		LoopAccYN:
 
-			// obtain current neighborhood_x from volume
-			CvMat* current_neighbor_x = cvCreateMat(1, D_NEIGHBOR[level], CV_32F); //rows = 1, cols = dimesnion
-			CvMat* current_neighbor_y = cvCreateMat(1, D_NEIGHBOR[level], CV_32F);
-			CvMat* current_neighbor_z = cvCreateMat(1, D_NEIGHBOR[level], CV_32F);
+			//// obtain current neighborhood_x from volume
+			//CvMat* current_neighbor_x = cvCreateMat(1, D_NEIGHBOR[level], CV_32F); //rows = 1, cols = dimesnion
+			//CvMat* current_neighbor_y = cvCreateMat(1, D_NEIGHBOR[level], CV_32F);
+			//CvMat* current_neighbor_z = cvCreateMat(1, D_NEIGHBOR[level], CV_32F);
 
 			ANNidx index = 0;
 			ANNidx TXy = Sx * y;
@@ -1469,14 +1518,14 @@ void DoPAR::searchVolume(int level) {
 				}
 			}
 
-			// PCA projection
-			int dimPCA_x = mp_neighbor_pca_eigenvec_x[level]->rows;	//computed already
-			int dimPCA_y = mp_neighbor_pca_eigenvec_y[level]->rows;
-			int dimPCA_z = mp_neighbor_pca_eigenvec_z[level]->rows;
-			//project current_neighbor_x to current_neighbor_x_projected, dimension = dimPCA_x
-			CvMat* current_neighbor_x_projected = cvCreateMat(1, dimPCA_x, CV_32F);
-			CvMat* current_neighbor_y_projected = cvCreateMat(1, dimPCA_y, CV_32F);
-			CvMat* current_neighbor_z_projected = cvCreateMat(1, dimPCA_z, CV_32F);
+			//// PCA projection
+			//int dimPCA_x = mp_neighbor_pca_eigenvec_x[level]->rows;	//computed already
+			//int dimPCA_y = mp_neighbor_pca_eigenvec_y[level]->rows;
+			//int dimPCA_z = mp_neighbor_pca_eigenvec_z[level]->rows;
+			////project current_neighbor_x to current_neighbor_x_projected, dimension = dimPCA_x
+			//CvMat* current_neighbor_x_projected = cvCreateMat(1, dimPCA_x, CV_32F);
+			//CvMat* current_neighbor_y_projected = cvCreateMat(1, dimPCA_y, CV_32F);
+			//CvMat* current_neighbor_z_projected = cvCreateMat(1, dimPCA_z, CV_32F);
 
 			cvProjectPCA(current_neighbor_x, mp_neighbor_pca_average_x[level], mp_neighbor_pca_eigenvec_x[level], current_neighbor_x_projected);
 			cvProjectPCA(current_neighbor_y, mp_neighbor_pca_average_y[level], mp_neighbor_pca_eigenvec_y[level], current_neighbor_y_projected);
@@ -1488,13 +1537,13 @@ void DoPAR::searchVolume(int level) {
 			mp_neighbor_kdTree_y[level]->annkSearch(current_neighbor_y_projected->data.fl, ANNsearchk[level], ann_index_y, ann_dist_y, ErrorBound[level]);
 			mp_neighbor_kdTree_z[level]->annkSearch(current_neighbor_z_projected->data.fl, ANNsearchk[level], ann_index_z, ann_dist_z, ErrorBound[level]);
 
-			// CV release
-			cvReleaseMat(&current_neighbor_x);
-			cvReleaseMat(&current_neighbor_y);
-			cvReleaseMat(&current_neighbor_z);
-			cvReleaseMat(&current_neighbor_x_projected);
-			cvReleaseMat(&current_neighbor_y_projected);
-			cvReleaseMat(&current_neighbor_z_projected);
+			//// CV release
+			//cvReleaseMat(&current_neighbor_x);
+			//cvReleaseMat(&current_neighbor_y);
+			//cvReleaseMat(&current_neighbor_z);
+			//cvReleaseMat(&current_neighbor_x_projected);
+			//cvReleaseMat(&current_neighbor_y_projected);
+			//cvReleaseMat(&current_neighbor_z_projected);
 
 			int selected_index_x(0), selected_index_y(0), selected_index_z(0);			
 			//==========multiple nearest index, Index Histogram matching=========
@@ -1522,23 +1571,30 @@ void DoPAR::searchVolume(int level) {
 			m_volume_nearest_x_index[level][i] = ann_index_x[selected_index_x];
 			m_volume_nearest_y_index[level][i] = ann_index_y[selected_index_y];
 			m_volume_nearest_z_index[level][i] = ann_index_z[selected_index_z];
-			m_volume_nearest_x_dist[level][i] = ann_dist_x[selected_index_x] + min_dist;
-			m_volume_nearest_y_dist[level][i] = ann_dist_y[selected_index_y] + min_dist;
-			m_volume_nearest_z_dist[level][i] = ann_dist_z[selected_index_z] + min_dist;
+			//m_volume_nearest_x_dist[level][i] = ann_dist_x[selected_index_x] + min_dist;
+			//m_volume_nearest_y_dist[level][i] = ann_dist_y[selected_index_y] + min_dist;
+			//m_volume_nearest_z_dist[level][i] = ann_dist_z[selected_index_z] + min_dist;
+			nearest_x_dist = ann_dist_x[selected_index_x] + min_dist;
+			nearest_y_dist = ann_dist_y[selected_index_y] + min_dist;
+			nearest_z_dist = ann_dist_z[selected_index_z] + min_dist;
 
 			//update weight for optimize step
-			m_volume_weight_x[level][i] = pow(m_volume_nearest_x_dist[level][i], -0.6f);
-			m_volume_weight_y[level][i] = pow(m_volume_nearest_y_dist[level][i], -0.6f);
-			m_volume_weight_z[level][i] = pow(m_volume_nearest_z_dist[level][i], -0.6f);
+			m_volume_weight_x[level][i] = pow(nearest_x_dist, -0.6f);
+			m_volume_weight_y[level][i] = pow(nearest_y_dist, -0.6f);
+			m_volume_weight_z[level][i] = pow(nearest_z_dist, -0.6f);
+			//m_volume_weight_x[level][i] = pow(m_volume_nearest_x_dist[level][i], -0.6f);
+			//m_volume_weight_y[level][i] = pow(m_volume_nearest_y_dist[level][i], -0.6f);
+			//m_volume_weight_z[level][i] = pow(m_volume_nearest_z_dist[level][i], -0.6f);
 
 			//search all points then optimize! Not search one point optimize one point!
-			global_energy_new += m_volume_nearest_x_dist[level][i] + m_volume_nearest_y_dist[level][i] + m_volume_nearest_z_dist[level][i];
+			global_energy_new += nearest_x_dist + nearest_y_dist + nearest_z_dist;
+			//global_energy_new += m_volume_nearest_x_dist[level][i] + m_volume_nearest_y_dist[level][i] + m_volume_nearest_z_dist[level][i];
 		}//if (!AccYN[i])
 
 		if (i2 == Size - 1) {
 			if (RemIIdx == -1) {
 				RemIIdx++;
-				for (long ij = 0; ij < Size; ++ij) {
+				for (ANNidx ij = 0; ij < Size; ++ij) {
 					if (!AccYN[ij])	RemIdxLst.push_back(ij);
 				}
 				AccYN.clear();
@@ -1552,12 +1608,21 @@ void DoPAR::searchVolume(int level) {
 			}
 		}
 	}//for every voxel
-	
+
+	cout << "search complete. delete[]:"<< endl ;
+
 	 //Release ann_index
 	//!!!Every use of new should be balanced by a delete, and every use of new[] should be balanced by delete[];
 	//!!delete releases the memory of a single element allocated using new, delete[] releases the memory allocated for arrays of elements using new and a size in brackets [].
 	delete[] ann_index_x;		delete[] ann_index_y;		delete[] ann_index_z;
 	delete[] ann_dist_x;		delete[] ann_dist_y;		delete[] ann_dist_z;
+	// CV release
+	cvReleaseMat(&current_neighbor_x);
+	cvReleaseMat(&current_neighbor_y);
+	cvReleaseMat(&current_neighbor_z);
+	cvReleaseMat(&current_neighbor_x_projected);
+	cvReleaseMat(&current_neighbor_y_projected);
+	cvReleaseMat(&current_neighbor_z_projected);
 
 	long time_end = clock();
 	cout << "done. clocks = " << (time_end - time_start) / CLOCKS_PER_SEC;
@@ -1627,7 +1692,7 @@ void DoPAR::optimizeVolume(int level) {
 	
 	//shuffle order
 	vector<bool> AccYN(Size, false);
-	vector<long> RemIdxLst;
+	vector<long> RemIdxLst;	RemIdxLst.reserve(0.1*Sx*Sy*Sz);
 	long RemIIdx = -1;
 	//shuffle(m_permutation_xyz.begin(), m_permutation_xyz.end(), mersennetwistergenerator);
 
@@ -1675,35 +1740,38 @@ void DoPAR::optimizeVolume(int level) {
 
 					for (int ori = 0; ori < 3; ++ori) {//3 orientations
 						ANNidx  nearest_index;
-						ANNdist nearest_dist, weights;
-						ANNcoord* p_neighbor;
+						//ANNdist nearest_dist;
+						ANNdist weight;
+						//ANNcoord* p_neighbor;
+						ANNcoord color;
+						// color of overlapping neighborhood pixel
+						//ANNcoord color = p_neighbor[D_NEIGHBOR[level] - 1 - m];	//index2 ~ m, index ~ D_NEIGHBOR[level] - 1 - m; the position is symmetrical!
 						switch (ori) {
 						case (0) : {
 							nearest_index = m_volume_nearest_x_index[level][index2_x];
-							nearest_dist = m_volume_nearest_x_dist[level][index2_x];
-							weights = m_volume_weight_x[level][index2_x];
-							p_neighbor = &m_neighbor_x[level][D_NEIGHBOR[level] * nearest_index];
+							//nearest_dist = m_volume_nearest_x_dist[level][index2_x];
+							weight = m_volume_weight_x[level][index2_x];
+							//p_neighbor = &m_neighbor_x[level][D_NEIGHBOR[level] * nearest_index];
+							color = m_neighbor_x[level][D_NEIGHBOR[level] * nearest_index+ D_NEIGHBOR[level] - 1 - m];
 							break;
 						}
 						case (1) : {
 							nearest_index = m_volume_nearest_y_index[level][index2_y];
-							nearest_dist = m_volume_nearest_y_dist[level][index2_y];
-							weights = m_volume_weight_y[level][index2_y];
-							p_neighbor = &m_neighbor_y[level][D_NEIGHBOR[level] * nearest_index];
+							//nearest_dist = m_volume_nearest_y_dist[level][index2_y];
+							weight = m_volume_weight_y[level][index2_y];
+							//p_neighbor = &m_neighbor_y[level][D_NEIGHBOR[level] * nearest_index];
+							color = m_neighbor_y[level][D_NEIGHBOR[level] * nearest_index + D_NEIGHBOR[level] - 1 - m];
 							break;
 						}
 						default: {
 							nearest_index = m_volume_nearest_z_index[level][index2_z];
-							nearest_dist = m_volume_nearest_z_dist[level][index2_z];
-							weights = m_volume_weight_z[level][index2_z];
-							p_neighbor = &m_neighbor_z[level][D_NEIGHBOR[level] * nearest_index];
+							//nearest_dist = m_volume_nearest_z_dist[level][index2_z];
+							weight = m_volume_weight_z[level][index2_z];
+							//p_neighbor = &m_neighbor_z[level][D_NEIGHBOR[level] * nearest_index];
+							color = m_neighbor_x[level][D_NEIGHBOR[level] * nearest_index + D_NEIGHBOR[level] - 1 - m];
 							break;
 						}
 						}
-
-						// color of overlapping neighborhood pixel
-						ANNcoord color = p_neighbor[D_NEIGHBOR[level] - 1 - m];	//index2 ~ m, index ~ D_NEIGHBOR[level] - 1 - m; the position is symmetrical!
-						ANNdist weight = weights;
 
 						// modify weight according to Color histogram matching
 						if (COLORHIS_ON) {
@@ -1741,12 +1809,11 @@ void DoPAR::optimizeVolume(int level) {
 		if (i2 == Size - 1) {
 			if (RemIIdx == -1) {
 				RemIIdx++;
-				for (long ij = 0; ij < Size; ++ij) {
+				for (ANNidx ij = 0; ij < Size; ++ij) {
 					if (!AccYN[ij])	RemIdxLst.push_back(ij);
 				}
 				AccYN.clear();
 			}
-
 			if (RemIIdx < RemIdxLst.size()) {
 				i = RemIdxLst[RemIIdx++];
 				z = i*dSxy;
@@ -1756,7 +1823,8 @@ void DoPAR::optimizeVolume(int level) {
 			}
 		}
 	}//for every voxel  
-
+	
+	cout << "optimize complete. delete[]:" << endl;
 
 	//========= Dynamic Thresholding based on TI histogram =========
 	if (DISCRETETHRESHOLD_ON) { DynamicThresholding(level); }
@@ -2825,3 +2893,4 @@ void DoPAR::BimodalRedistribution3D(vector<float>& Res, string filename) {
 	tempoutputfilename = filename.substr(0, filename.find('.')) + "_S" + to_string(Redis_Solid_Upper) + "P" + to_string(Redis_Pore_Lower) + ".RAW";
 	Write(outputpath + tempoutputfilename, tempmodel);
 }
+
