@@ -78,7 +78,7 @@ private:
 	void cleardata(int level);
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////
-	static const int MULTIRES = 1;				// # of multi-resolution (0 -> MULTIRES - 1 :: coarsest -> finest)
+	static const int MULTIRES = 5;				// # of multi-resolution (0 -> MULTIRES - 1 :: coarsest -> finest)
 	static const int N[MULTIRES];
 	static ANNidx TEXSIZE[MULTIRES];			// size of input exemplar
 	static int D_NEIGHBOR[MULTIRES];			// (2 * N + 1) * (2 * N + 1)
@@ -189,7 +189,7 @@ private:
 	static const short MAXITERATION;				//max iteration time
 
 	//=========== phase 1: search ===========================
-	static double PCA_RATIO_VARIANCE;				//0.95
+	static vector<double> PCA_RATIO_VARIANCE;				//0.95
 	static vector<double> ErrorBound;						//Kopf used 2.0
 	static vector<short> ANNsearchk;				//search k nearest index
 	vector<vector<ANNidx> > m_volume_nearest_x_index;		// [M] size: TEXSIZE^3
