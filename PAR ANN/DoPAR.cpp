@@ -584,7 +584,7 @@ const float DoPAR::inv_sqrt_2pi = 0.398942280401433f;
 ///========================== 190217 Kopf. optimization based =====================
 
 //MULTIRES: larger number means finner level
-const int DoPAR::N[MULTIRES] = { 4,4,3,3,2 };		//Kopf{ 3, 4, 4 }; Chen{4,3,2}; Turner{5,5,5}	// neighborhood size: (2 * N + 1)^2
+const int DoPAR::N[MULTIRES] = { 4,4,4,3,2 };		//Kopf{ 3, 4, 4 }; Chen{4,3,2}; Turner{5,5,5}	// neighborhood size: (2 * N + 1)^2
 ANNidx DoPAR::TEXSIZE[MULTIRES];
 int DoPAR::D_NEIGHBOR[MULTIRES];
 
@@ -600,11 +600,11 @@ float DoPAR::Pore_Lower;				//for redistribute distancemap model
 short DoPAR::DistanceThreshold;			//for binarise distance model.  DistanceThreshold=(Solid_Upper+Pore_Lower)/2
 vector<short> DoPAR::ProjectDMapMaxBins;
 
-vector<double> DoPAR::PCA_RATIO_VARIANCE;				//Kopf used 0.95
+vector<double> DoPAR::PCA_RATIO_VARIANCE;		//Kopf used 0.95
 vector<double> DoPAR::ErrorBound;				//Kopf used 2.0, we use different for multi levels
 vector<short> DoPAR::ANNsearchk;				//related to N[level]
 
-const short DoPAR::MAXITERATION = 20;
+const short DoPAR::MAXITERATION = 15;
 
 void DoPAR::DoANNOptimization() {
 	init();
@@ -638,7 +638,7 @@ void DoPAR::DoANNOptimization() {
 			else if (1.0*(globalenergy_old - globalenergy_new) / globalenergy_old < (0.01*(curlevel + 1))) convergencecount++;
 			globalenergy_old = globalenergy_new;
 			if (energyincreasecount > 1) break;
-			else if (convergencecount > (MULTIRES - curlevel)) break;	//if change <1% for twice, then mark as converge
+			else if (convergencecount > (MULTIRES -1 - curlevel)) break;	//if change <1% for twice, then mark as converge
 		}//loop in one level
 		if (curlevel < MULTIRES - 1) {//level up
 			FIRSTRUN = true;
@@ -648,7 +648,7 @@ void DoPAR::DoANNOptimization() {
 			cleardata(curlevel);
 		}
 
-		if (curlevel >= MULTIRES - 1) {//draw histogram graph && ouput model
+		if (curlevel >= MULTIRES - 2) {//draw histogram graph && ouput model
 			int cols = TEXSIZE[curlevel];
 			int rows = 3 * cols;
 			//if (INDEXHIS_ON) writeIndexHistogram(curlevel, m_indexhistogram_synthesis[curlevel], 3 * (cols - 2 * N[curlevel]), cols - 2 * N[curlevel], "IndexHis_" + parameterstring + "_L" + to_string(curlevel) + ".png");
@@ -918,12 +918,11 @@ void DoPAR::calcNeighbor() {
 		ANNsearchk[level] = max(13.0, (N[level])*(N[level])*(MULTIRES - level)*0.5);
 		if (!INDEXHIS_ON) ANNsearchk[level] = 1;
 
-		ErrorBound[level] = min(0.5*(2+level), 3.0);
-		//ErrorBound[level] = 2.0;
+		ErrorBound[level] = 2.0;
+		//ErrorBound[level] = min(0.5*(1+level), 2.0);
 		if (!INDEXHIS_ON) ErrorBound[level] = 1.0;
 
-		if (level <= 2) PCA_RATIO_VARIANCE[level] = 0.99 - 0.01*level;
-		else PCA_RATIO_VARIANCE[level] = 0.95;
+		PCA_RATIO_VARIANCE[level] = max(0.95, 0.99-0.015*level);
 
 
 		cout << endl << "level:" << level;
@@ -1296,7 +1295,7 @@ void DoPAR::outputmodel(int level) {
 	vector<uchar> tempmodel;
 	tempmodel = vector<uchar>(m_volume[level].begin(), m_volume[level].end());
 	string tempoutputfilename = outputfilename;
-	//if (MULTIRES>1) tempoutputfilename = outputfilename.substr(0, outputfilename.find('.')) + "_L" + to_string(level) + ".RAW";
+	if (level != MULTIRES-1) tempoutputfilename = outputfilename.substr(0, outputfilename.find('.')) + "_L" + to_string(level) + ".RAW";
 
 	Write(outputpath + tempoutputfilename, tempmodel);
 
@@ -1614,8 +1613,8 @@ void DoPAR::searchVolume(int level) {
 
 	long time_end = clock();
 	cout << "done. clocks = " << (time_end - time_start) / CLOCKS_PER_SEC;
-	global_energy_new /= (3 * Size);
-	cout << ", Average energy: " << global_energy_new;
+	global_energy_new /= (3 * Size * D_NEIGHBOR[level]);
+	cout << ", per pixel energy: " << global_energy_new;
 	globalenergy_new = global_energy_new;
 }
 
