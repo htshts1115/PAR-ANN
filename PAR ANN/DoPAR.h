@@ -72,35 +72,35 @@ private:
 	void upsampleVolume(int level);
 	void outputmodel(int level);
 	void DynamicThreshold(int level);
-	void writeIndexHistogram(int level, vector<float> &histogram, int rows, int cols, const string filename);
+	void writeHistogram(bool scaling, int level, vector<float> &histogram, int rows, int cols, const string filename);
 
 	//release data
 	void cleardata(int level);
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////
-	static const int MULTIRES = 5;				// # of multi-resolution (0 -> MULTIRES - 1 :: coarsest -> finest)
+	static const int MULTIRES = 3;				// # of multi-resolution (0 -> MULTIRES - 1 :: coarsest -> finest)
 	static const int N[MULTIRES];
 	static ANNidx TEXSIZE[MULTIRES];			// size of input exemplar
 	static int D_NEIGHBOR[MULTIRES];			// (2 * N + 1) * (2 * N + 1)
 
 	static const bool INDEXHIS_ON = true;				// Index Histogram in search step
-	static const bool COLORHIS_ON = true;				// Colour Histogram in optimize step
-	static const bool BIMODAL_ON = true;				// Using bimodal TI
 
+	static const bool DISCRETE_ON = true;				// discrete solver in optimize step
+	
+	static const bool COLORHIS_ON = false;				// Colour Histogram in optimize step
+	static const bool POSITIONHIS_ON = true;			// Position Histogram	in optimize step
+
+	static const bool BIMODAL_ON = true;				// Using bimodal TI
 	static const bool DISTANCEMAP_ON = false;			// convert to distance map model
 
 	static const bool DISCRETETHRESHOLD_ON = false;		// dynamic thresholding in optimize step. 	will slightly affect quality. dont use in double peak distribution
-	
 	//Discarded. Wrong or poor performance
-	//static const bool DISCRETE_ON = false;			// discrete solver in optimize step
 	//static const bool PROPORTIONTHRESHOLD_ON = false;	// ProportionThreshold()  not good when DM is not exact DistanceMap
-	//static const bool LINEARTRANSFORM_ON = false;		//transform weighted average to have same mean and dev as TI
-	//static const bool POSITIONHIS_ON = false;			// Position Histogram	in optimize step
-	//static const bool GAUSSIANFALLOFF_ON = false;		// gaussian fall off weight in optimize step
+	
 	//static const bool ITERATIVEGETDMAP_ON = false;	//convert to 3D DMap every iteration, to correct DM values
 	
 	//experimental	
-	static const bool EARLYTERMINATION_ON = false;		// terminate ANN search when max points has benn visited. Careful.
+	//static const bool EARLYTERMINATION_ON = false;		// terminate ANN search when max points has benn visited. Careful.
 	//bool COUTCH_ON = false;
 	//static const bool HYBRID_DMGREY_ON = false;		//For finnest resolution use grey image not DM
 
@@ -140,7 +140,9 @@ private:
 		float a = (x - mean) / stddev;
 		return inv_sqrt_2pi / stddev * exp(-0.5 * a * a);
 	}
-	
+	static const ANNdist alpha_[MULTIRES];
+
+
 	// ========== need to change to short ==================
 	vector<vector<ANNcoord> >  m_exemplar_x;
 	vector<vector<ANNcoord> >  m_exemplar_y;
@@ -148,6 +150,9 @@ private:
 
 	bool loadExemplar();
 	void calcNeighbor();
+
+	void initabsoluteneigh();
+	vector<vector<ANNidx>> absoluteneigh;
 
 	// random permutation (precomputed)
 	//vector<ANNidx>	 m_permutation_xyz;								// [M] size: TEXSIZE[level]^3
@@ -185,7 +190,7 @@ private:
 	//----------------------------------------------------------------------------
 
 	//check convergence
-	double globalenergy_new, globalenergy_old;
+	ANNdist perpixel_energy_new, perpixel_energy_old;
 	static const short MAXITERATION;				//max iteration time
 
 	//=========== phase 1: search ===========================
@@ -218,6 +223,15 @@ private:
 	//========== phase 2: optimization ======================
 	void optimizeVolume(int level);
 
+	static vector<float> HisStdDev;
+	// ===========position histogram=============
+	vector<vector<float> >  m_positionhistogram_exemplar;						//[level][bin]
+	vector<vector<float> >  m_positionhistogram_synthesis;				
+	vector<vector<ANNidx> > m_volume_position;		// volume_position record // [M] size: TEXSIZE^3
+	void initPositionHistogram_exemplar();
+	void initPositionHistogram_synthesis(int level);
+	void updatePositionHistogram_synthesis(int level, const ANNidx position_old, const ANNidx position_new);
+
 
 	//---------- color histogram ---------------	
 	static const short NUM_HISTOGRAM_BIN;			// # of histogram bins
@@ -232,8 +246,10 @@ private:
 	void updateHistogram_synthesis(int level, const ANNcoord color_old, const ANNcoord color_new);	
 	
 	//discrete solver
-	int FindClosestColorIndex(int level, vector<ANNcoord>& colorset, ANNcoord referencecolor);	// return the index in colorset of the most similar color	
+	ANNcoord DoPAR::FindClosestColor(int level, vector<ANNcoord> &color, ANNcoord referencecolor);
+	ANNidx FindClosestIndex(int level, vector<ANNcoord>& color, vector<ANNidx>& position, ANNcoord referencecolor);
 	
+
 	//----------- Dynamic thresholding ----------
 	const static short DISCRETE_HISTOGRAM_BIN;						// for thresholding, discrete values. e.g. default256
 	vector<vector<float> >  discrete_histogram_exemplar;			// [level][discretebin]	256
@@ -268,6 +284,7 @@ private:
 	//=========== Bimodal Transform ===============
 	void BimodalRedistribution(vector<float>& Res, string filename);
 	void BimodalRedistribution3D(vector<float>& Res, string filename);
+	void testBimodalRedistribution(vector<float>& Res, string filename);
 
 };
 

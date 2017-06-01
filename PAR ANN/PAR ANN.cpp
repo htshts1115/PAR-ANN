@@ -18,6 +18,16 @@ int main(int argc, const char* argv[])
 	return 0;
 }
 
+//cout << endl << rand(); cin.get(); //without initial seed, rand() will give the same results!
+
+//Toroidal
+//cout << endl << (-1 & 255) << " " << (258 & 255) << " " << (20 & 255);	//!!needs to be 127,255... otherwise wrong
+//cin.get();
+
+//cout << endl <<"opencv optimization enabled? " <<useOptimized(); _getch();	//true
+//cout << endl << 124999999 * (1.0f / (500 * 500));	//=500 should be 499!
+//_getch();
+
 ////--------------check address
 
 //vector<int> list = { 0,1,2,3,4,5,6,7,8,9 };
@@ -54,7 +64,6 @@ int main(int argc, const char* argv[])
 //	delete[] x;
 //	return 0;
 //}
-
 
 ////--------------ANN sample------------------
 
