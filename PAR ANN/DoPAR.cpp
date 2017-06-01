@@ -604,9 +604,9 @@ float DoPAR::Pore_Lower;				//for redistribute distancemap model
 short DoPAR::DistanceThreshold;			//for binarise distance model.  DistanceThreshold=(Solid_Upper+Pore_Lower)/2
 vector<short> DoPAR::ProjectDMapMaxBins;
 
-vector<double> DoPAR::PCA_RATIO_VARIANCE;		//Kopf used 0.95
-vector<double> DoPAR::ErrorBound;				//Kopf used 2.0, we use different for multi levels
-vector<short> DoPAR::ANNsearchk;				//related to N[level]
+//vector<double> DoPAR::PCA_RATIO_VARIANCE;		//Kopf used 0.95
+//vector<double> DoPAR::ErrorBound;				//Kopf used 2.0, we use different for multi levels
+//vector<short> DoPAR::ANNsearchk;				//related to N[level]
 
 const short DoPAR::MAXITERATION = 15;
 
@@ -1179,6 +1179,60 @@ void DoPAR::calcNeighbor() {
 
 	cout << endl << "calcNeighbor done.";
 }
+void DoPAR::computeKCoherence()
+{
+	cout << endl << "K-coherence...";
+	HisStdDev.resize(MULTIRES);
+	for (int level = 0; level < MULTIRES; ++level) {
+		HisStdDev[level] = min(0.015f, 0.005f*(MULTIRES - level));
+
+		cout << endl << "level:" << level;
+		int numData = (TEXSIZE[level] - 2 * N[level]) * (TEXSIZE[level] - 2 * N[level]);
+		//ann_index range=[0,numData), corresponds to (x,y) where x/y range=[N[level],TEXSIZE[level]-N[level])!
+		
+		ANNpointArray p_source_x, p_source_y, p_source_z;
+		p_source_x = annAllocPts(numData, D_NEIGHBOR[level]);	//rows='area' numData, cols=dimension (Neighbour size)
+		p_source_y = annAllocPts(numData, D_NEIGHBOR[level]);
+		p_source_z = annAllocPts(numData, D_NEIGHBOR[level]);
+
+		int row = 0;
+		for (int v = N[level]; v < TEXSIZE[level] - N[level]; ++v) {
+			for (int u = N[level]; u < TEXSIZE[level] - N[level]; ++u) {
+				int col = 0;
+				for (int dv = -N[level]; dv <= N[level]; ++dv) {
+					for (int du = -N[level]; du <= N[level]; ++du) {
+						ANNidx index = (TEXSIZE[level] * (v + dv) + u + du);
+
+						p_source_x[row][col] = m_exemplar_x[level][index];		//set p_source_x(row,col) to m_examplar_x(idx)
+						p_source_y[row][col] = m_exemplar_y[level][index];
+						p_source_z[row][col] = m_exemplar_z[level][index];
+
+						++col;
+					}
+				}
+				++row;
+			}
+		}
+
+		//ANNpoint* data point array = m_neighbor_kdTree_ptr_x, number of points = numData, dimension
+		mp_neighbor_kdTree_x[level] = new ANNkd_tree(p_source_x, numData, D_NEIGHBOR[level]);	//ANNkd_tree
+		mp_neighbor_kdTree_y[level] = new ANNkd_tree(p_source_y, numData, D_NEIGHBOR[level]);
+		mp_neighbor_kdTree_z[level] = new ANNkd_tree(p_source_z, numData, D_NEIGHBOR[level]);
+
+		//ANN search
+
+
+
+		//release matrices
+		annDeallocPts(p_source_x);
+		annDeallocPts(p_source_y);
+		annDeallocPts(p_source_z);
+	}
+
+	cout << endl << "K-coherence done.";
+}
+
+
 
 bool DoPAR::loadVolume() {
 	//----------------convert Model(vector<uchar>) to m_volume (vector<vector<int>> (multires,x*y*z))
@@ -1894,6 +1948,7 @@ void DoPAR::optimizeVolume(int level) {
 	long time_end = clock();
 	cout << "done. clocks = " << (time_end - time_start) / CLOCKS_PER_SEC;
 }
+
 
 //============Position Histogram for optimize step====
 void DoPAR::initabsoluteneigh() {

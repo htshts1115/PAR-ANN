@@ -151,6 +151,9 @@ private:
 	bool loadExemplar();
 	void calcNeighbor();
 
+	//K-coherence search
+	void computeKCoherence();
+
 	void initabsoluteneigh();
 	vector<vector<ANNidx>> absoluteneigh;
 
@@ -194,9 +197,9 @@ private:
 	static const short MAXITERATION;				//max iteration time
 
 	//=========== phase 1: search ===========================
-	static vector<double> PCA_RATIO_VARIANCE;				//0.95
-	static vector<double> ErrorBound;						//Kopf used 2.0
-	static vector<short> ANNsearchk;				//search k nearest index
+	const double PCA_RATIO_VARIANCE = 0.999;					//0.95
+	const double ErrorBound = 0.0;							//Kopf used 2.0
+	const int ANNsearchk = 9;								//search k nearest index
 	vector<vector<ANNidx> > m_volume_nearest_x_index;		// [M] size: TEXSIZE^3
 	vector<vector<ANNidx> > m_volume_nearest_y_index;		// [M] size: TEXSIZE^3
 	vector<vector<ANNidx> > m_volume_nearest_z_index;		// [M] size: TEXSIZE^3
