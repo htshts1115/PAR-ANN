@@ -152,11 +152,12 @@ private:
 	//void calcNeighbor();
 
 	// =========== K-coherence search ======================
+	const int CoherenceNUM = 9;
 	void computeKCoherence();
 	vector<vector<vector<ANNidx>>> KCoherence_x;					//[level][TIindex][k] = TIindex
 	vector<vector<vector<ANNidx>>> KCoherence_y;
 	vector<vector<vector<ANNidx>>> KCoherence_z;
-	const int CoherenceNUM = 9;
+	
 
 
 
@@ -214,7 +215,7 @@ private:
 	//vector<vector<ANNdist> > m_volume_weight_y;
 	//vector<vector<ANNdist> > m_volume_weight_z;
 
-	void searchVolume(int level);
+	//void searchVolume(int level);
 
 
 	// ----------- index histogram -------------
@@ -223,12 +224,12 @@ private:
 	vector<vector<float> >  m_indexhistogram_synthesis;
 	void initIndexHistogram();
 	void updateIndexHistogram(int level, const ANNidx oldannidx, const ANNidx newannidx);
-	int indexhistmatching_ann_index(int level, int orientation, ANNidxArray& idxarray);
+	//int indexhistmatching_ann_index(int level, int orientation, ANNidxArray& idxarray);
 	bool FIRSTRUN;					// dont use random initial histogram. start counting from 0 for the first run.
 
 
 	//========== phase 2: optimization ======================
-	void optimizeVolume(int level);
+	//void optimizeVolume(int level);
 
 	//static vector<float> HisStdDev;
 	// ===========position histogram=============
