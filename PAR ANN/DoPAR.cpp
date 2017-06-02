@@ -52,7 +52,8 @@ DoPAR::DoPAR()
 
 	m_indexhistogram_synthesis.resize(MULTIRES);
 
-	ANNsearchk.resize(MULTIRES);
+	//ANNsearchk.resize(MULTIRES);
+
 	// [end] multi-res memory allocation---------------
 }
 
@@ -597,7 +598,7 @@ const short DoPAR::DISCRETE_HISTOGRAM_BIN = 256;				//for thresholding, discrete
 float DoPAR::perHisBin;
 vector<float> DoPAR::delta_histogram_exemplar;
 vector<float> DoPAR::delta_histogram_synthesis;
-vector<float> DoPAR::HisStdDev;									// accept maximum stddev*3 error
+//vector<float> DoPAR::HisStdDev;									// accept maximum stddev*3 error
 
 float DoPAR::Solid_Upper;				//for redistribute distancemap model. e.g. 192: 0-192 solid
 float DoPAR::Pore_Lower;				//for redistribute distancemap model
@@ -622,12 +623,6 @@ void DoPAR::DoANNOptimization() {
 		perpixel_energy_old = 10e9;
 
 		//initPermutation(curlevel);
-
-		//if (EARLYTERMINATION_ON) {
-		//	float ANNsearchpercent = 0.80f;
-		//	annMaxPtsVisit(ANNsearchpercent*TEXSIZE[curlevel] * TEXSIZE[curlevel] * TEXSIZE[curlevel]);
-		//	cout << endl << "EARLY_TERMINATION for ANNsearch is set to: " << ANNsearchpercent * 100 << "%";
-		//}
 
 		FIRSTRUN = true;
 		int convergencecount(0), energyincreasecount(0);
@@ -689,7 +684,8 @@ void DoPAR::init() {
 
 	if (!loadVolume()) return;
 
-	if (!DISTANCEMAP_ON) calcNeighbor();
+	//if (!DISTANCEMAP_ON) calcNeighbor();
+	computeKCoherence();
 
 	//initial delta_histogram
 	perHisBin = 1.0f * NUM_HISTOGRAM_BIN / CHANNEL_MAXVALUE;
@@ -741,10 +737,13 @@ void DoPAR::init() {
 //}
 
 bool DoPAR::loadExemplar() {
+	
+	/////////////////////////////////////////////////////////////
 	//exemplar_x --> YZ, exemplar_y --> ZX, exemplar_z --> XY
 	//using imagej, XY slice is XY, ememplar_z
 	//ZX slice can be attained by: 1. reslice top + flip virtical 2. then rotate 90 degrees left
 	//YZ slice is done by: reslice left
+	/////////////////////////////////////////////////////////////
 
 	//---------------convert Mat to IplImage*---------------
 	Mat matxy = cv::imread(FNameXY, CV_LOAD_IMAGE_GRAYSCALE); // ti grayscale
@@ -767,11 +766,6 @@ bool DoPAR::loadExemplar() {
 	//Generate DM TI or not
 	GenerateDMTI = true;
 
-	// Bimodal TI enhancement
-	if (BIMODAL_ON)cout << endl << "Bimodal TI enhancement ON. Will re-threshold resized TIs.";
-	vector<short> TempExistedBinX, TempExistedBinY, TempExistedBinZ;
-	vector<float> TempExistedBinHisX, TempExistedBinHisY, TempExistedBinHisZ;
-
 	// build image pyramid
 	int img_depth = img_x->depth;
 	int img_nChannels = img_x->nChannels;
@@ -791,15 +785,15 @@ bool DoPAR::loadExemplar() {
 		m_neighbor_z[level].resize(D_NEIGHBOR[level] * (TEXSIZE[level] - 2 * N[level]) * (TEXSIZE[level] - 2 * N[level]));
 		m_volume[level].resize(TEXSIZE[level] * TEXSIZE[level] * TEXSIZE[level]);
 		if (POSITIONHIS_ON) m_volume_position[level].resize(TEXSIZE[level] * TEXSIZE[level] * TEXSIZE[level]);
-		m_volume_nearest_x_index[level].resize(TEXSIZE[level] * TEXSIZE[level] * TEXSIZE[level]);
-		m_volume_nearest_y_index[level].resize(TEXSIZE[level] * TEXSIZE[level] * TEXSIZE[level]);
-		m_volume_nearest_z_index[level].resize(TEXSIZE[level] * TEXSIZE[level] * TEXSIZE[level]);
+		//m_volume_nearest_x_index[level].resize(TEXSIZE[level] * TEXSIZE[level] * TEXSIZE[level]);
+		//m_volume_nearest_y_index[level].resize(TEXSIZE[level] * TEXSIZE[level] * TEXSIZE[level]);
+		//m_volume_nearest_z_index[level].resize(TEXSIZE[level] * TEXSIZE[level] * TEXSIZE[level]);
 		//m_volume_nearest_x_dist[level].resize(TEXSIZE[level] * TEXSIZE[level] * TEXSIZE[level]);
 		//m_volume_nearest_y_dist[level].resize(TEXSIZE[level] * TEXSIZE[level] * TEXSIZE[level]);
 		//m_volume_nearest_z_dist[level].resize(TEXSIZE[level] * TEXSIZE[level] * TEXSIZE[level]);
-		m_volume_weight_x[level].resize(TEXSIZE[level] * TEXSIZE[level] * TEXSIZE[level]);
-		m_volume_weight_y[level].resize(TEXSIZE[level] * TEXSIZE[level] * TEXSIZE[level]);
-		m_volume_weight_z[level].resize(TEXSIZE[level] * TEXSIZE[level] * TEXSIZE[level]);
+		//m_volume_weight_x[level].resize(TEXSIZE[level] * TEXSIZE[level] * TEXSIZE[level]);
+		//m_volume_weight_y[level].resize(TEXSIZE[level] * TEXSIZE[level] * TEXSIZE[level]);
+		//m_volume_weight_z[level].resize(TEXSIZE[level] * TEXSIZE[level] * TEXSIZE[level]);
 		// [end] memory allocation -------------------------------------------
 
 		for (int v = 0; v < TEXSIZE[level]; ++v) {
@@ -813,7 +807,9 @@ bool DoPAR::loadExemplar() {
 		}
 
 		//============ rethreshold to retain thin connections at coarser level! ===================
-		if (!DISTANCEMAP_ON) {
+		vector<short> TempExistedBinX, TempExistedBinY, TempExistedBinZ;
+		vector<float> TempExistedBinHisX, TempExistedBinHisY, TempExistedBinHisZ;
+		if (false) {
 			if (level == MULTIRES - 1) {
 				calcTempHistogram(m_exemplar_x[MULTIRES - 1], TempExistedBinX, TempExistedBinHisX);
 				calcTempHistogram(m_exemplar_y[MULTIRES - 1], TempExistedBinY, TempExistedBinHisY);
@@ -939,261 +935,274 @@ bool DoPAR::loadExemplar() {
 	cout << endl << "load TIs done.";
 	return true;
 }
-void DoPAR::calcNeighbor() {
-	//initialize kdtree for certain template/neighbourhood
-	cout << endl << "calcNeighbor...";
-	ANNsearchk.resize(MULTIRES);
-	ErrorBound.resize(MULTIRES);
-	PCA_RATIO_VARIANCE.resize(MULTIRES);
-	HisStdDev.resize(MULTIRES);
-	for (int level = 0; level < MULTIRES; ++level) {
-		// ============= ANNsearchk & ErrorBound now relates to neighbourhood size =================
-		//ANNsearchk[level] = 9;
-		ANNsearchk[level] = min(9, (MULTIRES-level)*4+1);
-		if (!INDEXHIS_ON) ANNsearchk[level] = 1;
-
-		//ErrorBound[level] = 0.5;
-		ErrorBound[level] = min(level+0.5, 2.0);
-		if (!INDEXHIS_ON) ErrorBound[level] = 1.0;
-
-		PCA_RATIO_VARIANCE[level] = max(0.95, 0.999-0.05*level);
-
-		HisStdDev[level] = min(0.015f, 0.005f*(MULTIRES - level));
-
-
-		cout << endl << "level:" << level;
-		int numData = (TEXSIZE[level] - 2 * N[level]) * (TEXSIZE[level] - 2 * N[level]);
-		//ann_index range=[0,numData), corresponds to (x,y) where x/y range=[N[level],TEXSIZE[level]-N[level])!
-		CvMat* p_source_x = cvCreateMat(numData, D_NEIGHBOR[level], CV_32F);	//rows='area' numData, cols=dimension (Neighbour size)
-		CvMat* p_source_y = cvCreateMat(numData, D_NEIGHBOR[level], CV_32F);
-		CvMat* p_source_z = cvCreateMat(numData, D_NEIGHBOR[level], CV_32F);
-		int row = 0;
-		for (int v = N[level]; v < TEXSIZE[level] - N[level]; ++v) {
-			for (int u = N[level]; u < TEXSIZE[level] - N[level]; ++u) {
-				int col = 0;
-				for (int dv = -N[level]; dv <= N[level]; ++dv) {
-					for (int du = -N[level]; du <= N[level]; ++du) {
-						ANNidx index = (TEXSIZE[level] * (v + dv) + u + du);
-						cvmSet(p_source_x, row, col, m_exemplar_x[level][index]);	//set p_source_x(row,col) to m_examplar_x(idx)
-						cvmSet(p_source_y, row, col, m_exemplar_y[level][index]);
-						cvmSet(p_source_z, row, col, m_exemplar_z[level][index]);
-
-						m_neighbor_x[level][D_NEIGHBOR[level] * row + col] = m_exemplar_x[level][index];
-						m_neighbor_y[level][D_NEIGHBOR[level] * row + col] = m_exemplar_y[level][index];
-						m_neighbor_z[level][D_NEIGHBOR[level] * row + col] = m_exemplar_z[level][index];
-						++col;
-					}
-				}
-				++row;
-			}
-		}
-		// PCA calculation (obtain all eigenvectors of the input covariance matrix)
-
-		////////每一行表示一个样本
-		//////CvMat* pData = cvCreateMat( 总的样本数, 每个样本的维数, CV_32FC1 );
-		if (mp_neighbor_pca_average_x[level] != NULL) cvReleaseMat(&mp_neighbor_pca_average_x[level]);
-		if (mp_neighbor_pca_average_y[level] != NULL) cvReleaseMat(&mp_neighbor_pca_average_y[level]);
-		if (mp_neighbor_pca_average_z[level] != NULL) cvReleaseMat(&mp_neighbor_pca_average_z[level]);
-		//CvMat* pMean = cvCreateMat(1, 样本的维数, CV_32FC1);
-		mp_neighbor_pca_average_x[level] = cvCreateMat(1, D_NEIGHBOR[level], CV_32F);
-		mp_neighbor_pca_average_y[level] = cvCreateMat(1, D_NEIGHBOR[level], CV_32F);
-		mp_neighbor_pca_average_z[level] = cvCreateMat(1, D_NEIGHBOR[level], CV_32F);
-		//pEigVals中的每个数表示一个特征值
-		//CvMat* pEigVals = cvCreateMat(1, min(总的样本数,样本的维数), CV_32FC1);
-		CvMat* p_eigenValues_x = cvCreateMat(1, D_NEIGHBOR[level], CV_32F);
-		CvMat* p_eigenValues_y = cvCreateMat(1, D_NEIGHBOR[level], CV_32F);
-		CvMat* p_eigenValues_z = cvCreateMat(1, D_NEIGHBOR[level], CV_32F);
-		//每一行表示一个特征向量
-		//CvMat* pEigVecs = cvCreateMat( min(总的样本数,样本的维数), 样本的维数, CV_32FC1);
-		CvMat* p_eigenVectors_all_x = cvCreateMat(D_NEIGHBOR[level], D_NEIGHBOR[level], CV_32F);
-		CvMat* p_eigenVectors_all_y = cvCreateMat(D_NEIGHBOR[level], D_NEIGHBOR[level], CV_32F);
-		CvMat* p_eigenVectors_all_z = cvCreateMat(D_NEIGHBOR[level], D_NEIGHBOR[level], CV_32F);
-		//PCA处理,计算出平均向量pMean,特征值pEigVals和特征向量pEigVecs
-		//cvCalcPCA(pData, pMean, pEigVals, pEigVecs, CV_PCA_DATA_AS_ROW);
-		//now have better function //PCA pca(data, mean, PCA::DATA_AS_ROW, 0.95);
-
-		cvCalcPCA(p_source_x, mp_neighbor_pca_average_x[level], p_eigenValues_x, p_eigenVectors_all_x, CV_PCA_DATA_AS_ROW);
-		cvCalcPCA(p_source_y, mp_neighbor_pca_average_y[level], p_eigenValues_y, p_eigenVectors_all_y, CV_PCA_DATA_AS_ROW);
-		cvCalcPCA(p_source_z, mp_neighbor_pca_average_z[level], p_eigenValues_z, p_eigenVectors_all_z, CV_PCA_DATA_AS_ROW);
-		// Decide amount of dimensionality reduction
-		double contribution_total_x = 0;
-		double contribution_total_y = 0;
-		double contribution_total_z = 0;
-		for (int i = 0; i < D_NEIGHBOR[level]; ++i) {
-			contribution_total_x += cvmGet(p_eigenValues_x, 0, i);
-			contribution_total_y += cvmGet(p_eigenValues_y, 0, i);
-			contribution_total_z += cvmGet(p_eigenValues_z, 0, i);
-		}
-
-		int dimPCA_x = 0;
-		int dimPCA_y = 0;
-		int dimPCA_z = 0;
-
-		char type;
-		do {
-			type = 'n';
-
-			dimPCA_x = 0;
-			dimPCA_y = 0;
-			dimPCA_z = 0;
-			double contribution_acc_x = 0;
-			double contribution_acc_y = 0;
-			double contribution_acc_z = 0;
-			for (int i = 0; i < D_NEIGHBOR[level]; ++i) {
-				double ratio_x = contribution_acc_x / contribution_total_x;
-				double ratio_y = contribution_acc_y / contribution_total_y;
-				double ratio_z = contribution_acc_z / contribution_total_z;
-				if (ratio_x < PCA_RATIO_VARIANCE[level]) {	//now have better function //PCA pca(data, mean, PCA::DATA_AS_ROW, 0.95);
-					contribution_acc_x += cvmGet(p_eigenValues_x, 0, i);
-					++dimPCA_x;
-				}
-				if (ratio_y < PCA_RATIO_VARIANCE[level]) {
-					contribution_acc_y += cvmGet(p_eigenValues_y, 0, i);
-					++dimPCA_y;
-				}
-				if (ratio_z < PCA_RATIO_VARIANCE[level]) {
-					contribution_acc_z += cvmGet(p_eigenValues_z, 0, i);
-					++dimPCA_z;
-				}
-				if (PCA_RATIO_VARIANCE[level] <= ratio_x && PCA_RATIO_VARIANCE[level] <= ratio_y && PCA_RATIO_VARIANCE[level] <= ratio_z) break;
-			}
-
-			cout << endl;
-			printf("PCA reduction (x): %d -> %d\n", D_NEIGHBOR[level], dimPCA_x);
-			printf("PCA reduction (y): %d -> %d\n", D_NEIGHBOR[level], dimPCA_y);
-			printf("PCA reduction (z): %d -> %d\n", D_NEIGHBOR[level], dimPCA_z);
-
-			//if (level == 0){
-			//	do{
-			//		cout << endl << "PCA_RATIO_VARIANCE= " << PCA_RATIO_VARIANCE << " Modify or not? [y / n]";
-			//		cin >> type;
-			//	} while (!cin.fail() && type != 'y' && type != 'n');
-			//	if (type == 'y'){
-			//		cout << endl << "new PCA_RATIO_VARIANCE(e.g.0.99)= ";
-			//		cin >> PCA_RATIO_VARIANCE;
-			//	}
-			//}
-		} while (type == 'y' && PCA_RATIO_VARIANCE[level] <= 1.0/* && PCA_RATIO_VARIANCE>0.85*/);
-
-		// Trim total eigenvectors into partial eigenvectors
-		if (mp_neighbor_pca_eigenvec_x[level] != NULL) cvReleaseMat(&mp_neighbor_pca_eigenvec_x[level]);
-		if (mp_neighbor_pca_eigenvec_y[level] != NULL) cvReleaseMat(&mp_neighbor_pca_eigenvec_y[level]);
-		if (mp_neighbor_pca_eigenvec_z[level] != NULL) cvReleaseMat(&mp_neighbor_pca_eigenvec_z[level]);
-		mp_neighbor_pca_eigenvec_x[level] = cvCreateMat(dimPCA_x, D_NEIGHBOR[level], CV_32F);
-		mp_neighbor_pca_eigenvec_y[level] = cvCreateMat(dimPCA_y, D_NEIGHBOR[level], CV_32F);
-		mp_neighbor_pca_eigenvec_z[level] = cvCreateMat(dimPCA_z, D_NEIGHBOR[level], CV_32F);
-		memcpy(mp_neighbor_pca_eigenvec_x[level]->data.fl, p_eigenVectors_all_x->data.fl, sizeof(ANNcoord)* dimPCA_x * D_NEIGHBOR[level]);
-		memcpy(mp_neighbor_pca_eigenvec_y[level]->data.fl, p_eigenVectors_all_y->data.fl, sizeof(ANNcoord)* dimPCA_y * D_NEIGHBOR[level]);
-		memcpy(mp_neighbor_pca_eigenvec_z[level]->data.fl, p_eigenVectors_all_z->data.fl, sizeof(ANNcoord)* dimPCA_z * D_NEIGHBOR[level]);
-		// PCA projection
-		////// And copy the PCA results:
-		////Mat mean = pca.mean.clone();
-		////Mat eigenvalues = pca.eigenvalues.clone();
-		////Mat eigenvectors = pca.eigenvectors.clone();
-		////now better function
-		////dst = pca.project(mat); //CvMat* pResult = cvCreateMat( 总的样本数, PCA变换后的样本维数(即主成份的数目)?, CV_32FC1 );
-		if (mp_neighbor_pca_projected_x[level] != NULL) cvReleaseMat(&mp_neighbor_pca_projected_x[level]);
-		if (mp_neighbor_pca_projected_y[level] != NULL) cvReleaseMat(&mp_neighbor_pca_projected_y[level]);
-		if (mp_neighbor_pca_projected_z[level] != NULL) cvReleaseMat(&mp_neighbor_pca_projected_z[level]);
-		//选出前P个特征向量(主成份),然后投影,结果保存在pResult中，pResult中包含了P个系数
-		//CvMat* pResult = cvCreateMat( 总的样本数, PCA变换后的样本维数(即主成份的数目)?, CV_32FC1 );
-		mp_neighbor_pca_projected_x[level] = cvCreateMat(numData, dimPCA_x, CV_32F);
-		mp_neighbor_pca_projected_y[level] = cvCreateMat(numData, dimPCA_y, CV_32F);
-		mp_neighbor_pca_projected_z[level] = cvCreateMat(numData, dimPCA_z, CV_32F);
-		//cvProjectPCA( pData, pMean, pEigVecs, pResult );
-		cvProjectPCA(p_source_x, mp_neighbor_pca_average_x[level], mp_neighbor_pca_eigenvec_x[level], mp_neighbor_pca_projected_x[level]);
-		cvProjectPCA(p_source_y, mp_neighbor_pca_average_y[level], mp_neighbor_pca_eigenvec_y[level], mp_neighbor_pca_projected_y[level]);
-		cvProjectPCA(p_source_z, mp_neighbor_pca_average_z[level], mp_neighbor_pca_eigenvec_z[level], mp_neighbor_pca_projected_z[level]);
-		// kd-tree construction
-		m_neighbor_kdTree_ptr_x[level].resize(numData);
-		m_neighbor_kdTree_ptr_y[level].resize(numData);
-		m_neighbor_kdTree_ptr_z[level].resize(numData);
-		for (int i = 0; i < numData; ++i) {
-			//ANNpoint* point array, row = 1, col = PCA dimension
-			m_neighbor_kdTree_ptr_x[level][i] = &mp_neighbor_pca_projected_x[level]->data.fl[dimPCA_x * i];	//ANNpoint* from PCA projection
-			//vector<uchar> array(mat.rows*mat.cols);
-			//if (mat.isContinuous())
-			//	array = mat.data;
-			m_neighbor_kdTree_ptr_y[level][i] = &mp_neighbor_pca_projected_y[level]->data.fl[dimPCA_y * i];
-			m_neighbor_kdTree_ptr_z[level][i] = &mp_neighbor_pca_projected_z[level]->data.fl[dimPCA_z * i];
-		}
-		if (mp_neighbor_kdTree_x[level] != NULL) delete mp_neighbor_kdTree_x[level];
-		if (mp_neighbor_kdTree_y[level] != NULL) delete mp_neighbor_kdTree_y[level];
-		if (mp_neighbor_kdTree_z[level] != NULL) delete mp_neighbor_kdTree_z[level];
-		//ANNpoint* data point array = m_neighbor_kdTree_ptr_x, number of points = numData, dimension = dimPCA_x
-		mp_neighbor_kdTree_x[level] = new ANNkd_tree(&m_neighbor_kdTree_ptr_x[level][0], numData, dimPCA_x); //ANNkd_tree
-		mp_neighbor_kdTree_y[level] = new ANNkd_tree(&m_neighbor_kdTree_ptr_y[level][0], numData, dimPCA_y);
-		mp_neighbor_kdTree_z[level] = new ANNkd_tree(&m_neighbor_kdTree_ptr_z[level][0], numData, dimPCA_z);
-
-		//============ TEST TI PCA backproject result
-		if (GenerateDMTI && level == MULTIRES - 1 && FALSE) {
-			CvMat* backproject_x = cvCreateMat(numData, D_NEIGHBOR[level], CV_32F);
-			cvBackProjectPCA(mp_neighbor_pca_projected_x[level], mp_neighbor_pca_average_x[level], mp_neighbor_pca_eigenvec_x[level], backproject_x);
-			Mat backprojectMat_x = cvarrToMat(backproject_x);
-			Mat PCAbackprojectDM1 = Mat(TEXSIZE[level], TEXSIZE[level], CV_8UC1);
-			PCAbackprojectDM1 = Mat(m_exemplar_x[level], true).reshape(1, PCAbackprojectDM1.rows);
-
-			CvMat* backproject_y = cvCreateMat(numData, D_NEIGHBOR[level], CV_32F);
-			cvBackProjectPCA(mp_neighbor_pca_projected_y[level], mp_neighbor_pca_average_y[level], mp_neighbor_pca_eigenvec_y[level], backproject_y);
-			Mat backprojectMat_y = cvarrToMat(backproject_y);
-			Mat PCAbackprojectDM2 = Mat(TEXSIZE[level], TEXSIZE[level], CV_8UC1);
-			PCAbackprojectDM2 = Mat(m_exemplar_y[level], true).reshape(1, PCAbackprojectDM2.rows);
-
-			CvMat* backproject_z = cvCreateMat(numData, D_NEIGHBOR[level], CV_32F);
-			cvBackProjectPCA(mp_neighbor_pca_projected_z[level], mp_neighbor_pca_average_z[level], mp_neighbor_pca_eigenvec_z[level], backproject_z);
-			Mat backprojectMat_z = cvarrToMat(backproject_z);
-			Mat PCAbackprojectDM3 = Mat(TEXSIZE[level], TEXSIZE[level], CV_8UC1);
-			PCAbackprojectDM3 = Mat(m_exemplar_z[level], true).reshape(1, PCAbackprojectDM3.rows);
-
-			int row = 0;
-			int cols = 0.5*((2 * N[level] + 1)*(2 * N[level] + 1) - 1);
-			for (int v = N[level]; v < TEXSIZE[level] - N[level]; ++v) {
-				for (int u = N[level]; u < TEXSIZE[level] - N[level]; ++u) {
-					PCAbackprojectDM1.at<uchar>(v, u) = backprojectMat_x.at<ANNcoord>(row, cols);
-					PCAbackprojectDM2.at<uchar>(v, u) = backprojectMat_y.at<ANNcoord>(row, cols);
-					PCAbackprojectDM3.at<uchar>(v, u) = backprojectMat_z.at<ANNcoord>(row, cols);
-					++row;
-				}
-			}
-
-			imwrite("PCAbackproject_DM1.png", PCAbackprojectDM1);
-			imwrite("PCAbackproject_DM2.png", PCAbackprojectDM2);
-			imwrite("PCAbackproject_DM3.png", PCAbackprojectDM3);
-			cvReleaseMat(&backproject_x);
-			cvReleaseMat(&backproject_y);
-			cvReleaseMat(&backproject_z);
-			cout << endl << "PCA back projected image outputed.";
-		}
-
-		// release CV matrices
-		cvReleaseMat(&p_source_x);
-		cvReleaseMat(&p_source_y);
-		cvReleaseMat(&p_source_z);
-		cvReleaseMat(&p_eigenValues_x);
-		cvReleaseMat(&p_eigenValues_y);
-		cvReleaseMat(&p_eigenValues_z);
-		cvReleaseMat(&p_eigenVectors_all_x);
-		cvReleaseMat(&p_eigenVectors_all_y);
-		cvReleaseMat(&p_eigenVectors_all_z);
-	}
-
-	cout << endl << "calcNeighbor done.";
-}
+//void DoPAR::calcNeighbor() {
+//	//initialize kdtree for certain template/neighbourhood
+//	cout << endl << "calcNeighbor...";
+//	ANNsearchk.resize(MULTIRES);
+//	ErrorBound.resize(MULTIRES);
+//	PCA_RATIO_VARIANCE.resize(MULTIRES);
+//	HisStdDev.resize(MULTIRES);
+//	for (int level = 0; level < MULTIRES; ++level) {
+//		// ============= ANNsearchk & ErrorBound now relates to neighbourhood size =================
+//		//ANNsearchk[level] = 9;
+//		ANNsearchk[level] = min(9, (MULTIRES-level)*4+1);
+//		if (!INDEXHIS_ON) ANNsearchk[level] = 1;
+//
+//		//ErrorBound[level] = 0.5;
+//		ErrorBound[level] = min(level+0.5, 2.0);
+//		if (!INDEXHIS_ON) ErrorBound[level] = 1.0;
+//
+//		PCA_RATIO_VARIANCE[level] = max(0.95, 0.999-0.05*level);
+//
+//		HisStdDev[level] = min(0.015f, 0.005f*(MULTIRES - level));
+//
+//
+//		cout << endl << "level:" << level;
+//		int numData = (TEXSIZE[level] - 2 * N[level]) * (TEXSIZE[level] - 2 * N[level]);
+//		//ann_index range=[0,numData), corresponds to (x,y) where x/y range=[N[level],TEXSIZE[level]-N[level])!
+//		CvMat* p_source_x = cvCreateMat(numData, D_NEIGHBOR[level], CV_32F);	//rows='area' numData, cols=dimension (Neighbour size)
+//		CvMat* p_source_y = cvCreateMat(numData, D_NEIGHBOR[level], CV_32F);
+//		CvMat* p_source_z = cvCreateMat(numData, D_NEIGHBOR[level], CV_32F);
+//		int row = 0;
+//		for (int v = N[level]; v < TEXSIZE[level] - N[level]; ++v) {
+//			for (int u = N[level]; u < TEXSIZE[level] - N[level]; ++u) {
+//				int col = 0;
+//				for (int dv = -N[level]; dv <= N[level]; ++dv) {
+//					for (int du = -N[level]; du <= N[level]; ++du) {
+//						ANNidx index = (TEXSIZE[level] * (v + dv) + u + du);
+//						cvmSet(p_source_x, row, col, m_exemplar_x[level][index]);	//set p_source_x(row,col) to m_examplar_x(idx)
+//						cvmSet(p_source_y, row, col, m_exemplar_y[level][index]);
+//						cvmSet(p_source_z, row, col, m_exemplar_z[level][index]);
+//
+//						m_neighbor_x[level][D_NEIGHBOR[level] * row + col] = m_exemplar_x[level][index];
+//						m_neighbor_y[level][D_NEIGHBOR[level] * row + col] = m_exemplar_y[level][index];
+//						m_neighbor_z[level][D_NEIGHBOR[level] * row + col] = m_exemplar_z[level][index];
+//						++col;
+//					}
+//				}
+//				++row;
+//			}
+//		}
+//		// PCA calculation (obtain all eigenvectors of the input covariance matrix)
+//
+//		////////每一行表示一个样本
+//		//////CvMat* pData = cvCreateMat( 总的样本数, 每个样本的维数, CV_32FC1 );
+//		if (mp_neighbor_pca_average_x[level] != NULL) cvReleaseMat(&mp_neighbor_pca_average_x[level]);
+//		if (mp_neighbor_pca_average_y[level] != NULL) cvReleaseMat(&mp_neighbor_pca_average_y[level]);
+//		if (mp_neighbor_pca_average_z[level] != NULL) cvReleaseMat(&mp_neighbor_pca_average_z[level]);
+//		//CvMat* pMean = cvCreateMat(1, 样本的维数, CV_32FC1);
+//		mp_neighbor_pca_average_x[level] = cvCreateMat(1, D_NEIGHBOR[level], CV_32F);
+//		mp_neighbor_pca_average_y[level] = cvCreateMat(1, D_NEIGHBOR[level], CV_32F);
+//		mp_neighbor_pca_average_z[level] = cvCreateMat(1, D_NEIGHBOR[level], CV_32F);
+//		//pEigVals中的每个数表示一个特征值
+//		//CvMat* pEigVals = cvCreateMat(1, min(总的样本数,样本的维数), CV_32FC1);
+//		CvMat* p_eigenValues_x = cvCreateMat(1, D_NEIGHBOR[level], CV_32F);
+//		CvMat* p_eigenValues_y = cvCreateMat(1, D_NEIGHBOR[level], CV_32F);
+//		CvMat* p_eigenValues_z = cvCreateMat(1, D_NEIGHBOR[level], CV_32F);
+//		//每一行表示一个特征向量
+//		//CvMat* pEigVecs = cvCreateMat( min(总的样本数,样本的维数), 样本的维数, CV_32FC1);
+//		CvMat* p_eigenVectors_all_x = cvCreateMat(D_NEIGHBOR[level], D_NEIGHBOR[level], CV_32F);
+//		CvMat* p_eigenVectors_all_y = cvCreateMat(D_NEIGHBOR[level], D_NEIGHBOR[level], CV_32F);
+//		CvMat* p_eigenVectors_all_z = cvCreateMat(D_NEIGHBOR[level], D_NEIGHBOR[level], CV_32F);
+//		//PCA处理,计算出平均向量pMean,特征值pEigVals和特征向量pEigVecs
+//		//cvCalcPCA(pData, pMean, pEigVals, pEigVecs, CV_PCA_DATA_AS_ROW);
+//		//now have better function //PCA pca(data, mean, PCA::DATA_AS_ROW, 0.95);
+//
+//		cvCalcPCA(p_source_x, mp_neighbor_pca_average_x[level], p_eigenValues_x, p_eigenVectors_all_x, CV_PCA_DATA_AS_ROW);
+//		cvCalcPCA(p_source_y, mp_neighbor_pca_average_y[level], p_eigenValues_y, p_eigenVectors_all_y, CV_PCA_DATA_AS_ROW);
+//		cvCalcPCA(p_source_z, mp_neighbor_pca_average_z[level], p_eigenValues_z, p_eigenVectors_all_z, CV_PCA_DATA_AS_ROW);
+//		// Decide amount of dimensionality reduction
+//		double contribution_total_x = 0;
+//		double contribution_total_y = 0;
+//		double contribution_total_z = 0;
+//		for (int i = 0; i < D_NEIGHBOR[level]; ++i) {
+//			contribution_total_x += cvmGet(p_eigenValues_x, 0, i);
+//			contribution_total_y += cvmGet(p_eigenValues_y, 0, i);
+//			contribution_total_z += cvmGet(p_eigenValues_z, 0, i);
+//		}
+//
+//		int dimPCA_x = 0;
+//		int dimPCA_y = 0;
+//		int dimPCA_z = 0;
+//
+//		char type;
+//		do {
+//			type = 'n';
+//
+//			dimPCA_x = 0;
+//			dimPCA_y = 0;
+//			dimPCA_z = 0;
+//			double contribution_acc_x = 0;
+//			double contribution_acc_y = 0;
+//			double contribution_acc_z = 0;
+//			for (int i = 0; i < D_NEIGHBOR[level]; ++i) {
+//				double ratio_x = contribution_acc_x / contribution_total_x;
+//				double ratio_y = contribution_acc_y / contribution_total_y;
+//				double ratio_z = contribution_acc_z / contribution_total_z;
+//				if (ratio_x < PCA_RATIO_VARIANCE[level]) {	//now have better function //PCA pca(data, mean, PCA::DATA_AS_ROW, 0.95);
+//					contribution_acc_x += cvmGet(p_eigenValues_x, 0, i);
+//					++dimPCA_x;
+//				}
+//				if (ratio_y < PCA_RATIO_VARIANCE[level]) {
+//					contribution_acc_y += cvmGet(p_eigenValues_y, 0, i);
+//					++dimPCA_y;
+//				}
+//				if (ratio_z < PCA_RATIO_VARIANCE[level]) {
+//					contribution_acc_z += cvmGet(p_eigenValues_z, 0, i);
+//					++dimPCA_z;
+//				}
+//				if (PCA_RATIO_VARIANCE[level] <= ratio_x && PCA_RATIO_VARIANCE[level] <= ratio_y && PCA_RATIO_VARIANCE[level] <= ratio_z) break;
+//			}
+//
+//			cout << endl;
+//			printf("PCA reduction (x): %d -> %d\n", D_NEIGHBOR[level], dimPCA_x);
+//			printf("PCA reduction (y): %d -> %d\n", D_NEIGHBOR[level], dimPCA_y);
+//			printf("PCA reduction (z): %d -> %d\n", D_NEIGHBOR[level], dimPCA_z);
+//
+//			//if (level == 0){
+//			//	do{
+//			//		cout << endl << "PCA_RATIO_VARIANCE= " << PCA_RATIO_VARIANCE << " Modify or not? [y / n]";
+//			//		cin >> type;
+//			//	} while (!cin.fail() && type != 'y' && type != 'n');
+//			//	if (type == 'y'){
+//			//		cout << endl << "new PCA_RATIO_VARIANCE(e.g.0.99)= ";
+//			//		cin >> PCA_RATIO_VARIANCE;
+//			//	}
+//			//}
+//		} while (type == 'y' && PCA_RATIO_VARIANCE[level] <= 1.0/* && PCA_RATIO_VARIANCE>0.85*/);
+//
+//		// Trim total eigenvectors into partial eigenvectors
+//		if (mp_neighbor_pca_eigenvec_x[level] != NULL) cvReleaseMat(&mp_neighbor_pca_eigenvec_x[level]);
+//		if (mp_neighbor_pca_eigenvec_y[level] != NULL) cvReleaseMat(&mp_neighbor_pca_eigenvec_y[level]);
+//		if (mp_neighbor_pca_eigenvec_z[level] != NULL) cvReleaseMat(&mp_neighbor_pca_eigenvec_z[level]);
+//		mp_neighbor_pca_eigenvec_x[level] = cvCreateMat(dimPCA_x, D_NEIGHBOR[level], CV_32F);
+//		mp_neighbor_pca_eigenvec_y[level] = cvCreateMat(dimPCA_y, D_NEIGHBOR[level], CV_32F);
+//		mp_neighbor_pca_eigenvec_z[level] = cvCreateMat(dimPCA_z, D_NEIGHBOR[level], CV_32F);
+//		memcpy(mp_neighbor_pca_eigenvec_x[level]->data.fl, p_eigenVectors_all_x->data.fl, sizeof(ANNcoord)* dimPCA_x * D_NEIGHBOR[level]);
+//		memcpy(mp_neighbor_pca_eigenvec_y[level]->data.fl, p_eigenVectors_all_y->data.fl, sizeof(ANNcoord)* dimPCA_y * D_NEIGHBOR[level]);
+//		memcpy(mp_neighbor_pca_eigenvec_z[level]->data.fl, p_eigenVectors_all_z->data.fl, sizeof(ANNcoord)* dimPCA_z * D_NEIGHBOR[level]);
+//		// PCA projection
+//		////// And copy the PCA results:
+//		////Mat mean = pca.mean.clone();
+//		////Mat eigenvalues = pca.eigenvalues.clone();
+//		////Mat eigenvectors = pca.eigenvectors.clone();
+//		////now better function
+//		////dst = pca.project(mat); //CvMat* pResult = cvCreateMat( 总的样本数, PCA变换后的样本维数(即主成份的数目)?, CV_32FC1 );
+//		if (mp_neighbor_pca_projected_x[level] != NULL) cvReleaseMat(&mp_neighbor_pca_projected_x[level]);
+//		if (mp_neighbor_pca_projected_y[level] != NULL) cvReleaseMat(&mp_neighbor_pca_projected_y[level]);
+//		if (mp_neighbor_pca_projected_z[level] != NULL) cvReleaseMat(&mp_neighbor_pca_projected_z[level]);
+//		//选出前P个特征向量(主成份),然后投影,结果保存在pResult中，pResult中包含了P个系数
+//		//CvMat* pResult = cvCreateMat( 总的样本数, PCA变换后的样本维数(即主成份的数目)?, CV_32FC1 );
+//		mp_neighbor_pca_projected_x[level] = cvCreateMat(numData, dimPCA_x, CV_32F);
+//		mp_neighbor_pca_projected_y[level] = cvCreateMat(numData, dimPCA_y, CV_32F);
+//		mp_neighbor_pca_projected_z[level] = cvCreateMat(numData, dimPCA_z, CV_32F);
+//		//cvProjectPCA( pData, pMean, pEigVecs, pResult );
+//		cvProjectPCA(p_source_x, mp_neighbor_pca_average_x[level], mp_neighbor_pca_eigenvec_x[level], mp_neighbor_pca_projected_x[level]);
+//		cvProjectPCA(p_source_y, mp_neighbor_pca_average_y[level], mp_neighbor_pca_eigenvec_y[level], mp_neighbor_pca_projected_y[level]);
+//		cvProjectPCA(p_source_z, mp_neighbor_pca_average_z[level], mp_neighbor_pca_eigenvec_z[level], mp_neighbor_pca_projected_z[level]);
+//		// kd-tree construction
+//		m_neighbor_kdTree_ptr_x[level].resize(numData);
+//		m_neighbor_kdTree_ptr_y[level].resize(numData);
+//		m_neighbor_kdTree_ptr_z[level].resize(numData);
+//		for (int i = 0; i < numData; ++i) {
+//			//ANNpoint* point array, row = 1, col = PCA dimension
+//			m_neighbor_kdTree_ptr_x[level][i] = &mp_neighbor_pca_projected_x[level]->data.fl[dimPCA_x * i];	//ANNpoint* from PCA projection
+//			//vector<uchar> array(mat.rows*mat.cols);
+//			//if (mat.isContinuous())
+//			//	array = mat.data;
+//			m_neighbor_kdTree_ptr_y[level][i] = &mp_neighbor_pca_projected_y[level]->data.fl[dimPCA_y * i];
+//			m_neighbor_kdTree_ptr_z[level][i] = &mp_neighbor_pca_projected_z[level]->data.fl[dimPCA_z * i];
+//		}
+//		if (mp_neighbor_kdTree_x[level] != NULL) delete mp_neighbor_kdTree_x[level];
+//		if (mp_neighbor_kdTree_y[level] != NULL) delete mp_neighbor_kdTree_y[level];
+//		if (mp_neighbor_kdTree_z[level] != NULL) delete mp_neighbor_kdTree_z[level];
+//		//ANNpoint* data point array = m_neighbor_kdTree_ptr_x, number of points = numData, dimension = dimPCA_x
+//		mp_neighbor_kdTree_x[level] = new ANNkd_tree(&m_neighbor_kdTree_ptr_x[level][0], numData, dimPCA_x); //ANNkd_tree
+//		mp_neighbor_kdTree_y[level] = new ANNkd_tree(&m_neighbor_kdTree_ptr_y[level][0], numData, dimPCA_y);
+//		mp_neighbor_kdTree_z[level] = new ANNkd_tree(&m_neighbor_kdTree_ptr_z[level][0], numData, dimPCA_z);
+//
+//		//============ TEST TI PCA backproject result
+//		if (GenerateDMTI && level == MULTIRES - 1 && FALSE) {
+//			CvMat* backproject_x = cvCreateMat(numData, D_NEIGHBOR[level], CV_32F);
+//			cvBackProjectPCA(mp_neighbor_pca_projected_x[level], mp_neighbor_pca_average_x[level], mp_neighbor_pca_eigenvec_x[level], backproject_x);
+//			Mat backprojectMat_x = cvarrToMat(backproject_x);
+//			Mat PCAbackprojectDM1 = Mat(TEXSIZE[level], TEXSIZE[level], CV_8UC1);
+//			PCAbackprojectDM1 = Mat(m_exemplar_x[level], true).reshape(1, PCAbackprojectDM1.rows);
+//
+//			CvMat* backproject_y = cvCreateMat(numData, D_NEIGHBOR[level], CV_32F);
+//			cvBackProjectPCA(mp_neighbor_pca_projected_y[level], mp_neighbor_pca_average_y[level], mp_neighbor_pca_eigenvec_y[level], backproject_y);
+//			Mat backprojectMat_y = cvarrToMat(backproject_y);
+//			Mat PCAbackprojectDM2 = Mat(TEXSIZE[level], TEXSIZE[level], CV_8UC1);
+//			PCAbackprojectDM2 = Mat(m_exemplar_y[level], true).reshape(1, PCAbackprojectDM2.rows);
+//
+//			CvMat* backproject_z = cvCreateMat(numData, D_NEIGHBOR[level], CV_32F);
+//			cvBackProjectPCA(mp_neighbor_pca_projected_z[level], mp_neighbor_pca_average_z[level], mp_neighbor_pca_eigenvec_z[level], backproject_z);
+//			Mat backprojectMat_z = cvarrToMat(backproject_z);
+//			Mat PCAbackprojectDM3 = Mat(TEXSIZE[level], TEXSIZE[level], CV_8UC1);
+//			PCAbackprojectDM3 = Mat(m_exemplar_z[level], true).reshape(1, PCAbackprojectDM3.rows);
+//
+//			int row = 0;
+//			int cols = 0.5*((2 * N[level] + 1)*(2 * N[level] + 1) - 1);
+//			for (int v = N[level]; v < TEXSIZE[level] - N[level]; ++v) {
+//				for (int u = N[level]; u < TEXSIZE[level] - N[level]; ++u) {
+//					PCAbackprojectDM1.at<uchar>(v, u) = backprojectMat_x.at<ANNcoord>(row, cols);
+//					PCAbackprojectDM2.at<uchar>(v, u) = backprojectMat_y.at<ANNcoord>(row, cols);
+//					PCAbackprojectDM3.at<uchar>(v, u) = backprojectMat_z.at<ANNcoord>(row, cols);
+//					++row;
+//				}
+//			}
+//
+//			imwrite("PCAbackproject_DM1.png", PCAbackprojectDM1);
+//			imwrite("PCAbackproject_DM2.png", PCAbackprojectDM2);
+//			imwrite("PCAbackproject_DM3.png", PCAbackprojectDM3);
+//			cvReleaseMat(&backproject_x);
+//			cvReleaseMat(&backproject_y);
+//			cvReleaseMat(&backproject_z);
+//			cout << endl << "PCA back projected image outputed.";
+//		}
+//
+//		// release CV matrices
+//		cvReleaseMat(&p_source_x);
+//		cvReleaseMat(&p_source_y);
+//		cvReleaseMat(&p_source_z);
+//		cvReleaseMat(&p_eigenValues_x);
+//		cvReleaseMat(&p_eigenValues_y);
+//		cvReleaseMat(&p_eigenValues_z);
+//		cvReleaseMat(&p_eigenVectors_all_x);
+//		cvReleaseMat(&p_eigenVectors_all_y);
+//		cvReleaseMat(&p_eigenVectors_all_z);
+//	}
+//
+//	cout << endl << "calcNeighbor done.";
+//}
 void DoPAR::computeKCoherence()
 {
 	cout << endl << "K-coherence...";
-	HisStdDev.resize(MULTIRES);
-	for (int level = 0; level < MULTIRES; ++level) {
-		HisStdDev[level] = min(0.015f, 0.005f*(MULTIRES - level));
 
-		cout << endl << "level:" << level;
-		int numData = (TEXSIZE[level] - 2 * N[level]) * (TEXSIZE[level] - 2 * N[level]);
-		//ann_index range=[0,numData), corresponds to (x,y) where x/y range=[N[level],TEXSIZE[level]-N[level])!
+	//==========multiple nearest index, position control=========
+	ANNidxArray ann_index_x = new ANNidx[CoherenceNUM];
+	ANNidxArray ann_index_y = new ANNidx[CoherenceNUM];
+	ANNidxArray ann_index_z = new ANNidx[CoherenceNUM];
+	ANNdistArray ann_dist_x = new ANNdist[CoherenceNUM];
+	ANNdistArray ann_dist_y = new ANNdist[CoherenceNUM];
+	ANNdistArray ann_dist_z = new ANNdist[CoherenceNUM];
+
+	for (int level = 0; level < MULTIRES; ++level) {
+		ANNidx numData = (TEXSIZE[level] - 2 * N[level]) * (TEXSIZE[level] - 2 * N[level]);
+		int dim = D_NEIGHBOR[level];
+		cout << endl << "level: " << level << "Dimension=" << dim;
 		
+		ANNkd_tree*  kdTree_x;
+		ANNkd_tree*  kdTree_y;
+		ANNkd_tree*  kdTree_z;
 		ANNpointArray p_source_x, p_source_y, p_source_z;
-		p_source_x = annAllocPts(numData, D_NEIGHBOR[level]);	//rows='area' numData, cols=dimension (Neighbour size)
-		p_source_y = annAllocPts(numData, D_NEIGHBOR[level]);
-		p_source_z = annAllocPts(numData, D_NEIGHBOR[level]);
+		p_source_x = annAllocPts(numData, dim);			//rows='area' numData, cols=dimension (Neighbour size)
+		p_source_y = annAllocPts(numData, dim);
+		p_source_z = annAllocPts(numData, dim);
+		ANNpoint queryPt_x, queryPt_y, queryPt_z;
+		queryPt_x = annAllocPt(dim);
+		queryPt_y = annAllocPt(dim);
+		queryPt_z = annAllocPt(dim);
 
 		int row = 0;
 		for (int v = N[level]; v < TEXSIZE[level] - N[level]; ++v) {
@@ -1202,11 +1211,9 @@ void DoPAR::computeKCoherence()
 				for (int dv = -N[level]; dv <= N[level]; ++dv) {
 					for (int du = -N[level]; du <= N[level]; ++du) {
 						ANNidx index = (TEXSIZE[level] * (v + dv) + u + du);
-
 						p_source_x[row][col] = m_exemplar_x[level][index];		//set p_source_x(row,col) to m_examplar_x(idx)
 						p_source_y[row][col] = m_exemplar_y[level][index];
 						p_source_z[row][col] = m_exemplar_z[level][index];
-
 						++col;
 					}
 				}
@@ -1215,19 +1222,47 @@ void DoPAR::computeKCoherence()
 		}
 
 		//ANNpoint* data point array = m_neighbor_kdTree_ptr_x, number of points = numData, dimension
-		mp_neighbor_kdTree_x[level] = new ANNkd_tree(p_source_x, numData, D_NEIGHBOR[level]);	//ANNkd_tree
-		mp_neighbor_kdTree_y[level] = new ANNkd_tree(p_source_y, numData, D_NEIGHBOR[level]);
-		mp_neighbor_kdTree_z[level] = new ANNkd_tree(p_source_z, numData, D_NEIGHBOR[level]);
+		kdTree_x = new ANNkd_tree(p_source_x, numData, dim);		//build ANNkd_tree
+		kdTree_y = new ANNkd_tree(p_source_y, numData, dim);
+		kdTree_z = new ANNkd_tree(p_source_z, numData, dim);
 
 		//ANN search
+		for (int v = N[level]; v < TEXSIZE[level] - N[level]; ++v) {
+			for (int u = N[level]; u < TEXSIZE[level] - N[level]; ++u) {
+				int num = 0;
+				ANNidx TIindex = (TEXSIZE[level] * (v) + u);					//(v,u)
+				for (int dv = -N[level]; dv <= N[level]; ++dv) {
+					for (int du = -N[level]; du <= N[level]; ++du) {
+						ANNidx index = TIindex + (TEXSIZE[level] * dv + du);
+						queryPt_x[num] = m_exemplar_x[level][index];			//set queryPt_x(num) to m_examplar_x(idx)
+						queryPt_y[num] = m_exemplar_y[level][index];
+						queryPt_z[num] = m_exemplar_z[level][index];
+						num++;
+					}
+				}
 
+				kdTree_x->annkSearch(queryPt_x, CoherenceNUM, ann_index_x, ann_dist_x, 0);
+				kdTree_y->annkSearch(queryPt_y, CoherenceNUM, ann_index_y, ann_dist_y, 0);
+				kdTree_z->annkSearch(queryPt_z, CoherenceNUM, ann_index_z, ann_dist_z, 0);
 
+				//Set K-Coherence
+				for (int k = 0; k < CoherenceNUM; ++k)
+				{
+					KCoherence_x[level][TIindex][k] = convertIndexANN(level, ann_index_x[k]);
+					KCoherence_y[level][TIindex][k] = convertIndexANN(level, ann_index_y[k]);
+					KCoherence_z[level][TIindex][k] = convertIndexANN(level, ann_index_z[k]);
+				}
+			}
+		}
 
-		//release matrices
-		annDeallocPts(p_source_x);
-		annDeallocPts(p_source_y);
-		annDeallocPts(p_source_z);
+		//release
+		annClose();
+		delete kdTree_x;		delete kdTree_y;		delete kdTree_z;
+		annDeallocPts(p_source_x);		annDeallocPts(p_source_y);		annDeallocPts(p_source_z);
+		annDeallocPt(queryPt_x);		annDeallocPt(queryPt_y);		annDeallocPt(queryPt_z);
 	}
+	delete[] ann_index_x;		delete[] ann_index_y;		delete[] ann_index_z;
+	delete[] ann_dist_x;		delete[] ann_dist_y;		delete[] ann_dist_z;
 
 	cout << endl << "K-coherence done.";
 }
@@ -1470,32 +1505,33 @@ void DoPAR::cleardata(int level) {
 	m_neighbor_z[level].clear();
 	m_volume[level].clear();
 	//m_permutation_xyz.clear();
-	m_volume_nearest_x_index[level].clear();
-	m_volume_nearest_y_index[level].clear();
-	m_volume_nearest_z_index[level].clear();
+	//m_volume_nearest_x_index[level].clear();
+	//m_volume_nearest_y_index[level].clear();
+	//m_volume_nearest_z_index[level].clear();
 	//m_volume_nearest_x_dist[level].clear();
 	//m_volume_nearest_y_dist[level].clear();
 	//m_volume_nearest_z_dist[level].clear();
-	m_volume_weight_x[level].clear();
-	m_volume_weight_y[level].clear();
-	m_volume_weight_z[level].clear();
-	m_neighbor_kdTree_ptr_x[level].clear();
-	m_neighbor_kdTree_ptr_y[level].clear();
-	m_neighbor_kdTree_ptr_z[level].clear();
+	//m_volume_weight_x[level].clear();
+	//m_volume_weight_y[level].clear();
+	//m_volume_weight_z[level].clear();
+	//m_neighbor_kdTree_ptr_x[level].clear();
+	//m_neighbor_kdTree_ptr_y[level].clear();
+	//m_neighbor_kdTree_ptr_z[level].clear();
 	//!!!Every use of new should be balanced by a delete, and every use of new[] should be balanced by delete[]
-	if (mp_neighbor_kdTree_x[level] != NULL) delete mp_neighbor_kdTree_x[level];
-	if (mp_neighbor_kdTree_y[level] != NULL) delete mp_neighbor_kdTree_y[level];
-	if (mp_neighbor_kdTree_z[level] != NULL) delete mp_neighbor_kdTree_z[level];
-	if (mp_neighbor_pca_average_x[level] != NULL) cvReleaseMat(&mp_neighbor_pca_average_x[level]);
-	if (mp_neighbor_pca_average_y[level] != NULL) cvReleaseMat(&mp_neighbor_pca_average_y[level]);
-	if (mp_neighbor_pca_average_z[level] != NULL) cvReleaseMat(&mp_neighbor_pca_average_z[level]);
-	if (mp_neighbor_pca_projected_x[level] != NULL) cvReleaseMat(&mp_neighbor_pca_projected_x[level]);
-	if (mp_neighbor_pca_projected_y[level] != NULL) cvReleaseMat(&mp_neighbor_pca_projected_y[level]);
-	if (mp_neighbor_pca_projected_z[level] != NULL) cvReleaseMat(&mp_neighbor_pca_projected_z[level]);
-	if (mp_neighbor_pca_eigenvec_x[level] != NULL) cvReleaseMat(&mp_neighbor_pca_eigenvec_x[level]);
-	if (mp_neighbor_pca_eigenvec_y[level] != NULL) cvReleaseMat(&mp_neighbor_pca_eigenvec_y[level]);
-	if (mp_neighbor_pca_eigenvec_z[level] != NULL) cvReleaseMat(&mp_neighbor_pca_eigenvec_z[level]);
+	//if (mp_neighbor_kdTree_x[level] != NULL) delete mp_neighbor_kdTree_x[level];
+	//if (mp_neighbor_kdTree_y[level] != NULL) delete mp_neighbor_kdTree_y[level];
+	//if (mp_neighbor_kdTree_z[level] != NULL) delete mp_neighbor_kdTree_z[level];
+	//if (mp_neighbor_pca_average_x[level] != NULL) cvReleaseMat(&mp_neighbor_pca_average_x[level]);
+	//if (mp_neighbor_pca_average_y[level] != NULL) cvReleaseMat(&mp_neighbor_pca_average_y[level]);
+	//if (mp_neighbor_pca_average_z[level] != NULL) cvReleaseMat(&mp_neighbor_pca_average_z[level]);
+	//if (mp_neighbor_pca_projected_x[level] != NULL) cvReleaseMat(&mp_neighbor_pca_projected_x[level]);
+	//if (mp_neighbor_pca_projected_y[level] != NULL) cvReleaseMat(&mp_neighbor_pca_projected_y[level]);
+	//if (mp_neighbor_pca_projected_z[level] != NULL) cvReleaseMat(&mp_neighbor_pca_projected_z[level]);
+	//if (mp_neighbor_pca_eigenvec_x[level] != NULL) cvReleaseMat(&mp_neighbor_pca_eigenvec_x[level]);
+	//if (mp_neighbor_pca_eigenvec_y[level] != NULL) cvReleaseMat(&mp_neighbor_pca_eigenvec_y[level]);
+	//if (mp_neighbor_pca_eigenvec_z[level] != NULL) cvReleaseMat(&mp_neighbor_pca_eigenvec_z[level]);
 }
+
 
 //================= phase 1: search ===========================
 void DoPAR::searchVolume(int level) {
@@ -1523,12 +1559,12 @@ void DoPAR::searchVolume(int level) {
 	/////shuffle(m_permutation_xyz.begin(), m_permutation_xyz.end(), mersennetwistergenerator);
 
 	//==========multiple nearest index, position control=========
-	ANNidxArray ann_index_x = new ANNidx[ANNsearchk[level]];
-	ANNidxArray ann_index_y = new ANNidx[ANNsearchk[level]];
-	ANNidxArray ann_index_z = new ANNidx[ANNsearchk[level]];
-	ANNdistArray ann_dist_x = new ANNdist[ANNsearchk[level]];
-	ANNdistArray ann_dist_y = new ANNdist[ANNsearchk[level]];
-	ANNdistArray ann_dist_z = new ANNdist[ANNsearchk[level]];
+	ANNidxArray ann_index_x = new ANNidx[ANNsearchk];
+	ANNidxArray ann_index_y = new ANNidx[ANNsearchk];
+	ANNidxArray ann_index_z = new ANNidx[ANNsearchk];
+	ANNdistArray ann_dist_x = new ANNdist[ANNsearchk];
+	ANNdistArray ann_dist_y = new ANNdist[ANNsearchk];
+	ANNdistArray ann_dist_z = new ANNdist[ANNsearchk];
 
 	//===========obtain current neighborhood_x from volume, no need to new every loop====
 	CvMat* current_neighbor_x = cvCreateMat(1, D_NEIGHBOR[level], CV_32F); //rows = 1, cols = dimesnion
@@ -1610,9 +1646,9 @@ void DoPAR::searchVolume(int level) {
 			cvProjectPCA(current_neighbor_z, mp_neighbor_pca_average_z[level], mp_neighbor_pca_eigenvec_z[level], current_neighbor_z_projected);
 
 			// ANN search. error bound = 2.0; Kopf used 2.0
-			mp_neighbor_kdTree_x[level]->annkSearch(current_neighbor_x_projected->data.fl, ANNsearchk[level], ann_index_x, ann_dist_x, ErrorBound[level]);
-			mp_neighbor_kdTree_y[level]->annkSearch(current_neighbor_y_projected->data.fl, ANNsearchk[level], ann_index_y, ann_dist_y, ErrorBound[level]);
-			mp_neighbor_kdTree_z[level]->annkSearch(current_neighbor_z_projected->data.fl, ANNsearchk[level], ann_index_z, ann_dist_z, ErrorBound[level]);
+			mp_neighbor_kdTree_x[level]->annkSearch(current_neighbor_x_projected->data.fl, ANNsearchk, ann_index_x, ann_dist_x, ErrorBound);
+			mp_neighbor_kdTree_y[level]->annkSearch(current_neighbor_y_projected->data.fl, ANNsearchk, ann_index_y, ann_dist_y, ErrorBound);
+			mp_neighbor_kdTree_z[level]->annkSearch(current_neighbor_z_projected->data.fl, ANNsearchk, ann_index_z, ann_dist_z, ErrorBound);
 
 			//// CV release
 			//cvReleaseMat(&current_neighbor_x);
@@ -1624,7 +1660,7 @@ void DoPAR::searchVolume(int level) {
 
 			int selected_index_x(0), selected_index_y(0), selected_index_z(0);
 			//==========multiple nearest index, Index Histogram matching=========
-			if (INDEXHIS_ON && ANNsearchk[level]>1) {
+			if (INDEXHIS_ON && ANNsearchk>1) {
 				selected_index_x = indexhistmatching_ann_index(level, 0, ann_index_x);
 				selected_index_y = indexhistmatching_ann_index(level, 1, ann_index_y);
 				selected_index_z = indexhistmatching_ann_index(level, 2, ann_index_z);
@@ -1713,6 +1749,7 @@ void DoPAR::searchVolume(int level) {
 	cout << ", per pixel energy: " << perpixel_energy_new;
 }
 
+
 //---------- Index Histogram for search step ---------
 void DoPAR::initIndexHistogram() {
 	if (FIRSTRUN == false) { cout << endl << "Error: FIRSTRUN==false in initIndexHistogram()"; _getch(); exit(1); }
@@ -1739,8 +1776,8 @@ int DoPAR::indexhistmatching_ann_index(int level, int orientation, ANNidxArray& 
 	ANNidx size = orientation*(TEXSIZE[level] - 2 * N[level]) * (TEXSIZE[level] - 2 * N[level]);
 
 	//simple form works better: just select minimum frequency
-	vector<float> frequecyarray(ANNsearchk[level], 0.0f);
-	for (int i = 0; i < ANNsearchk[level]; i++) {
+	vector<float> frequecyarray(ANNsearchk, 0.0f);
+	for (int i = 0; i < ANNsearchk; i++) {
 		ANNidx idx = idxarray[i] + size;
 		frequecyarray[i] = m_indexhistogram_synthesis[level][idx];
 	}
@@ -1748,6 +1785,8 @@ int DoPAR::indexhistmatching_ann_index(int level, int orientation, ANNidxArray& 
 
 	return distance(begin(frequecyarray), i);
 }
+
+
 
 //================= phase 2: optimization =====================
 void DoPAR::optimizeVolume(int level) {
@@ -2156,6 +2195,12 @@ ANNidx DoPAR::FindClosestIndex(int level, vector<ANNcoord> &color, vector<ANNidx
 	return minidx;
 }
 
+
+
+
+
+
+
 //----------- Dynamic thresholding, worse than proportionthreshold ---------
 void DoPAR::calcaccHistogram(vector<float> &inputhis, vector<float> &acchis) {
 	if (inputhis.size() != acchis.size()) { cout << endl << "accHistogram size " << acchis.size() << " not match " << inputhis.size(); _getch(); }
@@ -2298,6 +2343,7 @@ void DoPAR::ProportionThreshold(vector<short>& Model, vector<short> BinNum, vect
 	}
 	Model.swap(ResModel);
 }
+
 
 // ========= Distance Map ===========
 vector<unsigned short> DoPAR::BarDMap(short tSx, short tSy, short tSz, vector<char>& OImg) {

@@ -127,7 +127,7 @@ private:
 		//}
 	}
 	inline ANNidx convertIndexANN(int level, ANNidx index){
-		//convert ANNSearch m_volume_nearest_x_index to m_volume index
+		//convert ANNSearch m_volume_nearest_x_index to TI index
 		ANNidx x, y, size;
 		size = TEXSIZE[level] - 2 * N[level];
 		x = index%size;
@@ -149,10 +149,16 @@ private:
 	vector<vector<ANNcoord> >  m_exemplar_z;						// [M] exemplar RGB image, size: TEXSIZE^2
 
 	bool loadExemplar();
-	void calcNeighbor();
+	//void calcNeighbor();
 
-	//K-coherence search
+	// =========== K-coherence search ======================
 	void computeKCoherence();
+	vector<vector<vector<ANNidx>>> KCoherence_x;					//[level][TIindex][k] = TIindex
+	vector<vector<vector<ANNidx>>> KCoherence_y;
+	vector<vector<vector<ANNidx>>> KCoherence_z;
+	const int CoherenceNUM = 9;
+
+
 
 	void initabsoluteneigh();
 	vector<vector<ANNidx>> absoluteneigh;
@@ -165,21 +171,19 @@ private:
 	vector<vector<ANNcoord> > m_neighbor_x;							// [M] original neighborhood vector required for texture optimization
 	vector<vector<ANNcoord> > m_neighbor_y;
 	vector<vector<ANNcoord> > m_neighbor_z;
-	vector<CvMat*> mp_neighbor_pca_average_x;						// [M] average of neighborhood vector
-	vector<CvMat*> mp_neighbor_pca_average_y;
-	vector<CvMat*> mp_neighbor_pca_average_z;
-	vector<CvMat*> mp_neighbor_pca_projected_x;						// [M] PCA-projected neighborhood data
-	vector<CvMat*> mp_neighbor_pca_projected_y;
-	vector<CvMat*> mp_neighbor_pca_projected_z;
-	vector<CvMat*> mp_neighbor_pca_eigenvec_x;						// [M] eigenvectors for covariant matrix
-	vector<CvMat*> mp_neighbor_pca_eigenvec_y;
-	vector<CvMat*> mp_neighbor_pca_eigenvec_z;
-	vector<vector<ANNcoord*> > m_neighbor_kdTree_ptr_x;				// [M] array of pointers to vectors required for ANNkd_tree
-	vector<vector<ANNcoord*> > m_neighbor_kdTree_ptr_y;				//ANNPoint*, 3 level
-	vector<vector<ANNcoord*> > m_neighbor_kdTree_ptr_z;
-	vector<ANNkd_tree*          > mp_neighbor_kdTree_x;	// [M] ANN kdTree
-	vector<ANNkd_tree*          > mp_neighbor_kdTree_y;	// ANNkd_tree, 3 level
-	vector<ANNkd_tree*          > mp_neighbor_kdTree_z;
+	//vector<CvMat*> mp_neighbor_pca_average_x;						// [M] average of neighborhood vector
+	//vector<CvMat*> mp_neighbor_pca_average_y;
+	//vector<CvMat*> mp_neighbor_pca_average_z;
+	//vector<CvMat*> mp_neighbor_pca_projected_x;						// [M] PCA-projected neighborhood data
+	//vector<CvMat*> mp_neighbor_pca_projected_y;
+	//vector<CvMat*> mp_neighbor_pca_projected_z;
+	//vector<CvMat*> mp_neighbor_pca_eigenvec_x;						// [M] eigenvectors for covariant matrix
+	//vector<CvMat*> mp_neighbor_pca_eigenvec_y;
+	//vector<CvMat*> mp_neighbor_pca_eigenvec_z;
+	//vector<vector<ANNcoord*> > m_neighbor_kdTree_ptr_x;				// [M] array of pointers to vectors required for ANNkd_tree
+	//vector<vector<ANNcoord*> > m_neighbor_kdTree_ptr_y;				//ANNPoint*, 3 level
+	//vector<vector<ANNcoord*> > m_neighbor_kdTree_ptr_z;
+
 
 	// pseudocode-----------------------------------------------------------------
 	// volume[0] := initVolume(0);                                        % initialization
@@ -197,18 +201,18 @@ private:
 	static const short MAXITERATION;				//max iteration time
 
 	//=========== phase 1: search ===========================
-	const double PCA_RATIO_VARIANCE = 0.999;					//0.95
-	const double ErrorBound = 0.0;							//Kopf used 2.0
-	const int ANNsearchk = 9;								//search k nearest index
-	vector<vector<ANNidx> > m_volume_nearest_x_index;		// [M] size: TEXSIZE^3
-	vector<vector<ANNidx> > m_volume_nearest_y_index;		// [M] size: TEXSIZE^3
-	vector<vector<ANNidx> > m_volume_nearest_z_index;		// [M] size: TEXSIZE^3
+	//const double PCA_RATIO_VARIANCE = 0.999;					//0.95
+	//const double ErrorBound = 0.0;							//Kopf used 2.0
+	//const int ANNsearchk = 9;								//search k nearest index
+	//vector<vector<ANNidx> > m_volume_nearest_x_index;		// [M] size: TEXSIZE^3
+	//vector<vector<ANNidx> > m_volume_nearest_y_index;		// [M] size: TEXSIZE^3
+	//vector<vector<ANNidx> > m_volume_nearest_z_index;		// [M] size: TEXSIZE^3
 	//vector<vector<ANNdist> > m_volume_nearest_x_dist;		// [M] size: TEXSIZE^3
 	//vector<vector<ANNdist> > m_volume_nearest_y_dist;		// [M] size: TEXSIZE^3
 	//vector<vector<ANNdist> > m_volume_nearest_z_dist;		// [M] size: TEXSIZE^3
-	vector<vector<ANNdist> > m_volume_weight_x;
-	vector<vector<ANNdist> > m_volume_weight_y;
-	vector<vector<ANNdist> > m_volume_weight_z;
+	//vector<vector<ANNdist> > m_volume_weight_x;
+	//vector<vector<ANNdist> > m_volume_weight_y;
+	//vector<vector<ANNdist> > m_volume_weight_z;
 
 	void searchVolume(int level);
 
@@ -226,7 +230,7 @@ private:
 	//========== phase 2: optimization ======================
 	void optimizeVolume(int level);
 
-	static vector<float> HisStdDev;
+	//static vector<float> HisStdDev;
 	// ===========position histogram=============
 	vector<vector<float> >  m_positionhistogram_exemplar;						//[level][bin]
 	vector<vector<float> >  m_positionhistogram_synthesis;				
