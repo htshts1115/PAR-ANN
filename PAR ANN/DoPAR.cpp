@@ -562,7 +562,8 @@ const ANNdist  DoPAR::alpha_[MULTIRES] = {64.0f, 128.0f, 256.0f};
 ///========================== 190217 Kopf. optimization based =====================
 
 //MULTIRES: larger number means finner level
-const int DoPAR::N[] = { 4,3,2 };		//Kopf{ 3, 4, 4 }; Chen{4,4,3}; Turner{5,5,5}	// neighborhood size: (2 * N + 1)^2
+//const int DoPAR::N[] = { 4,3,2 };		//Kopf{ 3, 4, 4 }; Chen{4,4,3}; Turner{5,5,5}	// neighborhood size: (2 * N + 1)^2
+const int DoPAR::blockSize[] = {8, 6, 6};
 ANNidx DoPAR::TEXSIZE[MULTIRES];
 int DoPAR::D_NEIGHBOR[MULTIRES];
 const ANNdist DoPAR::factor[MULTIRES] = { 64.0f, 128.0f, 256.0f };
@@ -602,7 +603,7 @@ void DoPAR::DoANNOptimization() {
 
 			searchVolume(curlevel);
 			cout << endl << "optimize:";
-			//optimizeVolume(curlevel);
+			optimizeVolume(curlevel);
 
 			FIRSTRUN = false;
 
@@ -919,13 +920,20 @@ void DoPAR::computeKCoherence()
 	ANNdistArray ann_dist_z = new ANNdist[COHERENCENUM];
 
 	for (int level = 0; level < MULTIRES; ++level) {
-		ANNidx numData = (TEXSIZE[level] - 2 * N[level]) * (TEXSIZE[level] - 2 * N[level]);
-		int dim = D_NEIGHBOR[level];
+		ANNidx TEXSIZE_ = TEXSIZE[level];
+		ANNidx blockSize_ = blockSize[level];
+
+		ANNidx width = TEXSIZE_ - blockSize_ + 1;
+		ANNidx height = TEXSIZE_ - blockSize_ + 1;
+		ANNidx dim = blockSize_ * blockSize_;
+		ANNidx bias = blockSize_ / 2;
+		ANNidx numData = width * height;
+
 		cout << endl << "level: " << level << " Dimension=" << dim;
 		
-		KCoherence_x[level].resize(TEXSIZE[level] * TEXSIZE[level]);
-		KCoherence_y[level].resize(TEXSIZE[level] * TEXSIZE[level]);
-		KCoherence_z[level].resize(TEXSIZE[level] * TEXSIZE[level]);
+		KCoherence_x[level].resize(TEXSIZE_ * TEXSIZE_);
+		KCoherence_y[level].resize(TEXSIZE_ * TEXSIZE_);
+		KCoherence_z[level].resize(TEXSIZE_ * TEXSIZE_);
 		ANNkd_tree*  kdTree_x;
 		ANNkd_tree*  kdTree_y;
 		ANNkd_tree*  kdTree_z;
@@ -938,14 +946,15 @@ void DoPAR::computeKCoherence()
 		queryPt_y = annAllocPt(dim);
 		queryPt_z = annAllocPt(dim);
 
-		int row = 0;
-		for (int v = N[level]; v < TEXSIZE[level] - N[level]; ++v) {
-			for (int u = N[level]; u < TEXSIZE[level] - N[level]; ++u) {
-				int col = 0;
-				for (int dv = -N[level]; dv <= N[level]; ++dv) {
-					for (int du = -N[level]; du <= N[level]; ++du) {
-						ANNidx index = (TEXSIZE[level] * (v + dv) + u + du);	//[v+dv][u+du]
-						p_source_x[row][col] = m_exemplar_x[level][index];		//set p_source_x(row,col) to m_examplar_x(idx)
+		ANNidx row = 0;
+		for (ANNidx i = 0; i < width; ++i){
+			for (ANNidx j = 0; j < height; ++j){
+				ANNidx col = 0;
+				ANNidx index0 = TEXSIZE_ * i + j;
+				for (ANNidx m = 0; m <blockSize_; ++m){
+					for (ANNidx n = 0; n <blockSize_; ++n){
+						ANNidx index = index0 + m * TEXSIZE_ + n;		//[i+m][j+n]
+						p_source_x[row][col] = m_exemplar_x[level][index];
 						p_source_y[row][col] = m_exemplar_y[level][index];
 						p_source_z[row][col] = m_exemplar_z[level][index];
 
@@ -965,21 +974,19 @@ void DoPAR::computeKCoherence()
 		kdTree_y = new ANNkd_tree(p_source_y, numData, dim);
 		kdTree_z = new ANNkd_tree(p_source_z, numData, dim);
 
-		//ANN search
-		for (int v = N[level]; v < TEXSIZE[level] - N[level]; ++v) {
-			for (int u = N[level]; u < TEXSIZE[level] - N[level]; ++u) {
-				int num = 0;
-				ANNidx TIindex = (TEXSIZE[level] * (v) + u);					
-				for (int dv = -N[level]; dv <= N[level]; ++dv) {
-					for (int du = -N[level]; du <= N[level]; ++du) {
-						ANNidx index = TIindex + (TEXSIZE[level] * dv + du);	//[v+dv][u+du]
-						queryPt_x[num] = m_exemplar_x[level][index];			//set queryPt_x(num) to m_examplar_x(idx)
+		for (ANNidx i = 0; i < width; ++i){
+			for (ANNidx j = 0; j < height; ++j){
+				ANNidx num = 0;
+				ANNidx TIindex = TEXSIZE_ * i + j;
+				for (ANNidx m = 0; m < blockSize_; ++m){
+					for (ANNidx n = 0; n < blockSize_; ++n){
+						ANNidx index = TIindex + TEXSIZE_ * m + n;	//[i+m][j+n]
+						queryPt_x[num] = m_exemplar_x[level][index];
 						queryPt_y[num] = m_exemplar_y[level][index];
 						queryPt_z[num] = m_exemplar_z[level][index];
 						num++;
 					}
-				}
-
+				}				
 				kdTree_x->annkSearch(queryPt_x, COHERENCENUM, ann_index_x, ann_dist_x, 0);
 				kdTree_y->annkSearch(queryPt_y, COHERENCENUM, ann_index_y, ann_dist_y, 0);
 				kdTree_z->annkSearch(queryPt_z, COHERENCENUM, ann_index_z, ann_dist_z, 0);
@@ -988,11 +995,11 @@ void DoPAR::computeKCoherence()
 				KCoherence_x[level][TIindex].resize(COHERENCENUM);
 				KCoherence_y[level][TIindex].resize(COHERENCENUM);
 				KCoherence_z[level][TIindex].resize(COHERENCENUM);
-				for (int k = 0; k < COHERENCENUM; ++k)
-				{
-					KCoherence_x[level][TIindex][k] = convertIndexANN(level, ann_index_x[k]);		//direction=0
-					KCoherence_y[level][TIindex][k] = convertIndexANN(level, ann_index_y[k]);		//direction=1
-					KCoherence_z[level][TIindex][k] = convertIndexANN(level, ann_index_z[k]);		//direction=2
+				ANNidx bias_TIindex = TIindex + bias*TEXSIZE_ + bias;
+				for (int k = 0; k < COHERENCENUM; ++k){
+					KCoherence_x[level][bias_TIindex][k] = convertIndexANN(level, ann_index_x[k]);		//direction=0
+					KCoherence_y[level][bias_TIindex][k] = convertIndexANN(level, ann_index_y[k]);		//direction=1
+					KCoherence_z[level][bias_TIindex][k] = convertIndexANN(level, ann_index_z[k]);		//direction=2
 				}
 			}
 		}
@@ -1023,9 +1030,9 @@ ANNdist DoPAR::getFullDistance(int level, int direction, ANNidx idx, CvMat * dat
 {
 	ANNdist min_dist = 0.00001f;
 	ANNdist sum = 0.0f;
-	ANNidx R = N[level];
+	ANNidx R = static_cast<ANNidx>(blockSize[level] / 2);
 	ANNidx n = 0;
-	ANNidx Sx = TEXSIZE[level], Sy = TEXSIZE[level];
+	ANNidx Sx = TEXSIZE[level];
 	ANNidx tempIdx;
 	vector<ANNcoord>* tempTI;
 	switch (direction){
@@ -1037,9 +1044,9 @@ ANNdist DoPAR::getFullDistance(int level, int direction, ANNidx idx, CvMat * dat
 		tempTI = &m_exemplar_z[level];	break;
 	}
 
-	for (ANNidx i = -R; i <= R; ++i){
+	for (ANNidx i = -R; i < R; ++i){
 		tempIdx = idx + i*Sx;
-		for (ANNidx j = -R; j <= R; ++j){			
+		for (ANNidx j = -R; j < R; ++j){			
 			ANNdist dif = (*tempTI)[tempIdx+j] - cvmGet(dataMat, 0, n++);
 			sum += (dif * dif);
 		}
@@ -1053,7 +1060,7 @@ bool DoPAR::setNearestPos(int level, int direction, ANNidx idx, ANNidx nearestId
 
 
 
-
+///////////////////////////////////////////////////
 
 bool DoPAR::loadVolume() {
 	//----------------convert Model(vector<uchar>) to m_volume (vector<vector<int>> (multires,x*y*z))
@@ -1332,11 +1339,7 @@ bool DoPAR::searchVolume(int level) {
 	const ANNidx Sxz = Sx * Sz;
 	const ANNidx Syz = Sy * Sz;
 	const ANNidx Size = Sxy * Sz;
-	const ANNidx IdxHis1 = 0;
-	const ANNidx IdxHis2 = (TEXSIZE[level] - 2 * N[level]) * (TEXSIZE[level] - 2 * N[level]);
-	const ANNidx IdxHis3 = 2 * (TEXSIZE[level] - 2 * N[level]) * (TEXSIZE[level] - 2 * N[level]);
-	const ANNidx R = N[level];
-	//const float dSxy = 1.0f / Sxy, dSx = 1.0f / Sx;
+	const ANNidx R = static_cast<ANNidx>(blockSize[level] / 2);
 
 	bool isUnchanged = true;
 	vector<ANNidx> compareIdx; 
@@ -1355,9 +1358,9 @@ bool DoPAR::searchVolume(int level) {
 		if (isUnchangedBlock(level, direction, i, j, k)) continue;			//check neighbours all unchanged or not
 
 		ANNidx index = 0;
-		for (ANNidx du = -R; du <= R; ++du) {	//N is neighbourhood size.
+		for (ANNidx du = -R; du < R; ++du) {	//N is neighbourhood size.
 			ANNidx VCurIdx1 = Sxy * trimIndex(level, i + du) + k;
-			for (ANNidx dv = -R; dv <= R; ++dv) {
+			for (ANNidx dv = -R; dv < R; ++dv) {
 				ANNidx index2 = VCurIdx1 + Sx * trimIndex(level, j + dv);		//[i+du][j+dv][k]
 				cvmSet(current_neighbor, 0, index, m_volume[level][index2]);
 				index++;
@@ -1368,9 +1371,9 @@ bool DoPAR::searchVolume(int level) {
 		ANNidx bestIdx;
 		int compareNum;
 		compareIdx.clear(); compareIdx.reserve(D_NEIGHBOR[level] * COHERENCENUM);
-		for (int u = -R; u <= R; ++u) {
+		for (int u = -R; u < R; ++u) {
 			ANNidx posx = trimIndex(level, i + u);
-			for (int v = -R; v <= R; ++v) {
+			for (int v = -R; v < R; ++v) {
 				ANNidx posy = trimIndex(level, k + v);
 				getPosIndex(direction, posx, j, posy);
 				ANNidx eposx = posx - u;
@@ -1426,9 +1429,9 @@ bool DoPAR::searchVolume(int level) {
 		
 		ANNidx index = 0;		
 		ANNidx TXy = Sx * j;
-		for (ANNidx du = -R; du <= R; ++du) {	//N is neighbourhood size.
+		for (ANNidx du = -R; du < R; ++du) {	//N is neighbourhood size.
 			ANNidx VCurIdx2 = Sxy * trimIndex(level, i + du) + TXy;				
-			for (ANNidx dv = -R; dv <= R; ++dv) {
+			for (ANNidx dv = -R; dv < R; ++dv) {
 				ANNidx index2 = VCurIdx2 + trimIndex(level, k + dv);		//[i+du][j][k+dv]
 				cvmSet(current_neighbor, 0, index, m_volume[level][index2]);					
 				index++;
@@ -1439,9 +1442,9 @@ bool DoPAR::searchVolume(int level) {
 		ANNidx bestIdx;
 		int compareNum;
 		compareIdx.clear(); compareIdx.reserve(D_NEIGHBOR[level] * COHERENCENUM);
-		for (int u = -R; u <= R; ++u) {
+		for (int u = -R; u < R; ++u) {
 			ANNidx posx = trimIndex(level, i + u);
-			for (int v = -R; v <= R; ++v) {
+			for (int v = -R; v < R; ++v) {
 				ANNidx posy = trimIndex(level, k + v);
 				getPosIndex(direction, posx, j, posy);
 				ANNidx eposx = posx - u;
@@ -1497,9 +1500,9 @@ bool DoPAR::searchVolume(int level) {
 				
 		ANNidx index = 0;		
 		ANNidx TXYz = Sxy * i;
-		for (ANNidx du = -R; du <= R; ++du) {	//N is neighbourhood size.
+		for (ANNidx du = -R; du < R; ++du) {	//N is neighbourhood size.
 			ANNidx VCurIdx3 = TXYz + Sx * trimIndex(level, j + du);
-			for (ANNidx dv = -R; dv <= R; ++dv) {
+			for (ANNidx dv = -R; dv < R; ++dv) {
 				ANNidx index2 = VCurIdx3 + trimIndex(level, k + dv);								//[i][j+du][k+dv]
 				cvmSet(current_neighbor, 0, index, m_volume[level][index2]);						//set current_neighbor_x(0,col) to m_volume(idx)
 				index++;
@@ -1510,9 +1513,9 @@ bool DoPAR::searchVolume(int level) {
 		ANNidx bestIdx;
 		int compareNum;
 		compareIdx.clear(); compareIdx.reserve(D_NEIGHBOR[level] * COHERENCENUM);
-		for (int u = -R; u <= R; ++u){
+		for (int u = -R; u < R; ++u){
 			ANNidx posx = trimIndex(level, j + u);
-			for (int v = -R; v <= R; ++v){
+			for (int v = -R; v < R; ++v){
 				ANNidx posy = trimIndex(level, k + v);
 				getPosIndex(direction, i, posx, posy);
 				ANNidx eposx = posx - u;
@@ -1586,120 +1589,138 @@ void DoPAR::updateIndexHistogram(int level, const ANNidx oldannidx, const ANNidx
 
 //================= phase 2: optimization =====================
 
-//void DoPAR::optimizeVolume(int level) {
-//	long time_start = clock();
-//	const ANNidx Sx = TEXSIZE[level];
-//	const ANNidx Sy = TEXSIZE[level];
-//	const ANNidx Sz = TEXSIZE[level];
-//	const ANNidx Sxy = Sx * Sy;
-//	const ANNidx Sxz = Sx * Sz;
-//	const ANNidx Syz = Sy * Sz;
-//	const ANNidx Size = Sxy * Sz;
-//	const ANNidx IdxHis1 = 0;
-//	const ANNidx IdxHis2 = (TEXSIZE[level] - 2 * N[level]) * (TEXSIZE[level] - 2 * N[level]);
-//	const ANNidx IdxHis3 = 2 * (TEXSIZE[level] - 2 * N[level]) * (TEXSIZE[level] - 2 * N[level]);
-//	//const float dSxy = 1.0f / Sxy, dSx = 1.0f / Sx;
-//	const ANNidx DNEIGHBOR = D_NEIGHBOR[level];
-//
-//	//const ANNdist devidedbyHisGaussianProbZero = 1.0f / gaussian_pdf(0.0f, 0.0f, HisStdDev[level]);
-//
-//
-//
-//	cout << endl << "optimize...";
-//	shuffle(m_permutation_xyz.begin(), m_permutation_xyz.end(), mersennetwistergenerator);
-//	for (ANNidx i2 = 0; i2 < Size; ++i2) {
-//			long i = m_permutation_xyz[i2];			//x,y,z is random order
-//			int x = i % Sx;
-//			int y = (i / Sx) % Sy;
-//			int z = i / Sxy;
-//
-//			ANNdist weight_acc = 0.0f;
-//			ANNcoord color_acc = 0.0f;
-//
-//			ANNidx m = 0;
-//			//for every voxel's neighbourhood, in 3 orientations
-//			ANNidx TXy = Sx * y;
-//			ANNidx TXYz = Sxy * z;
-//
-//			ANNidx VCurIdx1, VCurIdx2, VCurIdx3;
-//			ANNidx index2_x, index2_y, index2_z;
-//			ANNidx  nearest_index;
-//			ANNdist weight;//ANNdist nearest_dist;
-//			ANNcoord color;// color of overlapping neighborhood pixel
-//			ANNidx bin;
-//			ANNdist Hisgaussianprob;
-//			float histogram_matching;
-//
-//			for (ANNidx dv = -N[level]; dv <= N[level]; ++dv) {	//N is neighbourhood size.
-//				VCurIdx1 = Sxy * trimIndex(level, z + dv) + x;
-//				VCurIdx2 = Sxy * trimIndex(level, z + dv) + TXy;
-//				VCurIdx3 = TXYz + Sx * trimIndex(level, y + dv);
-//				for (ANNidx du = -N[level]; du <= N[level]; ++du) {
-//					index2_x = VCurIdx1 + Sx * trimIndex(level, y + du);						// i + (dv, du, 0)
-//					index2_y = VCurIdx2 + trimIndex(level, x + du);								// i + (dv, 0, du)
-//					index2_z = VCurIdx3 + trimIndex(level, x + du);								// i + (0, dv, du)
-//
-//					for (int ori = 0; ori < 3; ++ori) {//3 orientations		
-//						switch (ori) {
-//						case (0) : {
-//							nearest_index = m_volume_nearest_x_index[level][index2_x];
-//							weight = m_volume_weight_x[level][index2_x];
-//							color = m_neighbor_x[level][DNEIGHBOR * nearest_index + DNEIGHBOR - 1 - m];
-//							break;
-//						}
-//						case (1) : {
-//							nearest_index = m_volume_nearest_y_index[level][index2_y];
-//							weight = m_volume_weight_y[level][index2_y];
-//							color = m_neighbor_y[level][DNEIGHBOR * nearest_index + DNEIGHBOR - 1 - m];
-//							break;
-//						}
-//						default: {
-//							nearest_index = m_volume_nearest_z_index[level][index2_z];
-//							weight = m_volume_weight_z[level][index2_z];
-//							color = m_neighbor_z[level][DNEIGHBOR * nearest_index + DNEIGHBOR - 1 - m];
-//							break;
-//						}
-//						}
-//						//ANNcoord color = p_neighbor[D_NEIGHBOR[level] - 1 - m];	//index2 ~ m, index ~ D_NEIGHBOR[level] - 1 - m; the position is symmetrical!
-//
-//						//discrete solver
-//
-//
-//
-//
-//						//mean-shift to reduce bluring
-//
-//
-//
-//						// modify weight according to Color histogram matching
-//
-//
-//
-//						// accumulate color
-//						color_acc += weight * color;
-//						weight_acc += weight;
-//					}//3 orientations
-//					++m;
-//				}
-//			}//for every voxel's neighbourhood, in 3 orientations
-//
-//			// old & new colors for this voxel
-//			ANNcoord color_old = m_volume[level][i];
-//			//least square solver
-//			ANNcoord color_new = 1.0f * color_acc / weight_acc;
-//			
-//			//discrete solver
-//
-//			
-//
-//			// voxel update
-//			m_volume[level][i] = color_new;
-//
-//	}//for every voxel
-//
-//	long time_end = clock();
-//	cout << " clocks = " << (time_end - time_start) / CLOCKS_PER_SEC;
-//}
+void DoPAR::optimizeVolume(int level) {
+	long time_start = clock();	cout << endl << "optimize...";
+
+	const ANNidx Sx = TEXSIZE[level];
+	const ANNidx Sy = TEXSIZE[level];
+	const ANNidx Sz = TEXSIZE[level];
+	const ANNidx Sxy = Sx * Sy;
+	const ANNidx Sxz = Sx * Sz;
+	const ANNidx Syz = Sy * Sz;
+	const ANNidx Size = Sxy * Sz;
+	const ANNidx blockSize_ = blockSize[level];
+	const ANNidx start = static_cast<ANNidx>(blockSize_ / (2 * GRID)) + 1;
+	const ANNidx end = start;
+	ANNidx s1 = -static_cast<ANNidx>(blockSize_ / 2);
+	ANNidx e1 = static_cast<ANNidx>((blockSize_ -1)/ 2);
+	if (level != 0) {	//reduce average blurring
+		s1 += 1;
+		e1 -= 1;
+	}
+	
+	int direction;
+	shuffle(m_permutation_xyz.begin(), m_permutation_xyz.end(), mersennetwistergenerator);
+	for (ANNidx i2 = 0; i2 < Size; ++i2) {
+		ANNidx idx = m_permutation_xyz[i2];			//[i][j][k]
+		ANNidx k = idx % Sx;
+		ANNidx j = (idx / Sx) % Sy;
+		ANNidx i = idx / Sxy;
+		ANNdist weight_acc = 0.0f;
+		ANNcoord color_acc = 0.0f;
+		ANNcoord color_avg = 0.0f;
+
+		// For Z	
+		direction = 2;
+		ANNidx tempx0 = (i / GRID) * GRID;
+		ANNidx tempy0 = (j / GRID) * GRID;
+		for (ANNidx l = start; l >= -end; --l) {
+			ANNidx tempx = tempx0 + l * GRID;
+			ANNidx deltax = i - tempx;
+			for (ANNidx h = start; h >= -end; --h) {
+				ANNidx tempy = tempy0 + h * GRID;
+				ANNidx deltay = j - tempy;
+				if (deltax < s1 || deltax > e1 || deltay < s1 || deltay > e1)
+					continue;
+
+				ANNidx tempidx = trimIndex(level, tempx)*Sx + trimIndex(level, tempy) + k;
+				ANNidx tempnearestidx;
+				ANNdist tempnearestdis;
+				getNearestPos(direction, tempidx, tempnearestidx, tempnearestdis);
+
+				tempnearestidx += deltax * Sx + deltay;
+				ANNcoord tempcolor = m_exemplar_z[level][tempnearestidx];
+
+				addCandidate(tempcolor, direction, tempnearestidx);
+
+				ANNdist weight = tempnearestdis / his->getValue(coord);
+
+				color_acc += weight * tempcolor;
+				weight_acc += weight;
+			}
+		}
+	
+
+		color_avg = color_acc / weight_acc;
+
+		double xMinColor = INFINITY;
+		double yMinColor = INFINITY;
+		double zMinColor = INFINITY;
+
+		double dis;
+		for (size_t ai = 0; ai < vnum; ++ai)
+		{
+			switch (cand_.getPlane(ai))
+			{
+			case Plane_X:
+				dis = avgColor.distance(cand_.getColor(ai));	//multi-channel use sqare distance!
+				if (xMinColor > dis)
+				{
+					xMinColor = dis;
+					xCoord = cand_.getCoordinate(ai);
+				}
+				break;
+			case Plane_Y:
+				dis = avgColor.distance(cand_.getColor(ai));
+				if (yMinColor > dis)
+				{
+					yMinColor = dis;
+					yCoord = cand_.getCoordinate(ai);
+				}
+				break;
+			case Plane_Z:
+				dis = avgColor.distance(cand_.getColor(ai));
+				if (zMinColor > dis)
+				{
+					zMinColor = dis;
+					zCoord = cand_.getCoordinate(ai);
+				}
+				break;
+			default:
+				break;
+			}
+		}
+		solid->setPosIndex(i, j, k, 0, xCoord);					//update isUnchangeblock
+		if (!isWoodType_)
+			solid->setPosIndex(i, j, k, 1, yCoord);
+		solid->setPosIndex(i, j, k, 2, zCoord);
+
+		if (xMinColor < yMinColor && xMinColor < zMinColor)
+		{
+			tc = xexemplar.getColor(xCoord);
+			if (isWoodType_)
+			{
+				xCoord.swapXY();
+			}
+			solid->setColor(i, j, k, tc, xCoord, his);			//PosHis update
+		}
+		else if (yMinColor < xMinColor && yMinColor < zMinColor && !isWoodType_)
+		{
+			tc = yexemplar.getColor(yCoord);
+			yCoord.swapXY();
+			solid->setColor(i, j, k, tc, yCoord, his);
+		}
+		else
+		{
+			tc = zexemplar.getColor(zCoord);
+			solid->setColor(i, j, k, tc, zCoord, his);
+		}
+
+	}//for (ANNidx i2 = 0; i2 < Size; ++i2) {
+
+	long time_end = clock();
+	cout << " clocks = " << (time_end - time_start) / CLOCKS_PER_SEC;
+}
 
 
 //============Position Histogram for optimize step====

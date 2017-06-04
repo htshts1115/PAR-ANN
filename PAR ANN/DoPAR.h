@@ -79,7 +79,8 @@ private:
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////
 	static const int MULTIRES = 3;				// # of multi-resolution (0 -> MULTIRES - 1 :: coarsest -> finest)
-	static const int N[MULTIRES];
+	//static const int N[MULTIRES];
+	static const int blockSize[];
 	static ANNidx TEXSIZE[MULTIRES];			// size of input exemplar
 	static int D_NEIGHBOR[MULTIRES];			// (2 * N + 1) * (2 * N + 1)
 	const ANNidx GRID = 2;
@@ -121,11 +122,12 @@ private:
 	}
 	inline ANNidx convertIndexANN(int level, ANNidx index){
 		//convert ANNSearch m_volume_nearest_x_index to TI index
-		ANNidx x, y, size;
-		size = TEXSIZE[level] - 2 * N[level];
-		x = index%size;
-		y = index / size;
-		return ((y + N[level])*TEXSIZE[level] + (x + N[level]));
+		ANNidx x, y, height, bias;
+		height = TEXSIZE[level] - blockSize[level] + 1;
+		bias = static_cast<ANNidx>(blockSize[level] / 2);
+		x = index / height;
+		y = index % height;
+		return ((x + bias)*TEXSIZE[level] + (y + bias));
 	}
 	static const float inv_sqrt_2pi;
 	inline float gaussian_pdf(float x, float mean, float stddev)
@@ -196,7 +198,7 @@ private:
 
 
 	//========== phase 2: optimization ======================
-	//void optimizeVolume(int level);
+	void optimizeVolume(int level);
 
 	//static vector<float> HisStdDev;
 	// ===========position histogram=============
