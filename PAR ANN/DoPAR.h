@@ -82,6 +82,8 @@ private:
 	static const int N[MULTIRES];
 	static ANNidx TEXSIZE[MULTIRES];			// size of input exemplar
 	static int D_NEIGHBOR[MULTIRES];			// (2 * N + 1) * (2 * N + 1)
+	const ANNidx GRID = 2;
+	static const ANNdist factor[MULTIRES];
 
 	static const bool INDEXHIS_ON = true;				// Index Histogram in search step
 
@@ -94,15 +96,6 @@ private:
 	static const bool DISTANCEMAP_ON = false;			// convert to distance map model
 
 	static const bool DISCRETETHRESHOLD_ON = false;		// dynamic thresholding in optimize step. 	will slightly affect quality. dont use in double peak distribution
-	//Discarded. Wrong or poor performance
-	//static const bool PROPORTIONTHRESHOLD_ON = false;	// ProportionThreshold()  not good when DM is not exact DistanceMap
-	
-	//static const bool ITERATIVEGETDMAP_ON = false;	//convert to 3D DMap every iteration, to correct DM values
-	
-	//experimental	
-	//static const bool EARLYTERMINATION_ON = false;		// terminate ANN search when max points has benn visited. Careful.
-	//bool COUTCH_ON = false;
-	//static const bool HYBRID_DMGREY_ON = false;		//For finnest resolution use grey image not DM
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -151,71 +144,45 @@ private:
 	bool loadExemplar();
 	//void calcNeighbor();
 
+	////////////////////////////////////////////////////////
 	// =========== K-coherence search ======================
-	const int CoherenceNUM = 9;
-	void computeKCoherence();
+	const int COHERENCENUM = 9;
 	vector<vector<vector<ANNidx>>> KCoherence_x;					//[level][TIindex][k] = TIindex
 	vector<vector<vector<ANNidx>>> KCoherence_y;
 	vector<vector<vector<ANNidx>>> KCoherence_z;
 	
+	void computeKCoherence();
 
+	bool isUnchangedBlock(int level, int direction, ANNidx i, ANNidx j, ANNidx k);
+	
+	void getPosIndex(int direction, ANNidx& i, ANNidx& j, ANNidx& k);
+
+	ANNdist getFullDistance(int level, int direction, ANNidx idx, CvMat* dataMat);
+
+	bool setNearestPos(int level, int direction, ANNidx idx, ANNidx nearestIdx, ANNdist devDis);
+
+	////////////////////////////////////////////////////////
 
 
 	void initabsoluteneigh();
 	vector<vector<ANNidx>> absoluteneigh;
 
 	// random permutation (precomputed)
-	//vector<ANNidx>	 m_permutation_xyz;								// [M] size: TEXSIZE[level]^3
-	//void initPermutation(int level);
+	vector<ANNidx>	 m_permutation_xyz;								// [M] size: TEXSIZE[level]^3
+	void initPermutation(int level);
 
-	// PCA-projected neighborhood vector
+	//neighborhood vector
 	vector<vector<ANNcoord> > m_neighbor_x;							// [M] original neighborhood vector required for texture optimization
 	vector<vector<ANNcoord> > m_neighbor_y;
 	vector<vector<ANNcoord> > m_neighbor_z;
-	//vector<CvMat*> mp_neighbor_pca_average_x;						// [M] average of neighborhood vector
-	//vector<CvMat*> mp_neighbor_pca_average_y;
-	//vector<CvMat*> mp_neighbor_pca_average_z;
-	//vector<CvMat*> mp_neighbor_pca_projected_x;						// [M] PCA-projected neighborhood data
-	//vector<CvMat*> mp_neighbor_pca_projected_y;
-	//vector<CvMat*> mp_neighbor_pca_projected_z;
-	//vector<CvMat*> mp_neighbor_pca_eigenvec_x;						// [M] eigenvectors for covariant matrix
-	//vector<CvMat*> mp_neighbor_pca_eigenvec_y;
-	//vector<CvMat*> mp_neighbor_pca_eigenvec_z;
-	//vector<vector<ANNcoord*> > m_neighbor_kdTree_ptr_x;				// [M] array of pointers to vectors required for ANNkd_tree
-	//vector<vector<ANNcoord*> > m_neighbor_kdTree_ptr_y;				//ANNPoint*, 3 level
-	//vector<vector<ANNcoord*> > m_neighbor_kdTree_ptr_z;
 
-
-	// pseudocode-----------------------------------------------------------------
-	// volume[0] := initVolume(0);                                        % initialization
-	// for level = 0 to L                                                 % coarse-to-fine synthesis
-	//   repeat                                                           % several iterations for a single level
-	//     nearest_neighbor := searchVolume(level);                       % phase 1: search
-	//     volume[level] := optimizeVolume(level, nearest_neighbor);      % phase 2: optimization
-	//   until converged
-	//   volume[level + 1] = upsampleVolume(level);                       % upsampling
-	// end for
-	//----------------------------------------------------------------------------
 
 	//check convergence
 	ANNdist perpixel_energy_new, perpixel_energy_old;
 	static const short MAXITERATION;				//max iteration time
 
 	//=========== phase 1: search ===========================
-	//const double PCA_RATIO_VARIANCE = 0.999;					//0.95
-	//const double ErrorBound = 0.0;							//Kopf used 2.0
-	//const int ANNsearchk = 9;								//search k nearest index
-	//vector<vector<ANNidx> > m_volume_nearest_x_index;		// [M] size: TEXSIZE^3
-	//vector<vector<ANNidx> > m_volume_nearest_y_index;		// [M] size: TEXSIZE^3
-	//vector<vector<ANNidx> > m_volume_nearest_z_index;		// [M] size: TEXSIZE^3
-	//vector<vector<ANNdist> > m_volume_nearest_x_dist;		// [M] size: TEXSIZE^3
-	//vector<vector<ANNdist> > m_volume_nearest_y_dist;		// [M] size: TEXSIZE^3
-	//vector<vector<ANNdist> > m_volume_nearest_z_dist;		// [M] size: TEXSIZE^3
-	//vector<vector<ANNdist> > m_volume_weight_x;
-	//vector<vector<ANNdist> > m_volume_weight_y;
-	//vector<vector<ANNdist> > m_volume_weight_z;
-
-	//void searchVolume(int level);
+	bool searchVolume(int level);
 
 
 	// ----------- index histogram -------------

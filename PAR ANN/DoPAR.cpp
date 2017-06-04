@@ -14,45 +14,19 @@ DoPAR::DoPAR()
 	m_neighbor_x.resize(MULTIRES);
 	m_neighbor_y.resize(MULTIRES);
 	m_neighbor_z.resize(MULTIRES);
-	//mp_neighbor_pca_average_x.resize(MULTIRES, NULL);
-	//mp_neighbor_pca_average_y.resize(MULTIRES, NULL);
-	//mp_neighbor_pca_average_z.resize(MULTIRES, NULL);
-	//mp_neighbor_pca_projected_x.resize(MULTIRES, NULL);
-	//mp_neighbor_pca_projected_y.resize(MULTIRES, NULL);
-	//mp_neighbor_pca_projected_z.resize(MULTIRES, NULL);
-	//mp_neighbor_pca_eigenvec_x.resize(MULTIRES, NULL);
-	//mp_neighbor_pca_eigenvec_y.resize(MULTIRES, NULL);
-	//mp_neighbor_pca_eigenvec_z.resize(MULTIRES, NULL);
-	//m_neighbor_kdTree_ptr_x.resize(MULTIRES);
-	//m_neighbor_kdTree_ptr_y.resize(MULTIRES);
-	//m_neighbor_kdTree_ptr_z.resize(MULTIRES);
-	//mp_neighbor_kdTree_x.resize(MULTIRES, NULL);
-	//mp_neighbor_kdTree_y.resize(MULTIRES, NULL);
-	//mp_neighbor_kdTree_z.resize(MULTIRES, NULL);
 
 	discrete_histogram_synthesis.resize(MULTIRES);
 	m_histogram_synthesis.resize(MULTIRES);
 
 	m_volume.resize(MULTIRES);
 
-	//m_volume_nearest_x_index.resize(MULTIRES);
-	//m_volume_nearest_y_index.resize(MULTIRES);
-	//m_volume_nearest_z_index.resize(MULTIRES);
-	//m_volume_nearest_x_dist.resize(MULTIRES);
-	//m_volume_nearest_y_dist.resize(MULTIRES);
-	//m_volume_nearest_z_dist.resize(MULTIRES);
-	//m_volume_weight_x.resize(MULTIRES);
-	//m_volume_weight_y.resize(MULTIRES);
-	//m_volume_weight_z.resize(MULTIRES);
-
 	absoluteneigh.resize(MULTIRES);
+	
 	m_volume_position.resize(MULTIRES);
 	m_positionhistogram_exemplar.resize(MULTIRES);
 	m_positionhistogram_synthesis.resize(MULTIRES);
 
 	m_indexhistogram_synthesis.resize(MULTIRES);
-
-	//ANNsearchk.resize(MULTIRES);
 
 	// [end] multi-res memory allocation---------------
 }
@@ -588,9 +562,10 @@ const ANNdist  DoPAR::alpha_[MULTIRES] = {64.0f, 128.0f, 256.0f};
 ///========================== 190217 Kopf. optimization based =====================
 
 //MULTIRES: larger number means finner level
-const int DoPAR::N[MULTIRES] = { 4,3,2 };		//Kopf{ 3, 4, 4 }; Chen{4,4,3}; Turner{5,5,5}	// neighborhood size: (2 * N + 1)^2
+const int DoPAR::N[] = { 4,3,2 };		//Kopf{ 3, 4, 4 }; Chen{4,4,3}; Turner{5,5,5}	// neighborhood size: (2 * N + 1)^2
 ANNidx DoPAR::TEXSIZE[MULTIRES];
 int DoPAR::D_NEIGHBOR[MULTIRES];
+const ANNdist DoPAR::factor[MULTIRES] = { 64.0f, 128.0f, 256.0f };
 
 const short DoPAR::NUM_HISTOGRAM_BIN = 64;						//for color histograms	Kopf used 16
 short DoPAR::CHANNEL_MAXVALUE;									//for color histogram
@@ -605,10 +580,6 @@ float DoPAR::Pore_Lower;				//for redistribute distancemap model
 short DoPAR::DistanceThreshold;			//for binarise distance model.  DistanceThreshold=(Solid_Upper+Pore_Lower)/2
 vector<short> DoPAR::ProjectDMapMaxBins;
 
-//vector<double> DoPAR::PCA_RATIO_VARIANCE;		//Kopf used 0.95
-//vector<double> DoPAR::ErrorBound;				//Kopf used 2.0, we use different for multi levels
-//vector<short> DoPAR::ANNsearchk;				//related to N[level]
-
 const short DoPAR::MAXITERATION = 15;
 
 void DoPAR::DoANNOptimization() {
@@ -622,14 +593,14 @@ void DoPAR::DoANNOptimization() {
 		perpixel_energy_new = 0.0f;		
 		perpixel_energy_old = 10e9;
 
-		//initPermutation(curlevel);
+		initPermutation(curlevel);
 
 		FIRSTRUN = true;
 		int convergencecount(0), energyincreasecount(0);
 		for (int loop = 0; loop < MAXITERATION - curlevel * 2; loop++) {
 			cout << endl << "---------iteration: " << loop + 1 << "------------";
 
-			//searchVolume(curlevel);
+			searchVolume(curlevel);
 			cout << endl << "optimize:";
 			//optimizeVolume(curlevel);
 
@@ -684,13 +655,10 @@ void DoPAR::init() {
 
 	if (!loadVolume()) return;
 
-	//if (!DISTANCEMAP_ON) calcNeighbor();
-
 	unsigned long t1 = GetTickCount();
 	computeKCoherence();
 	unsigned long t2 = GetTickCount();
 	cout << "Computing KCoherence runs in "	<< static_cast<double>(t2 - t1) / (1000.0)	<< " s." << endl; 
-	_getch();
 
 
 	//initial delta_histogram
@@ -705,7 +673,6 @@ void DoPAR::init() {
 	initHistogram_exemplar();
 
 	FIRSTRUN = true;
-	if ((COLORHIS_ON || DISCRETETHRESHOLD_ON) && !DISTANCEMAP_ON) initHistogram_synthesis(0);
 	if (INDEXHIS_ON && !DISTANCEMAP_ON) { initIndexHistogram(); }
 	
 	if (POSITIONHIS_ON) {
@@ -733,14 +700,14 @@ void DoPAR::init() {
 	}
 }
 
-//void DoPAR::initPermutation(int level) {// random permutation (precomputed)
-//	ANNidx Size = TEXSIZE[level] * TEXSIZE[level] * TEXSIZE[level];
-//	m_permutation_xyz.clear();
-//	m_permutation_xyz.resize(Size);
-//	for (ANNidx i = 0; i <Size; ++i) {
-//		m_permutation_xyz[i] = i;
-//	}
-//}
+void DoPAR::initPermutation(int level) {// random permutation (precomputed)
+	ANNidx Size = TEXSIZE[level] * TEXSIZE[level] * TEXSIZE[level];
+	m_permutation_xyz.clear();
+	m_permutation_xyz.resize(Size);
+	for (ANNidx i = 0; i <Size; ++i) {
+		m_permutation_xyz[i] = i;
+	}
+}
 
 bool DoPAR::loadExemplar() {
 	
@@ -791,15 +758,6 @@ bool DoPAR::loadExemplar() {
 		m_neighbor_z[level].resize(D_NEIGHBOR[level] * (TEXSIZE[level] - 2 * N[level]) * (TEXSIZE[level] - 2 * N[level]));
 		m_volume[level].resize(TEXSIZE[level] * TEXSIZE[level] * TEXSIZE[level]);
 		if (POSITIONHIS_ON) m_volume_position[level].resize(TEXSIZE[level] * TEXSIZE[level] * TEXSIZE[level]);
-		//m_volume_nearest_x_index[level].resize(TEXSIZE[level] * TEXSIZE[level] * TEXSIZE[level]);
-		//m_volume_nearest_y_index[level].resize(TEXSIZE[level] * TEXSIZE[level] * TEXSIZE[level]);
-		//m_volume_nearest_z_index[level].resize(TEXSIZE[level] * TEXSIZE[level] * TEXSIZE[level]);
-		//m_volume_nearest_x_dist[level].resize(TEXSIZE[level] * TEXSIZE[level] * TEXSIZE[level]);
-		//m_volume_nearest_y_dist[level].resize(TEXSIZE[level] * TEXSIZE[level] * TEXSIZE[level]);
-		//m_volume_nearest_z_dist[level].resize(TEXSIZE[level] * TEXSIZE[level] * TEXSIZE[level]);
-		//m_volume_weight_x[level].resize(TEXSIZE[level] * TEXSIZE[level] * TEXSIZE[level]);
-		//m_volume_weight_y[level].resize(TEXSIZE[level] * TEXSIZE[level] * TEXSIZE[level]);
-		//m_volume_weight_z[level].resize(TEXSIZE[level] * TEXSIZE[level] * TEXSIZE[level]);
 		// [end] memory allocation -------------------------------------------
 
 		for (int v = 0; v < TEXSIZE[level]; ++v) {
@@ -941,246 +899,10 @@ bool DoPAR::loadExemplar() {
 	cout << endl << "load TIs done.";
 	return true;
 }
-//void DoPAR::calcNeighbor() {
-//	//initialize kdtree for certain template/neighbourhood
-//	cout << endl << "calcNeighbor...";
-//	ANNsearchk.resize(MULTIRES);
-//	ErrorBound.resize(MULTIRES);
-//	PCA_RATIO_VARIANCE.resize(MULTIRES);
-//	HisStdDev.resize(MULTIRES);
-//	for (int level = 0; level < MULTIRES; ++level) {
-//		// ============= ANNsearchk & ErrorBound now relates to neighbourhood size =================
-//		//ANNsearchk[level] = 9;
-//		ANNsearchk[level] = min(9, (MULTIRES-level)*4+1);
-//		if (!INDEXHIS_ON) ANNsearchk[level] = 1;
-//
-//		//ErrorBound[level] = 0.5;
-//		ErrorBound[level] = min(level+0.5, 2.0);
-//		if (!INDEXHIS_ON) ErrorBound[level] = 1.0;
-//
-//		PCA_RATIO_VARIANCE[level] = max(0.95, 0.999-0.05*level);
-//
-//		HisStdDev[level] = min(0.015f, 0.005f*(MULTIRES - level));
-//
-//
-//		cout << endl << "level:" << level;
-//		int numData = (TEXSIZE[level] - 2 * N[level]) * (TEXSIZE[level] - 2 * N[level]);
-//		//ann_index range=[0,numData), corresponds to (x,y) where x/y range=[N[level],TEXSIZE[level]-N[level])!
-//		CvMat* p_source_x = cvCreateMat(numData, D_NEIGHBOR[level], CV_32F);	//rows='area' numData, cols=dimension (Neighbour size)
-//		CvMat* p_source_y = cvCreateMat(numData, D_NEIGHBOR[level], CV_32F);
-//		CvMat* p_source_z = cvCreateMat(numData, D_NEIGHBOR[level], CV_32F);
-//		int row = 0;
-//		for (int v = N[level]; v < TEXSIZE[level] - N[level]; ++v) {
-//			for (int u = N[level]; u < TEXSIZE[level] - N[level]; ++u) {
-//				int col = 0;
-//				for (int dv = -N[level]; dv <= N[level]; ++dv) {
-//					for (int du = -N[level]; du <= N[level]; ++du) {
-//						ANNidx index = (TEXSIZE[level] * (v + dv) + u + du);
-//						cvmSet(p_source_x, row, col, m_exemplar_x[level][index]);	//set p_source_x(row,col) to m_examplar_x(idx)
-//						cvmSet(p_source_y, row, col, m_exemplar_y[level][index]);
-//						cvmSet(p_source_z, row, col, m_exemplar_z[level][index]);
-//
-//						m_neighbor_x[level][D_NEIGHBOR[level] * row + col] = m_exemplar_x[level][index];
-//						m_neighbor_y[level][D_NEIGHBOR[level] * row + col] = m_exemplar_y[level][index];
-//						m_neighbor_z[level][D_NEIGHBOR[level] * row + col] = m_exemplar_z[level][index];
-//						++col;
-//					}
-//				}
-//				++row;
-//			}
-//		}
-//		// PCA calculation (obtain all eigenvectors of the input covariance matrix)
-//
-//		////////每一行表示一个样本
-//		//////CvMat* pData = cvCreateMat( 总的样本数, 每个样本的维数, CV_32FC1 );
-//		if (mp_neighbor_pca_average_x[level] != NULL) cvReleaseMat(&mp_neighbor_pca_average_x[level]);
-//		if (mp_neighbor_pca_average_y[level] != NULL) cvReleaseMat(&mp_neighbor_pca_average_y[level]);
-//		if (mp_neighbor_pca_average_z[level] != NULL) cvReleaseMat(&mp_neighbor_pca_average_z[level]);
-//		//CvMat* pMean = cvCreateMat(1, 样本的维数, CV_32FC1);
-//		mp_neighbor_pca_average_x[level] = cvCreateMat(1, D_NEIGHBOR[level], CV_32F);
-//		mp_neighbor_pca_average_y[level] = cvCreateMat(1, D_NEIGHBOR[level], CV_32F);
-//		mp_neighbor_pca_average_z[level] = cvCreateMat(1, D_NEIGHBOR[level], CV_32F);
-//		//pEigVals中的每个数表示一个特征值
-//		//CvMat* pEigVals = cvCreateMat(1, min(总的样本数,样本的维数), CV_32FC1);
-//		CvMat* p_eigenValues_x = cvCreateMat(1, D_NEIGHBOR[level], CV_32F);
-//		CvMat* p_eigenValues_y = cvCreateMat(1, D_NEIGHBOR[level], CV_32F);
-//		CvMat* p_eigenValues_z = cvCreateMat(1, D_NEIGHBOR[level], CV_32F);
-//		//每一行表示一个特征向量
-//		//CvMat* pEigVecs = cvCreateMat( min(总的样本数,样本的维数), 样本的维数, CV_32FC1);
-//		CvMat* p_eigenVectors_all_x = cvCreateMat(D_NEIGHBOR[level], D_NEIGHBOR[level], CV_32F);
-//		CvMat* p_eigenVectors_all_y = cvCreateMat(D_NEIGHBOR[level], D_NEIGHBOR[level], CV_32F);
-//		CvMat* p_eigenVectors_all_z = cvCreateMat(D_NEIGHBOR[level], D_NEIGHBOR[level], CV_32F);
-//		//PCA处理,计算出平均向量pMean,特征值pEigVals和特征向量pEigVecs
-//		//cvCalcPCA(pData, pMean, pEigVals, pEigVecs, CV_PCA_DATA_AS_ROW);
-//		//now have better function //PCA pca(data, mean, PCA::DATA_AS_ROW, 0.95);
-//
-//		cvCalcPCA(p_source_x, mp_neighbor_pca_average_x[level], p_eigenValues_x, p_eigenVectors_all_x, CV_PCA_DATA_AS_ROW);
-//		cvCalcPCA(p_source_y, mp_neighbor_pca_average_y[level], p_eigenValues_y, p_eigenVectors_all_y, CV_PCA_DATA_AS_ROW);
-//		cvCalcPCA(p_source_z, mp_neighbor_pca_average_z[level], p_eigenValues_z, p_eigenVectors_all_z, CV_PCA_DATA_AS_ROW);
-//		// Decide amount of dimensionality reduction
-//		double contribution_total_x = 0;
-//		double contribution_total_y = 0;
-//		double contribution_total_z = 0;
-//		for (int i = 0; i < D_NEIGHBOR[level]; ++i) {
-//			contribution_total_x += cvmGet(p_eigenValues_x, 0, i);
-//			contribution_total_y += cvmGet(p_eigenValues_y, 0, i);
-//			contribution_total_z += cvmGet(p_eigenValues_z, 0, i);
-//		}
-//
-//		int dimPCA_x = 0;
-//		int dimPCA_y = 0;
-//		int dimPCA_z = 0;
-//
-//		char type;
-//		do {
-//			type = 'n';
-//
-//			dimPCA_x = 0;
-//			dimPCA_y = 0;
-//			dimPCA_z = 0;
-//			double contribution_acc_x = 0;
-//			double contribution_acc_y = 0;
-//			double contribution_acc_z = 0;
-//			for (int i = 0; i < D_NEIGHBOR[level]; ++i) {
-//				double ratio_x = contribution_acc_x / contribution_total_x;
-//				double ratio_y = contribution_acc_y / contribution_total_y;
-//				double ratio_z = contribution_acc_z / contribution_total_z;
-//				if (ratio_x < PCA_RATIO_VARIANCE[level]) {	//now have better function //PCA pca(data, mean, PCA::DATA_AS_ROW, 0.95);
-//					contribution_acc_x += cvmGet(p_eigenValues_x, 0, i);
-//					++dimPCA_x;
-//				}
-//				if (ratio_y < PCA_RATIO_VARIANCE[level]) {
-//					contribution_acc_y += cvmGet(p_eigenValues_y, 0, i);
-//					++dimPCA_y;
-//				}
-//				if (ratio_z < PCA_RATIO_VARIANCE[level]) {
-//					contribution_acc_z += cvmGet(p_eigenValues_z, 0, i);
-//					++dimPCA_z;
-//				}
-//				if (PCA_RATIO_VARIANCE[level] <= ratio_x && PCA_RATIO_VARIANCE[level] <= ratio_y && PCA_RATIO_VARIANCE[level] <= ratio_z) break;
-//			}
-//
-//			cout << endl;
-//			printf("PCA reduction (x): %d -> %d\n", D_NEIGHBOR[level], dimPCA_x);
-//			printf("PCA reduction (y): %d -> %d\n", D_NEIGHBOR[level], dimPCA_y);
-//			printf("PCA reduction (z): %d -> %d\n", D_NEIGHBOR[level], dimPCA_z);
-//
-//			//if (level == 0){
-//			//	do{
-//			//		cout << endl << "PCA_RATIO_VARIANCE= " << PCA_RATIO_VARIANCE << " Modify or not? [y / n]";
-//			//		cin >> type;
-//			//	} while (!cin.fail() && type != 'y' && type != 'n');
-//			//	if (type == 'y'){
-//			//		cout << endl << "new PCA_RATIO_VARIANCE(e.g.0.99)= ";
-//			//		cin >> PCA_RATIO_VARIANCE;
-//			//	}
-//			//}
-//		} while (type == 'y' && PCA_RATIO_VARIANCE[level] <= 1.0/* && PCA_RATIO_VARIANCE>0.85*/);
-//
-//		// Trim total eigenvectors into partial eigenvectors
-//		if (mp_neighbor_pca_eigenvec_x[level] != NULL) cvReleaseMat(&mp_neighbor_pca_eigenvec_x[level]);
-//		if (mp_neighbor_pca_eigenvec_y[level] != NULL) cvReleaseMat(&mp_neighbor_pca_eigenvec_y[level]);
-//		if (mp_neighbor_pca_eigenvec_z[level] != NULL) cvReleaseMat(&mp_neighbor_pca_eigenvec_z[level]);
-//		mp_neighbor_pca_eigenvec_x[level] = cvCreateMat(dimPCA_x, D_NEIGHBOR[level], CV_32F);
-//		mp_neighbor_pca_eigenvec_y[level] = cvCreateMat(dimPCA_y, D_NEIGHBOR[level], CV_32F);
-//		mp_neighbor_pca_eigenvec_z[level] = cvCreateMat(dimPCA_z, D_NEIGHBOR[level], CV_32F);
-//		memcpy(mp_neighbor_pca_eigenvec_x[level]->data.fl, p_eigenVectors_all_x->data.fl, sizeof(ANNcoord)* dimPCA_x * D_NEIGHBOR[level]);
-//		memcpy(mp_neighbor_pca_eigenvec_y[level]->data.fl, p_eigenVectors_all_y->data.fl, sizeof(ANNcoord)* dimPCA_y * D_NEIGHBOR[level]);
-//		memcpy(mp_neighbor_pca_eigenvec_z[level]->data.fl, p_eigenVectors_all_z->data.fl, sizeof(ANNcoord)* dimPCA_z * D_NEIGHBOR[level]);
-//		// PCA projection
-//		////// And copy the PCA results:
-//		////Mat mean = pca.mean.clone();
-//		////Mat eigenvalues = pca.eigenvalues.clone();
-//		////Mat eigenvectors = pca.eigenvectors.clone();
-//		////now better function
-//		////dst = pca.project(mat); //CvMat* pResult = cvCreateMat( 总的样本数, PCA变换后的样本维数(即主成份的数目)?, CV_32FC1 );
-//		if (mp_neighbor_pca_projected_x[level] != NULL) cvReleaseMat(&mp_neighbor_pca_projected_x[level]);
-//		if (mp_neighbor_pca_projected_y[level] != NULL) cvReleaseMat(&mp_neighbor_pca_projected_y[level]);
-//		if (mp_neighbor_pca_projected_z[level] != NULL) cvReleaseMat(&mp_neighbor_pca_projected_z[level]);
-//		//选出前P个特征向量(主成份),然后投影,结果保存在pResult中，pResult中包含了P个系数
-//		//CvMat* pResult = cvCreateMat( 总的样本数, PCA变换后的样本维数(即主成份的数目)?, CV_32FC1 );
-//		mp_neighbor_pca_projected_x[level] = cvCreateMat(numData, dimPCA_x, CV_32F);
-//		mp_neighbor_pca_projected_y[level] = cvCreateMat(numData, dimPCA_y, CV_32F);
-//		mp_neighbor_pca_projected_z[level] = cvCreateMat(numData, dimPCA_z, CV_32F);
-//		//cvProjectPCA( pData, pMean, pEigVecs, pResult );
-//		cvProjectPCA(p_source_x, mp_neighbor_pca_average_x[level], mp_neighbor_pca_eigenvec_x[level], mp_neighbor_pca_projected_x[level]);
-//		cvProjectPCA(p_source_y, mp_neighbor_pca_average_y[level], mp_neighbor_pca_eigenvec_y[level], mp_neighbor_pca_projected_y[level]);
-//		cvProjectPCA(p_source_z, mp_neighbor_pca_average_z[level], mp_neighbor_pca_eigenvec_z[level], mp_neighbor_pca_projected_z[level]);
-//		// kd-tree construction
-//		m_neighbor_kdTree_ptr_x[level].resize(numData);
-//		m_neighbor_kdTree_ptr_y[level].resize(numData);
-//		m_neighbor_kdTree_ptr_z[level].resize(numData);
-//		for (int i = 0; i < numData; ++i) {
-//			//ANNpoint* point array, row = 1, col = PCA dimension
-//			m_neighbor_kdTree_ptr_x[level][i] = &mp_neighbor_pca_projected_x[level]->data.fl[dimPCA_x * i];	//ANNpoint* from PCA projection
-//			//vector<uchar> array(mat.rows*mat.cols);
-//			//if (mat.isContinuous())
-//			//	array = mat.data;
-//			m_neighbor_kdTree_ptr_y[level][i] = &mp_neighbor_pca_projected_y[level]->data.fl[dimPCA_y * i];
-//			m_neighbor_kdTree_ptr_z[level][i] = &mp_neighbor_pca_projected_z[level]->data.fl[dimPCA_z * i];
-//		}
-//		if (mp_neighbor_kdTree_x[level] != NULL) delete mp_neighbor_kdTree_x[level];
-//		if (mp_neighbor_kdTree_y[level] != NULL) delete mp_neighbor_kdTree_y[level];
-//		if (mp_neighbor_kdTree_z[level] != NULL) delete mp_neighbor_kdTree_z[level];
-//		//ANNpoint* data point array = m_neighbor_kdTree_ptr_x, number of points = numData, dimension = dimPCA_x
-//		mp_neighbor_kdTree_x[level] = new ANNkd_tree(&m_neighbor_kdTree_ptr_x[level][0], numData, dimPCA_x); //ANNkd_tree
-//		mp_neighbor_kdTree_y[level] = new ANNkd_tree(&m_neighbor_kdTree_ptr_y[level][0], numData, dimPCA_y);
-//		mp_neighbor_kdTree_z[level] = new ANNkd_tree(&m_neighbor_kdTree_ptr_z[level][0], numData, dimPCA_z);
-//
-//		//============ TEST TI PCA backproject result
-//		if (GenerateDMTI && level == MULTIRES - 1 && FALSE) {
-//			CvMat* backproject_x = cvCreateMat(numData, D_NEIGHBOR[level], CV_32F);
-//			cvBackProjectPCA(mp_neighbor_pca_projected_x[level], mp_neighbor_pca_average_x[level], mp_neighbor_pca_eigenvec_x[level], backproject_x);
-//			Mat backprojectMat_x = cvarrToMat(backproject_x);
-//			Mat PCAbackprojectDM1 = Mat(TEXSIZE[level], TEXSIZE[level], CV_8UC1);
-//			PCAbackprojectDM1 = Mat(m_exemplar_x[level], true).reshape(1, PCAbackprojectDM1.rows);
-//
-//			CvMat* backproject_y = cvCreateMat(numData, D_NEIGHBOR[level], CV_32F);
-//			cvBackProjectPCA(mp_neighbor_pca_projected_y[level], mp_neighbor_pca_average_y[level], mp_neighbor_pca_eigenvec_y[level], backproject_y);
-//			Mat backprojectMat_y = cvarrToMat(backproject_y);
-//			Mat PCAbackprojectDM2 = Mat(TEXSIZE[level], TEXSIZE[level], CV_8UC1);
-//			PCAbackprojectDM2 = Mat(m_exemplar_y[level], true).reshape(1, PCAbackprojectDM2.rows);
-//
-//			CvMat* backproject_z = cvCreateMat(numData, D_NEIGHBOR[level], CV_32F);
-//			cvBackProjectPCA(mp_neighbor_pca_projected_z[level], mp_neighbor_pca_average_z[level], mp_neighbor_pca_eigenvec_z[level], backproject_z);
-//			Mat backprojectMat_z = cvarrToMat(backproject_z);
-//			Mat PCAbackprojectDM3 = Mat(TEXSIZE[level], TEXSIZE[level], CV_8UC1);
-//			PCAbackprojectDM3 = Mat(m_exemplar_z[level], true).reshape(1, PCAbackprojectDM3.rows);
-//
-//			int row = 0;
-//			int cols = 0.5*((2 * N[level] + 1)*(2 * N[level] + 1) - 1);
-//			for (int v = N[level]; v < TEXSIZE[level] - N[level]; ++v) {
-//				for (int u = N[level]; u < TEXSIZE[level] - N[level]; ++u) {
-//					PCAbackprojectDM1.at<uchar>(v, u) = backprojectMat_x.at<ANNcoord>(row, cols);
-//					PCAbackprojectDM2.at<uchar>(v, u) = backprojectMat_y.at<ANNcoord>(row, cols);
-//					PCAbackprojectDM3.at<uchar>(v, u) = backprojectMat_z.at<ANNcoord>(row, cols);
-//					++row;
-//				}
-//			}
-//
-//			imwrite("PCAbackproject_DM1.png", PCAbackprojectDM1);
-//			imwrite("PCAbackproject_DM2.png", PCAbackprojectDM2);
-//			imwrite("PCAbackproject_DM3.png", PCAbackprojectDM3);
-//			cvReleaseMat(&backproject_x);
-//			cvReleaseMat(&backproject_y);
-//			cvReleaseMat(&backproject_z);
-//			cout << endl << "PCA back projected image outputed.";
-//		}
-//
-//		// release CV matrices
-//		cvReleaseMat(&p_source_x);
-//		cvReleaseMat(&p_source_y);
-//		cvReleaseMat(&p_source_z);
-//		cvReleaseMat(&p_eigenValues_x);
-//		cvReleaseMat(&p_eigenValues_y);
-//		cvReleaseMat(&p_eigenValues_z);
-//		cvReleaseMat(&p_eigenVectors_all_x);
-//		cvReleaseMat(&p_eigenVectors_all_y);
-//		cvReleaseMat(&p_eigenVectors_all_z);
-//	}
-//
-//	cout << endl << "calcNeighbor done.";
-//}
+
+
+///////////////////////////////////////////////////
+//========K-Coherence Search=====================//
 void DoPAR::computeKCoherence()
 {
 	cout << endl << "K-coherence...";
@@ -1189,12 +911,12 @@ void DoPAR::computeKCoherence()
 	KCoherence_y.resize(MULTIRES);
 	KCoherence_z.resize(MULTIRES);
 	//==========multiple nearest index, position control=========
-	ANNidxArray ann_index_x = new ANNidx[CoherenceNUM];
-	ANNidxArray ann_index_y = new ANNidx[CoherenceNUM];
-	ANNidxArray ann_index_z = new ANNidx[CoherenceNUM];
-	ANNdistArray ann_dist_x = new ANNdist[CoherenceNUM];
-	ANNdistArray ann_dist_y = new ANNdist[CoherenceNUM];
-	ANNdistArray ann_dist_z = new ANNdist[CoherenceNUM];
+	ANNidxArray ann_index_x = new ANNidx[COHERENCENUM];
+	ANNidxArray ann_index_y = new ANNidx[COHERENCENUM];
+	ANNidxArray ann_index_z = new ANNidx[COHERENCENUM];
+	ANNdistArray ann_dist_x = new ANNdist[COHERENCENUM];
+	ANNdistArray ann_dist_y = new ANNdist[COHERENCENUM];
+	ANNdistArray ann_dist_z = new ANNdist[COHERENCENUM];
 
 	for (int level = 0; level < MULTIRES; ++level) {
 		ANNidx numData = (TEXSIZE[level] - 2 * N[level]) * (TEXSIZE[level] - 2 * N[level]);
@@ -1222,10 +944,15 @@ void DoPAR::computeKCoherence()
 				int col = 0;
 				for (int dv = -N[level]; dv <= N[level]; ++dv) {
 					for (int du = -N[level]; du <= N[level]; ++du) {
-						ANNidx index = (TEXSIZE[level] * (v + dv) + u + du);
+						ANNidx index = (TEXSIZE[level] * (v + dv) + u + du);	//[v+dv][u+du]
 						p_source_x[row][col] = m_exemplar_x[level][index];		//set p_source_x(row,col) to m_examplar_x(idx)
 						p_source_y[row][col] = m_exemplar_y[level][index];
 						p_source_z[row][col] = m_exemplar_z[level][index];
+
+						m_neighbor_x[level][D_NEIGHBOR[level] * row + col] = m_exemplar_x[level][index];
+						m_neighbor_y[level][D_NEIGHBOR[level] * row + col] = m_exemplar_y[level][index];
+						m_neighbor_z[level][D_NEIGHBOR[level] * row + col] = m_exemplar_z[level][index];
+
 						++col;
 					}
 				}
@@ -1242,10 +969,10 @@ void DoPAR::computeKCoherence()
 		for (int v = N[level]; v < TEXSIZE[level] - N[level]; ++v) {
 			for (int u = N[level]; u < TEXSIZE[level] - N[level]; ++u) {
 				int num = 0;
-				ANNidx TIindex = (TEXSIZE[level] * (v) + u);					//(v,u)
+				ANNidx TIindex = (TEXSIZE[level] * (v) + u);					
 				for (int dv = -N[level]; dv <= N[level]; ++dv) {
 					for (int du = -N[level]; du <= N[level]; ++du) {
-						ANNidx index = TIindex + (TEXSIZE[level] * dv + du);
+						ANNidx index = TIindex + (TEXSIZE[level] * dv + du);	//[v+dv][u+du]
 						queryPt_x[num] = m_exemplar_x[level][index];			//set queryPt_x(num) to m_examplar_x(idx)
 						queryPt_y[num] = m_exemplar_y[level][index];
 						queryPt_z[num] = m_exemplar_z[level][index];
@@ -1253,19 +980,19 @@ void DoPAR::computeKCoherence()
 					}
 				}
 
-				kdTree_x->annkSearch(queryPt_x, CoherenceNUM, ann_index_x, ann_dist_x, 0);
-				kdTree_y->annkSearch(queryPt_y, CoherenceNUM, ann_index_y, ann_dist_y, 0);
-				kdTree_z->annkSearch(queryPt_z, CoherenceNUM, ann_index_z, ann_dist_z, 0);
+				kdTree_x->annkSearch(queryPt_x, COHERENCENUM, ann_index_x, ann_dist_x, 0);
+				kdTree_y->annkSearch(queryPt_y, COHERENCENUM, ann_index_y, ann_dist_y, 0);
+				kdTree_z->annkSearch(queryPt_z, COHERENCENUM, ann_index_z, ann_dist_z, 0);
 
 				//Set K-Coherence
-				KCoherence_x[level][TIindex].resize(CoherenceNUM);
-				KCoherence_y[level][TIindex].resize(CoherenceNUM);
-				KCoherence_z[level][TIindex].resize(CoherenceNUM);
-				for (int k = 0; k < CoherenceNUM; ++k)
+				KCoherence_x[level][TIindex].resize(COHERENCENUM);
+				KCoherence_y[level][TIindex].resize(COHERENCENUM);
+				KCoherence_z[level][TIindex].resize(COHERENCENUM);
+				for (int k = 0; k < COHERENCENUM; ++k)
 				{
-					KCoherence_x[level][TIindex][k] = convertIndexANN(level, ann_index_x[k]);
-					KCoherence_y[level][TIindex][k] = convertIndexANN(level, ann_index_y[k]);
-					KCoherence_z[level][TIindex][k] = convertIndexANN(level, ann_index_z[k]);
+					KCoherence_x[level][TIindex][k] = convertIndexANN(level, ann_index_x[k]);		//direction=0
+					KCoherence_y[level][TIindex][k] = convertIndexANN(level, ann_index_y[k]);		//direction=1
+					KCoherence_z[level][TIindex][k] = convertIndexANN(level, ann_index_z[k]);		//direction=2
 				}
 			}
 		}
@@ -1281,6 +1008,50 @@ void DoPAR::computeKCoherence()
 
 	cout << endl << "K-coherence done.";
 }
+
+bool DoPAR::isUnchangedBlock(int level, int direction, ANNidx i, ANNidx j, ANNidx k) {
+
+}
+
+void DoPAR::getPosIndex(int direction, ANNidx& i, ANNidx& j, ANNidx& k) {
+	
+	//voxels_[i][j][k].slice[ith].origin;
+
+}
+
+ANNdist DoPAR::getFullDistance(int level, int direction, ANNidx idx, CvMat * dataMat)
+{
+	ANNdist min_dist = 0.00001f;
+	ANNdist sum = 0.0f;
+	ANNidx R = N[level];
+	ANNidx n = 0;
+	ANNidx Sx = TEXSIZE[level], Sy = TEXSIZE[level];
+	ANNidx tempIdx;
+	vector<ANNcoord>* tempTI;
+	switch (direction){
+	case(0) ://X
+		tempTI = &m_exemplar_x[level];	break;
+	case(1) ://Y
+		tempTI = &m_exemplar_y[level];	break;
+	case(2) ://Z
+		tempTI = &m_exemplar_z[level];	break;
+	}
+
+	for (ANNidx i = -R; i <= R; ++i){
+		tempIdx = idx + i*Sx;
+		for (ANNidx j = -R; j <= R; ++j){			
+			ANNdist dif = (*tempTI)[tempIdx+j] - cvmGet(dataMat, 0, n++);
+			sum += (dif * dif);
+		}
+	}
+	return (sum < min_dist) ? min_dist : sum;
+}
+
+bool DoPAR::setNearestPos(int level, int direction, ANNidx idx, ANNidx nearestIdx, ANNdist devDis) {
+
+}
+
+
 
 
 
@@ -1550,257 +1321,266 @@ void DoPAR::cleardata(int level) {
 
 //================= phase 1: search ===========================
 
-//void DoPAR::searchVolume(int level) {
-//	long time_start = clock();	cout << endl << "phase1:searching";
-//	ANNdist global_energy_new = 0.0f;
-//	const ANNdist min_dist = 0.00001f;
-//
-//	const ANNidx Sx = TEXSIZE[level];
-//	const ANNidx Sy = TEXSIZE[level];
-//	const ANNidx Sz = TEXSIZE[level];
-//	const ANNidx Sxy = Sx * Sy;
-//	const ANNidx Sxz = Sx * Sz;
-//	const ANNidx Syz = Sy * Sz;
-//	const ANNidx Size = Sxy * Sz;
-//	const ANNidx IdxHis1 = 0;
-//	const ANNidx IdxHis2 = (TEXSIZE[level] - 2 * N[level]) * (TEXSIZE[level] - 2 * N[level]);
-//	const ANNidx IdxHis3 = 2 * (TEXSIZE[level] - 2 * N[level]) * (TEXSIZE[level] - 2 * N[level]);
-//	//const float dSxy = 1.0f / Sxy, dSx = 1.0f / Sx;
-//
-//	//========For index histogram counting, shuffle the order. ========
-//	srand(time(NULL)); //jzy
-//	vector<bool> AccYN(Size, false);
-//	vector<long> RemIdxLst;	RemIdxLst.reserve(0.1*Sx*Sy*Sz);
-//	long RemIIdx = -1;
-//	/////shuffle(m_permutation_xyz.begin(), m_permutation_xyz.end(), mersennetwistergenerator);
-//
-//	//==========multiple nearest index, position control=========
-//	ANNidxArray ann_index_x = new ANNidx[ANNsearchk];
-//	ANNidxArray ann_index_y = new ANNidx[ANNsearchk];
-//	ANNidxArray ann_index_z = new ANNidx[ANNsearchk];
-//	ANNdistArray ann_dist_x = new ANNdist[ANNsearchk];
-//	ANNdistArray ann_dist_y = new ANNdist[ANNsearchk];
-//	ANNdistArray ann_dist_z = new ANNdist[ANNsearchk];
-//
-//	//===========obtain current neighborhood_x from volume, no need to new every loop====
-//	CvMat* current_neighbor_x = cvCreateMat(1, D_NEIGHBOR[level], CV_32F); //rows = 1, cols = dimesnion
-//	CvMat* current_neighbor_y = cvCreateMat(1, D_NEIGHBOR[level], CV_32F);
-//	CvMat* current_neighbor_z = cvCreateMat(1, D_NEIGHBOR[level], CV_32F);
-//	// PCA projection
-//	int dimPCA_x = mp_neighbor_pca_eigenvec_x[level]->rows;	//computed already
-//	int dimPCA_y = mp_neighbor_pca_eigenvec_y[level]->rows;
-//	int dimPCA_z = mp_neighbor_pca_eigenvec_z[level]->rows;
-//	//===========no need to new every loop=============
-//	//project current_neighbor_x to current_neighbor_x_projected, dimension = dimPCA_x
-//	CvMat* current_neighbor_x_projected = cvCreateMat(1, dimPCA_x, CV_32F);
-//	CvMat* current_neighbor_y_projected = cvCreateMat(1, dimPCA_y, CV_32F);
-//	CvMat* current_neighbor_z_projected = cvCreateMat(1, dimPCA_z, CV_32F);
-//
-//	//===========Remove m_volume_nearest_x_dist[level][i];no need to store them=======
-//	ANNdist nearest_x_dist, nearest_y_dist, nearest_z_dist;
-//
-//	ANNidx displayprocess = -1;
-//	ANNidx JCntNum = Size / 10.0 + 1;
-//	const ANNidx MULTIRES_1 = MULTIRES - 1;
-//	for (ANNidx i2 = 0; i2 < Size; ++i2) {
-//		//for each point in volume	(the sequence doesnt matter, all the points are searched and then optimize)
-//		if (level == MULTIRES_1) {
-//			if (i2 % JCntNum == 0) {
-//				displayprocess++;
-//				cout << "\r" << displayprocess * 10 << "%..";
-//			}
-//		}
-//		//========For index histogram counting, use shuffled index========
-//		ANNidx z = rand() % Sz;		//[0,Sz-1]
-//		ANNidx y = rand() % Sy;
-//		ANNidx x = rand() % Sx;
-//		ANNidx i = x + y*Sx + z*Sxy;
-//		//cout << endl << "i2=" << i2 << "  (" << x << ", " << y << ", " << z << ")";
-//
-//		if (!AccYN[i]) {
-//			AccYN[i] = true;
-//		LoopAccYN:
-//
-//			//// obtain current neighborhood_x from volume
-//			//CvMat* current_neighbor_x = cvCreateMat(1, D_NEIGHBOR[level], CV_32F); //rows = 1, cols = dimesnion
-//			//CvMat* current_neighbor_y = cvCreateMat(1, D_NEIGHBOR[level], CV_32F);
-//			//CvMat* current_neighbor_z = cvCreateMat(1, D_NEIGHBOR[level], CV_32F);
-//
-//			ANNidx index = 0;
-//			ANNidx TXy = Sx * y;
-//			ANNidx TXYz = Sxy * z;
-//			for (ANNidx dv = -N[level]; dv <= N[level]; ++dv) {	//N is neighbourhood size.
-//				ANNidx VCurIdx1 = Sxy * trimIndex(level, z + dv) + x;
-//				ANNidx VCurIdx2 = Sxy * trimIndex(level, z + dv) + TXy;
-//				ANNidx VCurIdx3 = TXYz + Sx * trimIndex(level, y + dv);
-//				for (ANNidx du = -N[level]; du <= N[level]; ++du) {
-//					ANNidx index2_x = VCurIdx1 + Sx * trimIndex(level, y + du);							// i + (dv, du, 0)
-//					ANNidx index2_y = VCurIdx2 + trimIndex(level, x + du);								// i + (dv, 0, du)
-//					ANNidx index2_z = VCurIdx3 + trimIndex(level, x + du);								// i + (0, dv, du)
-//					//ANNidx index2_x =  Sxy * trimIndex(level, z + dv) + Sx * trimIndex(level, y + du) + x;
-//					//ANNidx index2_y =  Sxy * trimIndex(level, z + dv) + Sx * y + trimIndex(level, x + du);
-//					//ANNidx index2_z =  Sxy * z + TEXSIZE[level] * trimIndex(level, y + dv) + trimIndex(level, x + du);
-//
-//					cvmSet(current_neighbor_x, 0, index, m_volume[level][index2_x]);	//set current_neighbor_x(0,col) to m_volume(idx)
-//					cvmSet(current_neighbor_y, 0, index, m_volume[level][index2_y]);
-//					cvmSet(current_neighbor_z, 0, index, m_volume[level][index2_z]);
-//					index += 1;
-//				}
-//			}
-//
-//			//// PCA projection
-//			//int dimPCA_x = mp_neighbor_pca_eigenvec_x[level]->rows;	//computed already
-//			//int dimPCA_y = mp_neighbor_pca_eigenvec_y[level]->rows;
-//			//int dimPCA_z = mp_neighbor_pca_eigenvec_z[level]->rows;
-//			////project current_neighbor_x to current_neighbor_x_projected, dimension = dimPCA_x
-//			//CvMat* current_neighbor_x_projected = cvCreateMat(1, dimPCA_x, CV_32F);
-//			//CvMat* current_neighbor_y_projected = cvCreateMat(1, dimPCA_y, CV_32F);
-//			//CvMat* current_neighbor_z_projected = cvCreateMat(1, dimPCA_z, CV_32F);
-//
-//			cvProjectPCA(current_neighbor_x, mp_neighbor_pca_average_x[level], mp_neighbor_pca_eigenvec_x[level], current_neighbor_x_projected);
-//			cvProjectPCA(current_neighbor_y, mp_neighbor_pca_average_y[level], mp_neighbor_pca_eigenvec_y[level], current_neighbor_y_projected);
-//			cvProjectPCA(current_neighbor_z, mp_neighbor_pca_average_z[level], mp_neighbor_pca_eigenvec_z[level], current_neighbor_z_projected);
-//
-//			// ANN search. error bound = 2.0; Kopf used 2.0
-//			mp_neighbor_kdTree_x[level]->annkSearch(current_neighbor_x_projected->data.fl, ANNsearchk, ann_index_x, ann_dist_x, ErrorBound);
-//			mp_neighbor_kdTree_y[level]->annkSearch(current_neighbor_y_projected->data.fl, ANNsearchk, ann_index_y, ann_dist_y, ErrorBound);
-//			mp_neighbor_kdTree_z[level]->annkSearch(current_neighbor_z_projected->data.fl, ANNsearchk, ann_index_z, ann_dist_z, ErrorBound);
-//
-//			//// CV release
-//			//cvReleaseMat(&current_neighbor_x);
-//			//cvReleaseMat(&current_neighbor_y);
-//			//cvReleaseMat(&current_neighbor_z);
-//			//cvReleaseMat(&current_neighbor_x_projected);
-//			//cvReleaseMat(&current_neighbor_y_projected);
-//			//cvReleaseMat(&current_neighbor_z_projected);
-//
-//			int selected_index_x(0), selected_index_y(0), selected_index_z(0);
-//			//==========multiple nearest index, Index Histogram matching=========
-//			if (INDEXHIS_ON && ANNsearchk>1) {
-//				selected_index_x = indexhistmatching_ann_index(level, 0, ann_index_x);
-//				selected_index_y = indexhistmatching_ann_index(level, 1, ann_index_y);
-//				selected_index_z = indexhistmatching_ann_index(level, 2, ann_index_z);
-//
-//				ANNidx newidx, oldidx;
-//				//update index histogram
-//				newidx = ann_index_x[selected_index_x] + IdxHis1;
-//				oldidx = m_volume_nearest_x_index[level][i] + IdxHis1;	//ori*Nxy
-//				updateIndexHistogram(level, oldidx, newidx);			//level, old, new
-//
-//				newidx = ann_index_y[selected_index_y] + IdxHis2;
-//				oldidx = m_volume_nearest_y_index[level][i] + IdxHis2;
-//				updateIndexHistogram(level, oldidx, newidx);
-//
-//				newidx = ann_index_z[selected_index_z] + IdxHis3;
-//				oldidx = m_volume_nearest_z_index[level][i] + IdxHis3;
-//				updateIndexHistogram(level, oldidx, newidx);
-//			}
-//
-//			//update nearest_index, nearest_dist
-//			m_volume_nearest_x_index[level][i] = ann_index_x[selected_index_x];
-//			m_volume_nearest_y_index[level][i] = ann_index_y[selected_index_y];
-//			m_volume_nearest_z_index[level][i] = ann_index_z[selected_index_z];
-//			//m_volume_nearest_x_dist[level][i] = ann_dist_x[selected_index_x] + min_dist;
-//			//m_volume_nearest_y_dist[level][i] = ann_dist_y[selected_index_y] + min_dist;
-//			//m_volume_nearest_z_dist[level][i] = ann_dist_z[selected_index_z] + min_dist;
-//			nearest_x_dist = ann_dist_x[selected_index_x] + min_dist;
-//			nearest_y_dist = ann_dist_y[selected_index_y] + min_dist;
-//			nearest_z_dist = ann_dist_z[selected_index_z] + min_dist;
-//			if (nearest_x_dist < 0) cout << endl << "nearest_x_dist=" << nearest_x_dist << " selected_index_x=" << selected_index_x;
-//			if (nearest_y_dist < 0) cout << endl << "nearest_y_dist=" << nearest_y_dist << " selected_index_y=" << selected_index_y;
-//			if (nearest_z_dist < 0) cout << endl << "nearest_z_dist=" << nearest_z_dist << " selected_index_z=" << selected_index_z;
-//
-//			//update weight for optimize step
-//			//m_volume_weight_x[level][i] = nearest_x_dist;
-//			//m_volume_weight_y[level][i] = nearest_y_dist;
-//			//m_volume_weight_z[level][i] = nearest_z_dist;
-//			m_volume_weight_x[level][i] = pow(nearest_x_dist, -0.6f);
-//			m_volume_weight_y[level][i] = pow(nearest_y_dist, -0.6f);
-//			m_volume_weight_z[level][i] = pow(nearest_z_dist, -0.6f);
-//
-//			//search all points then optimize! Not search one point optimize one point!
-//			global_energy_new += nearest_x_dist + nearest_y_dist + nearest_z_dist;
-//			if (global_energy_new < 0) cout << endl << "g_new=" << global_energy_new << " dist_x=" << nearest_x_dist << " dist_y=" << nearest_y_dist << " dist_z=" << nearest_z_dist;
-//			//global_energy_new += m_volume_nearest_x_dist[level][i] + m_volume_nearest_y_dist[level][i] + m_volume_nearest_z_dist[level][i];
-//		}//if (!AccYN[i])
-//
-//		if (FALSE && i2 == Size - 1) {
-//			if (RemIIdx == -1) {
-//				RemIIdx++;
-//				for (ANNidx ij = 0; ij < Size; ++ij) {
-//					if (!AccYN[ij])	RemIdxLst.push_back(ij);
-//				}
-//				AccYN.clear();
-//			}
-//			if (RemIIdx < RemIdxLst.size()) {
-//				i = RemIdxLst[RemIIdx++];
-//				x = i % Sx;
-//				y = (i / Sx) % Sy;
-//				z = (i / Sxy) % Sz;
-//				////z = i*dSxy;	//buggy!
-//				////y = (i - z*Sxy)*dSx;
-//				////x = i % TEXSIZE[level];
-//				goto LoopAccYN;
-//			}
-//		}
-//	}//for every voxel
-//
-//	 //Release ann_index
-//	//!!!Every use of new should be balanced by a delete, and every use of new[] should be balanced by delete[];
-//	//!!delete releases the memory of a single element allocated using new, delete[] releases the memory allocated for arrays of elements using new and a size in brackets [].
-//	delete[] ann_index_x;		delete[] ann_index_y;		delete[] ann_index_z;
-//	delete[] ann_dist_x;		delete[] ann_dist_y;		delete[] ann_dist_z;
-//	// CV release
-//	cvReleaseMat(&current_neighbor_x);
-//	cvReleaseMat(&current_neighbor_y);
-//	cvReleaseMat(&current_neighbor_z);
-//	cvReleaseMat(&current_neighbor_x_projected);
-//	cvReleaseMat(&current_neighbor_y_projected);
-//	cvReleaseMat(&current_neighbor_z_projected);
-//
-//	long time_end = clock();
-//	cout << " done. clocks = " << (time_end - time_start) / CLOCKS_PER_SEC;
-//	global_energy_new /= (3 * Size * D_NEIGHBOR[level]);
-//	perpixel_energy_new = global_energy_new;
-//	cout << ", per pixel energy: " << perpixel_energy_new;
-//}
+bool DoPAR::searchVolume(int level) {
+	long time_start = clock();	cout << endl << "search...";
+
+	const ANNdist min_dist = 0.00001f;
+	const ANNidx Sx = TEXSIZE[level];
+	const ANNidx Sy = TEXSIZE[level];
+	const ANNidx Sz = TEXSIZE[level];
+	const ANNidx Sxy = Sx * Sy;
+	const ANNidx Sxz = Sx * Sz;
+	const ANNidx Syz = Sy * Sz;
+	const ANNidx Size = Sxy * Sz;
+	const ANNidx IdxHis1 = 0;
+	const ANNidx IdxHis2 = (TEXSIZE[level] - 2 * N[level]) * (TEXSIZE[level] - 2 * N[level]);
+	const ANNidx IdxHis3 = 2 * (TEXSIZE[level] - 2 * N[level]) * (TEXSIZE[level] - 2 * N[level]);
+	const ANNidx R = N[level];
+	//const float dSxy = 1.0f / Sxy, dSx = 1.0f / Sx;
+
+	bool isUnchanged = true;
+	vector<ANNidx> compareIdx; 
+	ANNdist curDis, curError, IndexHisWeight;
+	CvMat* current_neighbor = cvCreateMat(1, D_NEIGHBOR[level], CV_32F);		//rows = 1, cols = dimesnion
+
+	//For Z
+	int direction = 2;
+	shuffle(m_permutation_xyz.begin(), m_permutation_xyz.end(), mersennetwistergenerator);
+	for (ANNidx i2 = 0; i2 < Size; ++i2) {
+		ANNidx idx = m_permutation_xyz[i2];			//[i][j][k] idx=i*Sxy+j*Sx+k
+		ANNidx k = idx % Sx;
+		ANNidx j = (idx / Sx) % Sy;
+		ANNidx i = idx / Sxy;
+		if (i % GRID != 0 || j % GRID != 0)	continue;						//sparse grid			
+		if (isUnchangedBlock(level, direction, i, j, k)) continue;			//check neighbours all unchanged or not
+
+		ANNidx index = 0;
+		for (ANNidx du = -R; du <= R; ++du) {	//N is neighbourhood size.
+			ANNidx VCurIdx1 = Sxy * trimIndex(level, i + du) + k;
+			for (ANNidx dv = -R; dv <= R; ++dv) {
+				ANNidx index2 = VCurIdx1 + Sx * trimIndex(level, j + dv);		//[i+du][j+dv][k]
+				cvmSet(current_neighbor, 0, index, m_volume[level][index2]);
+				index++;
+			}
+		}
+
+		ANNdist maxError = 10e9, maxDis = 10e9;
+		ANNidx bestIdx;
+		int compareNum;
+		compareIdx.clear(); compareIdx.reserve(D_NEIGHBOR[level] * COHERENCENUM);
+		for (int u = -R; u <= R; ++u) {
+			ANNidx posx = trimIndex(level, i + u);
+			for (int v = -R; v <= R; ++v) {
+				ANNidx posy = trimIndex(level, k + v);
+				getPosIndex(direction, posx, j, posy);
+				ANNidx eposx = posx - u;
+				ANNidx eposy = posy - v;
+				if (!(eposx >= R && eposx < Sx - R && eposy >= R && eposy < Sy - R)) continue;
+
+				ANNidx tempTIidx = eposx*Sx + eposy;
+				for (int l = 0; l < COHERENCENUM; ++l) {						//[0,COHERENCENUM]				
+					ANNidx tempidx = KCoherence_z[level][tempTIidx][l];
+					int p = 0;
+					compareNum = compareIdx.size();
+					for (; p < compareNum; ++p) {
+						if (compareIdx[p] == tempidx)	break;
+					}
+					if (p < compareNum)	continue;
+
+					IndexHisWeight = 1.0f + factor[level] * max(0.0f, IndexHis_z[level][tempidx] - 1.0f);			//IndexHis needs sparse grid
+					curDis = getFullDistance(level, direction, tempidx, current_neighbor);
+					curError = IndexHisWeight * curDis;
+
+					if (maxError > curError) {								//min error			
+						maxError = curError;
+						maxDis = curDis;									//maxDis=eudis^-2
+						bestIdx = tempidx;
+					}
+					compareIdx.push_back(tempidx);
+				}//for (int l = 0; l < COHERENCENUM; ++l){	
+			}//for (int v = -R; v <= R; ++v){
+		}//for (int u = -R; u <= R; ++u){
+
+		if (maxError < 10e9) {
+			if (!setNearestPos(level, direction, idx, bestIdx, 1.0f / maxDis))	//update NearestIndex, IndexHis, store EuDis
+				isUnchanged = false;
+		}
+		else {
+			cout << "bad point...\n";	_getch();
+			//bestCoord = xexemplar->getRandomPos();
+			//setNearestPos(direction, i, j, k, bestCoord, xexemplar, min_dist);	
+			//isUnchanged = false;
+		}
+	}//for (ANNidx i2 = 0; i2 < Size; ++i2) {
+
+	//For Y	
+	int direction = 1;
+	shuffle(m_permutation_xyz.begin(), m_permutation_xyz.end(), mersennetwistergenerator);
+	for (ANNidx i2 = 0; i2 < Size; ++i2) {
+		ANNidx idx = m_permutation_xyz[i2];			//[i][j][k] idx=i*Sxy+j*Sx+k
+		ANNidx k = idx % Sx;				
+		ANNidx j = (idx / Sx) % Sy;			
+		ANNidx i = idx / Sxy;				
+		if (i % GRID != 0 || k % GRID != 0)	continue;						//sparse grid			
+		if (isUnchangedBlock(level, direction, i, j, k)) continue;			//check neighbours all unchanged or not
+		
+		ANNidx index = 0;		
+		ANNidx TXy = Sx * j;
+		for (ANNidx du = -R; du <= R; ++du) {	//N is neighbourhood size.
+			ANNidx VCurIdx2 = Sxy * trimIndex(level, i + du) + TXy;				
+			for (ANNidx dv = -R; dv <= R; ++dv) {
+				ANNidx index2 = VCurIdx2 + trimIndex(level, k + dv);		//[i+du][j][k+dv]
+				cvmSet(current_neighbor, 0, index, m_volume[level][index2]);					
+				index++;
+			}
+		}
+		
+		ANNdist maxError = 10e9, maxDis = 10e9;
+		ANNidx bestIdx;
+		int compareNum;
+		compareIdx.clear(); compareIdx.reserve(D_NEIGHBOR[level] * COHERENCENUM);
+		for (int u = -R; u <= R; ++u) {
+			ANNidx posx = trimIndex(level, i + u);
+			for (int v = -R; v <= R; ++v) {
+				ANNidx posy = trimIndex(level, k + v);
+				getPosIndex(direction, posx, j, posy);
+				ANNidx eposx = posx - u;
+				ANNidx eposy = posy - v;
+				if (!(eposx >= R && eposx < Sx - R && eposy >= R && eposy < Sy - R)) continue;
+
+				ANNidx tempTIidx = eposx*Sx + eposy;
+				for (int l = 0; l < COHERENCENUM; ++l) {						//[0,COHERENCENUM]				
+					ANNidx tempidx = KCoherence_y[level][tempTIidx][l];
+					int p = 0;
+					compareNum = compareIdx.size();
+					for (; p < compareNum; ++p) {
+						if (compareIdx[p] == tempidx)	break;
+					}
+					if (p < compareNum)	continue;
+
+					IndexHisWeight = 1.0f + factor[level] * max(0.0f, IndexHis_y[level][tempidx] - 1.0f);			//IndexHis needs sparse grid
+					curDis = getFullDistance(level, direction, tempidx, current_neighbor);
+					curError = IndexHisWeight * curDis;
+
+					if (maxError > curError) {								//min error			
+						maxError = curError;
+						maxDis = curDis;									//maxDis=eudis^-2
+						bestIdx = tempidx;
+					}
+					compareIdx.push_back(tempidx);
+				}//for (int l = 0; l < COHERENCENUM; ++l){	
+			}//for (int v = -R; v <= R; ++v){
+		}//for (int u = -R; u <= R; ++u){
+
+		if (maxError < 10e9) {
+			if (!setNearestPos(level, direction, idx, bestIdx, 1.0f / maxDis))	//update NearestIndex, IndexHis, store EuDis
+				isUnchanged = false;
+		}
+		else {
+			cout << "bad point...\n";	_getch();
+			//bestCoord = xexemplar->getRandomPos();
+			//setNearestPos(direction, i, j, k, bestCoord, xexemplar, min_dist);	
+			//isUnchanged = false;
+		}
+	}//for (ANNidx i2 = 0; i2 < Size; ++i2) {
+
+	//For X		
+	int direction = 0;	
+	shuffle(m_permutation_xyz.begin(), m_permutation_xyz.end(), mersennetwistergenerator);
+	for (ANNidx i2 = 0; i2 < Size; ++i2) {
+		ANNidx idx = m_permutation_xyz[i2];			//[i][j][k] idx=i*Sxy+j*Sx+k
+		ANNidx k = idx % Sx;				
+		ANNidx j = (idx / Sx) % Sy;		
+		ANNidx i = idx / Sxy;				
+		if (j % GRID != 0 || k % GRID != 0)	continue;					//sparse grid			
+		if(isUnchangedBlock(level,direction, i,j,k)) continue;			//check neighbours all unchanged or not
+				
+		ANNidx index = 0;		
+		ANNidx TXYz = Sxy * i;
+		for (ANNidx du = -R; du <= R; ++du) {	//N is neighbourhood size.
+			ANNidx VCurIdx3 = TXYz + Sx * trimIndex(level, j + du);
+			for (ANNidx dv = -R; dv <= R; ++dv) {
+				ANNidx index2 = VCurIdx3 + trimIndex(level, k + dv);								//[i][j+du][k+dv]
+				cvmSet(current_neighbor, 0, index, m_volume[level][index2]);						//set current_neighbor_x(0,col) to m_volume(idx)
+				index++;
+			}
+		}
+
+		ANNdist maxError = 10e9, maxDis = 10e9;
+		ANNidx bestIdx;
+		int compareNum;
+		compareIdx.clear(); compareIdx.reserve(D_NEIGHBOR[level] * COHERENCENUM);
+		for (int u = -R; u <= R; ++u){
+			ANNidx posx = trimIndex(level, j + u);
+			for (int v = -R; v <= R; ++v){
+				ANNidx posy = trimIndex(level, k + v);
+				getPosIndex(direction, i, posx, posy);
+				ANNidx eposx = posx - u;
+				ANNidx eposy = posy - v;
+				if (!(eposx >= R && eposx < Sx - R && eposy >= R && eposy < Sy - R)) continue;
+
+				ANNidx tempTIidx = eposx*Sx + eposy;						//[x][y] idx=x*Sx+y			
+				for (int l = 0; l < COHERENCENUM; ++l){						//[0,COHERENCENUM]				
+					ANNidx tempidx = KCoherence_x[level][tempTIidx][l];
+					int p = 0;
+					compareNum = compareIdx.size();
+					for (; p < compareNum; ++p){
+						if (compareIdx[p] == tempidx)	break;
+					}
+					if (p < compareNum)	continue;
+	
+					IndexHisWeight = 1.0f + factor[level] * max(0.0f, IndexHis_x[level][tempidx] - 1.0f);			//IndexHis needs sparse grid
+					curDis = getFullDistance(level, direction, tempidx, current_neighbor);
+					curError = IndexHisWeight * curDis;
+
+					if (maxError > curError){								//min error			
+						maxError = curError;
+						maxDis = curDis;									//maxDis=eudis^-2
+						bestIdx = tempidx;
+					}
+					compareIdx.push_back(tempidx);
+				}//for (int l = 0; l < COHERENCENUM; ++l){	
+			}//for (int v = -R; v <= R; ++v){
+		}//for (int u = -R; u <= R; ++u){
+
+		if (maxError < 10e9){
+			if (!setNearestPos(level, direction, idx, bestIdx, 1.0f / maxDis))	//update NearestIndex, IndexHis, store EuDis
+				isUnchanged = false;	
+		}else{
+			cout << "bad point...\n";	_getch();			
+			//bestCoord = xexemplar->getRandomPos();
+			//setNearestPos(direction, i, j, k, bestCoord, xexemplar, min_dist);	
+			//isUnchanged = false;
+		}
+	}//for (ANNidx i2 = 0; i2 < Size; ++i2) {
+
+	long time_end = clock();
+	cout << " clocks = " << (time_end - time_start) / CLOCKS_PER_SEC;
+	return isUnchanged;
+}
 
 
 //---------- Index Histogram for search step ---------
+
 void DoPAR::initIndexHistogram() {
-	if (FIRSTRUN == false) { cout << endl << "Error: FIRSTRUN==false in initIndexHistogram()"; _getch(); exit(1); }
+	//if (FIRSTRUN == false) { cout << endl << "Error: FIRSTRUN==false in initIndexHistogram()"; _getch(); exit(1); }
+	//for (int level = 0; level < MULTIRES; level++) {
+	//	long numData = 3 * (TEXSIZE[level] - 2 * N[level]) * (TEXSIZE[level] - 2 * N[level]);
+	//	m_indexhistogram_synthesis[level].clear();
+	//	m_indexhistogram_synthesis[level].resize(numData, 0.0f);
+	//}
 
-	for (int level = 0; level < MULTIRES; level++) {
-		long numData = 3 * (TEXSIZE[level] - 2 * N[level]) * (TEXSIZE[level] - 2 * N[level]);
-
-		m_indexhistogram_synthesis[level].clear();
-		m_indexhistogram_synthesis[level].resize(numData, 0.0f);
-	}
-
-	//writeIndexHistogram(level, m_indexhistogram_synthesis[level],  3 * (TEXSIZE[level] - 2 * N[level]), TEXSIZE[level] - 2 * N[level], "IndexHis.png");
+	////writeIndexHistogram(level, m_indexhistogram_synthesis[level],  3 * (TEXSIZE[level] - 2 * N[level]), TEXSIZE[level] - 2 * N[level], "IndexHis.png");
 }
 void DoPAR::updateIndexHistogram(int level, const ANNidx oldannidx, const ANNidx newannidx) {
-	if (FIRSTRUN) {
-		m_indexhistogram_synthesis[level][newannidx] += 1.0f;
-	}
-	else {
-		m_indexhistogram_synthesis[level][oldannidx] -= 1.0f;
-		m_indexhistogram_synthesis[level][newannidx] += 1.0f;
-	}
+	//if (FIRSTRUN) {
+	//	m_indexhistogram_synthesis[level][newannidx] += 1.0f;
+	//}
+	//else {
+	//	m_indexhistogram_synthesis[level][oldannidx] -= 1.0f;
+	//	m_indexhistogram_synthesis[level][newannidx] += 1.0f;
+	//}
 }
-//int DoPAR::indexhistmatching_ann_index(int level, int orientation, ANNidxArray& idxarray) {
-//	ANNidx size = orientation*(TEXSIZE[level] - 2 * N[level]) * (TEXSIZE[level] - 2 * N[level]);
-//
-//	//simple form works better: just select minimum frequency
-//	vector<float> frequecyarray(ANNsearchk, 0.0f);
-//	for (int i = 0; i < ANNsearchk; i++) {
-//		ANNidx idx = idxarray[i] + size;
-//		frequecyarray[i] = m_indexhistogram_synthesis[level][idx];
-//	}
-//	auto i = min_element(begin(frequecyarray), end(frequecyarray));
-//
-//	return distance(begin(frequecyarray), i);
-//}
 
 
 
@@ -1821,38 +1601,17 @@ void DoPAR::updateIndexHistogram(int level, const ANNidx oldannidx, const ANNidx
 //	//const float dSxy = 1.0f / Sxy, dSx = 1.0f / Sx;
 //	const ANNidx DNEIGHBOR = D_NEIGHBOR[level];
 //
-//	
-//	const ANNdist devidedbyHisGaussianProbZero = 1.0f / gaussian_pdf(0.0f, 0.0f, HisStdDev[level]);
+//	//const ANNdist devidedbyHisGaussianProbZero = 1.0f / gaussian_pdf(0.0f, 0.0f, HisStdDev[level]);
 //
-//	//========discrete solver=================
-//	vector<ANNcoord> colorset(3 * DNEIGHBOR, -1);
-//	vector<ANNidx> positionset(3 * DNEIGHBOR, -1);
 //
-//	//shuffle order
-//	vector<bool> AccYN(Size, false);
-//	vector<long> RemIdxLst;	RemIdxLst.reserve(0.1*Sx*Sy*Sz);
-//	long RemIIdx = -1;
 //
-//	cout << endl << "phase2:optimizing...";
-//	ANNidx displayprocess = -1;
-//	ANNidx JCntNum = Size / 10.0 + 1;
-//	const ANNidx MULTIRES_1 = MULTIRES - 1;
+//	cout << endl << "optimize...";
+//	shuffle(m_permutation_xyz.begin(), m_permutation_xyz.end(), mersennetwistergenerator);
 //	for (ANNidx i2 = 0; i2 < Size; ++i2) {
-//		if (level == MULTIRES_1) {
-//			if (i2 % JCntNum == 0) {
-//				displayprocess++;
-//				cout << "\r" << displayprocess * 10 << "%..";
-//			}
-//		}
-//
-//		ANNidx z = rand() % Sz;
-//		ANNidx y = rand() % Sy;
-//		ANNidx x = rand() % Sx;
-//		ANNidx i = x + y*Sx + z*Sxy;
-//
-//		if (!AccYN[i]) {
-//			AccYN[i] = true;
-//		SearchLoop:
+//			long i = m_permutation_xyz[i2];			//x,y,z is random order
+//			int x = i % Sx;
+//			int y = (i / Sx) % Sy;
+//			int z = i / Sxy;
 //
 //			ANNdist weight_acc = 0.0f;
 //			ANNcoord color_acc = 0.0f;
@@ -1866,7 +1625,6 @@ void DoPAR::updateIndexHistogram(int level, const ANNidx oldannidx, const ANNidx
 //			ANNidx index2_x, index2_y, index2_z;
 //			ANNidx  nearest_index;
 //			ANNdist weight;//ANNdist nearest_dist;
-//			//ANNcoord* p_neighbor;
 //			ANNcoord color;// color of overlapping neighborhood pixel
 //			ANNidx bin;
 //			ANNdist Hisgaussianprob;
@@ -1885,25 +1643,19 @@ void DoPAR::updateIndexHistogram(int level, const ANNidx oldannidx, const ANNidx
 //						switch (ori) {
 //						case (0) : {
 //							nearest_index = m_volume_nearest_x_index[level][index2_x];
-//							//nearest_dist = m_volume_nearest_x_dist[level][index2_x];
 //							weight = m_volume_weight_x[level][index2_x];
-//							//p_neighbor = &m_neighbor_x[level][D_NEIGHBOR[level] * nearest_index];
 //							color = m_neighbor_x[level][DNEIGHBOR * nearest_index + DNEIGHBOR - 1 - m];
 //							break;
 //						}
 //						case (1) : {
 //							nearest_index = m_volume_nearest_y_index[level][index2_y];
-//							//nearest_dist = m_volume_nearest_y_dist[level][index2_y];
 //							weight = m_volume_weight_y[level][index2_y];
-//							//p_neighbor = &m_neighbor_y[level][D_NEIGHBOR[level] * nearest_index];
 //							color = m_neighbor_y[level][DNEIGHBOR * nearest_index + DNEIGHBOR - 1 - m];
 //							break;
 //						}
 //						default: {
 //							nearest_index = m_volume_nearest_z_index[level][index2_z];
-//							//nearest_dist = m_volume_nearest_z_dist[level][index2_z];
 //							weight = m_volume_weight_z[level][index2_z];
-//							//p_neighbor = &m_neighbor_z[level][D_NEIGHBOR[level] * nearest_index];
 //							color = m_neighbor_z[level][DNEIGHBOR * nearest_index + DNEIGHBOR - 1 - m];
 //							break;
 //						}
@@ -1911,40 +1663,17 @@ void DoPAR::updateIndexHistogram(int level, const ANNidx oldannidx, const ANNidx
 //						//ANNcoord color = p_neighbor[D_NEIGHBOR[level] - 1 - m];	//index2 ~ m, index ~ D_NEIGHBOR[level] - 1 - m; the position is symmetrical!
 //
 //						//discrete solver
-//						if (DISCRETE_ON) {
-//							/*if (COLORHIS_ON)*/	colorset[ori*DNEIGHBOR + m] = color;
-//							if (POSITIONHIS_ON)		positionset[ori*DNEIGHBOR + m] = ori*(TEXSIZE[level] * TEXSIZE[level])
-//								+ convertIndexANN(level, nearest_index) + absoluteneigh[level][DNEIGHBOR - 1 - m];
-//						}
+//
+//
+//
 //
 //						//mean-shift to reduce bluring
 //
 //
 //
 //						// modify weight according to Color histogram matching
-//						if (COLORHIS_ON) {
-//							bin = color * perHisBin;
-//							//only decrease weight, increase weight could cause overshooting
-//							histogram_matching = max(0.0f, m_histogram_synthesis[level][bin] - m_histogram_exemplar[level][bin]);
-//							//changed to gaussian distribution, std = accepted error				
-//							Hisgaussianprob = gaussian_pdf(histogram_matching, 0.0f, HisStdDev[level]);
-//							weight *= Hisgaussianprob * devidedbyHisGaussianProbZero;		//(0,1]
-//							//test linear weight, difference not obvious
-//							//weight /= 1 + alpha_[level] * histogram_matching;	
-//						}
-//						// modify weight according to Position Histogram matching
-//						else if (POSITIONHIS_ON) {
-//							histogram_matching = max(0.0f, 
-//								m_positionhistogram_synthesis[level][positionset[ori*DNEIGHBOR + m]] - m_positionhistogram_exemplar[level][positionset[ori*DNEIGHBOR + m]]);		// [0, 1]
-//							////test linear weight, difference not obvious
-//							//weight /= 1 + alpha_[level] * histogram_matching;	
-//							Hisgaussianprob = gaussian_pdf(histogram_matching, 0.0, HisStdDev[level]);
-//							weight *= Hisgaussianprob * devidedbyHisGaussianProbZero;
-//						}
 //
-//						//min max weight
-//						//if (weight < 0.02f) weight = 0.02f;
-//						//else if (weight > 10.0f) weight = 10.0f;
+//
 //
 //						// accumulate color
 //						color_acc += weight * color;
@@ -1958,51 +1687,18 @@ void DoPAR::updateIndexHistogram(int level, const ANNidx oldannidx, const ANNidx
 //			ANNcoord color_old = m_volume[level][i];
 //			//least square solver
 //			ANNcoord color_new = 1.0f * color_acc / weight_acc;
-//		
-//			if (COLORHIS_ON ) { 
-//				//discrete solver
-//				if (DISCRETE_ON) { 	
-//					color_new = FindClosestColor(level, colorset, color_new);	//update with the existed most similar color	
-//				}
-//				//color histogram update
-//				updateHistogram_synthesis(level, color_old, color_new); 
-//			}	
-//			else if (POSITIONHIS_ON && DISCRETE_ON) {
-//				//discrete solver
-//				ANNidx closestindex = FindClosestIndex(level, colorset, positionset, color_new);
+//			
+//			//discrete solver
 //
-//				updatePositionHistogram_synthesis(level, m_volume_position[level][i], positionset[closestindex]);
-//				color_new = colorset[closestindex];
-//				m_volume_position[level][i] = positionset[closestindex];			
-//			}
+//			
 //
 //			// voxel update
 //			m_volume[level][i] = color_new;
-//		}//if (!AccYN[i])
 //
-//		if (FALSE && i2 == Size - 1) {
-//			if (RemIIdx == -1) {
-//				RemIIdx++;
-//				for (ANNidx ij = 0; ij < Size; ++ij) {
-//					if (!AccYN[ij])	RemIdxLst.push_back(ij);
-//				}
-//				AccYN.clear();
-//			}
-//			if (RemIIdx < RemIdxLst.size()) {
-//				i = RemIdxLst[RemIIdx++];
-//				x = i % Sx;
-//				y = (i / Sx) % Sy;
-//				z = (i / Sxy) % Sz;
-//				goto SearchLoop;
-//			}
-//		}
 //	}//for every voxel
 //
-//	//========= Dynamic Thresholding based on TI histogram =========
-//	if (DISCRETETHRESHOLD_ON) { DynamicThresholding(level); }
-//
 //	long time_end = clock();
-//	cout << "done. clocks = " << (time_end - time_start) / CLOCKS_PER_SEC;
+//	cout << " clocks = " << (time_end - time_start) / CLOCKS_PER_SEC;
 //}
 
 
@@ -2189,7 +1885,6 @@ ANNcoord DoPAR::FindClosestColor(int level, vector<ANNcoord> &color, ANNcoord re
 		return abs(x - referencecolor) < abs(y - referencecolor);
 	});
 }
-
 ANNidx DoPAR::FindClosestIndex(int level, vector<ANNcoord> &color, vector<ANNidx> &position, ANNcoord referencecolor) {
 	ANNidx minidx = 0;
 	float minhis = m_positionhistogram_synthesis[level][position[0]], temphis;
@@ -2285,45 +1980,6 @@ void DoPAR::DynamicThresholding(int level) {
 	//update color histogram after changing value
 	initHistogram_synthesis(level);
 }
-////Non-linear solver
-//void DoPAR::PolynomialInterpolation(vector<double>& Xv, vector<double>& Yv, vector<double>& X){
-//	//(1) Xv, Yv are a set of points
-//	//   Note that no two x-values are the same, otherwise this programm could collapse
-//	//(2) A set of x values as input, will get y values as output
-//
-//	if (Xv.size() != Yv.size() || Xv.size() == 0 || X.size() == 0) { cout << endl << "PolynomialInterpolation:size error"; return; }
-//
-//	vector<double> XX, YRes;
-//
-//	XX.resize(Xv.size());
-//
-//	for (long ij = 0; ij < Xv.size(); ++ij) {
-//		XX[ij] = 1.0;
-//		for (long kl = 0; kl < Xv.size(); ++kl) {
-//			if (kl == ij) continue;
-//			if (Xv[ij] == Xv[kl]) { cout << endl << "!!!Error: Xv[ij]=Xv[kl]!!!"; _getch(); return; }
-//			XX[ij] *= (Xv[ij] - Xv[kl]);
-//		}
-//	}
-//
-//	YRes.resize(X.size());
-//
-//	for (long idx = 0; idx < X.size(); ++idx) {
-//		YRes[idx] = 0.0;
-//		for (long ij = 0; ij < Xv.size(); ++ij) {
-//			double Val = 1.0;
-//			for (long kl = 0; kl < Xv.size(); ++kl) {
-//				if (kl == ij) continue;
-//				Val *= (X[idx] - Xv[kl]);
-//			}
-//			YRes[idx] += Val*Yv[ij] / XX[ij];
-//		}
-//	}
-//
-//	YRes.swap(X);
-//}
-//
-//----------- Proportion Threshold, better ---------
 void DoPAR::ProportionThreshold(vector<short>& Model, vector<short> BinNum, vector<float> Prob) {
 	//(1) Model to be thresholded according to a distribution <BinNum, Prob>
 	//(2) BinNum and Prob corresponds to histogram (), BinNum must be ordered. The last BinNum is biggest.
