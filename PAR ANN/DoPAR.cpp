@@ -1405,7 +1405,7 @@ bool DoPAR::searchVolume(int level) {
 		}//for (int u = -R; u <= R; ++u){
 
 		if (maxError < 10e9) {
-			if (!setNearestPos(level, direction, idx, bestIdx, 1.0f / maxDis))	//update NearestIndex, IndexHis, store EuDis
+			if (!setNearestPos(level, direction, idx, bestIdx, 1.0f / maxDis))						//update NearestIndex, IndexHis, store EuDis
 				isUnchanged = false;
 		}
 		else {
@@ -1605,8 +1605,8 @@ void DoPAR::optimizeVolume(int level) {
 	ANNidx s1 = -static_cast<ANNidx>(blockSize_ / 2);
 	ANNidx e1 = static_cast<ANNidx>((blockSize_ -1)/ 2);
 	if (level != 0) {	//reduce average blurring
-		s1 += 1;
-		e1 -= 1;
+		if (s1<-1) s1 += 1;
+		if (e1>1) e1 -= 1;
 	}
 	
 	int direction;
@@ -1616,14 +1616,19 @@ void DoPAR::optimizeVolume(int level) {
 		ANNidx k = idx % Sx;
 		ANNidx j = (idx / Sx) % Sy;
 		ANNidx i = idx / Sxy;
-		ANNdist weight_acc = 0.0f;
+
+		ANNdist weight_acc = 0.0f, weight;
 		ANNcoord color_acc = 0.0f;
-		ANNcoord color_avg = 0.0f;
+		ANNcoord color_avg = 0.0f;		
 
 		// For Z	
 		direction = 2;
-		ANNidx tempx0 = (i / GRID) * GRID;
-		ANNidx tempy0 = (j / GRID) * GRID;
+		ANNidx tempnearestidx, tempidx;
+		ANNdist tempnearestdis;
+		ANNcoord tempcolor;
+		ANNidx tempx0, tempy0;
+		tempx0 = (i / GRID) * GRID;
+		tempy0 = (j / GRID) * GRID;
 		for (ANNidx l = start; l >= -end; --l) {
 			ANNidx tempx = tempx0 + l * GRID;
 			ANNidx deltax = i - tempx;
@@ -1633,18 +1638,70 @@ void DoPAR::optimizeVolume(int level) {
 				if (deltax < s1 || deltax > e1 || deltay < s1 || deltay > e1)
 					continue;
 
-				ANNidx tempidx = trimIndex(level, tempx)*Sx + trimIndex(level, tempy) + k;
-				ANNidx tempnearestidx;
-				ANNdist tempnearestdis;
+				tempidx = trimIndex(level, tempx)*Sxy + trimIndex(level, tempy)*Sx + k;		//[tempx][tempy][k]
 				getNearestPos(direction, tempidx, tempnearestidx, tempnearestdis);
-
 				tempnearestidx += deltax * Sx + deltay;
-				ANNcoord tempcolor = m_exemplar_z[level][tempnearestidx];
-
+				tempcolor = m_exemplar_z[level][tempnearestidx];
 				addCandidate(tempcolor, direction, tempnearestidx);
 
-				ANNdist weight = tempnearestdis / his->getValue(coord);
+				weight = tempnearestdis / his->getValue(coord);
+				color_acc += weight * tempcolor;
+				weight_acc += weight;
+			}
+		}
+		// For Y	
+		direction = 1;
+		ANNidx tempnearestidx, tempidx;
+		ANNdist tempnearestdis;
+		ANNcoord tempcolor;
+		ANNidx tempx0, tempy0;
+		tempx0 = (i / GRID) * GRID;
+		tempy0 = (k / GRID) * GRID;
+		for (ANNidx l = start; l >= -end; --l) {
+			ANNidx tempx = tempx0 + l * GRID;
+			ANNidx deltax = i - tempx;
+			for (ANNidx h = start; h >= -end; --h) {
+				ANNidx tempy = tempy0 + h * GRID;
+				ANNidx deltay = k - tempy;
+				if (deltax < s1 || deltax > e1 || deltay < s1 || deltay > e1)
+					continue;
 
+				tempidx = trimIndex(level, tempx)*Sxy + j*Sx + trimIndex(level, tempy);		//[tempx][j][tempy]
+				getNearestPos(direction, tempidx, tempnearestidx, tempnearestdis);
+				tempnearestidx += deltax * Sx + deltay;
+				tempcolor = m_exemplar_y[level][tempnearestidx];
+				addCandidate(tempcolor, direction, tempnearestidx);
+
+				//coord.swapXY();
+				weight = tempnearestdis / his->getValue(coord);
+				color_acc += weight * tempcolor;
+				weight_acc += weight;
+			}
+		}
+		// For X	
+		direction = 0;
+		ANNidx tempnearestidx, tempidx;
+		ANNdist tempnearestdis;
+		ANNcoord tempcolor;
+		ANNidx tempx0, tempy0;
+		tempx0 = (j / GRID) * GRID;
+		tempy0 = (k / GRID) * GRID;
+		for (ANNidx l = start; l >= -end; --l) {
+			ANNidx tempx = tempx0 + l * GRID;
+			ANNidx deltax = j - tempx;
+			for (ANNidx h = start; h >= -end; --h) {
+				ANNidx tempy = tempy0 + h * GRID;
+				ANNidx deltay = k - tempy;
+				if (deltax < s1 || deltax > e1 || deltay < s1 || deltay > e1)
+					continue;
+
+				tempidx = i*Sxy + trimIndex(level, tempx)*Sx + trimIndex(level, tempy);		//[i][tempx][tempy]
+				getNearestPos(direction, tempidx, tempnearestidx, tempnearestdis);
+				tempnearestidx += deltax * Sx + deltay;
+				tempcolor = m_exemplar_x[level][tempnearestidx];
+				addCandidate(tempcolor, direction, tempnearestidx);
+
+				weight = tempnearestdis / his->getValue(coord);
 				color_acc += weight * tempcolor;
 				weight_acc += weight;
 			}
@@ -1653,67 +1710,50 @@ void DoPAR::optimizeVolume(int level) {
 
 		color_avg = color_acc / weight_acc;
 
-		double xMinColor = INFINITY;
-		double yMinColor = INFINITY;
-		double zMinColor = INFINITY;
-
-		double dis;
-		for (size_t ai = 0; ai < vnum; ++ai)
-		{
-			switch (cand_.getPlane(ai))
-			{
+		ANNdist xMinDis = 10e9;		ANNdist yMinDis = 10e9;		ANNdist zMinDis = 10e9;
+		ANNidx closestIdx_x, closestIdx_y, closestIdx_z;
+		ANNdist tempdis;
+		for (size_t ai = 0; ai < vnum; ++ai){
+			switch (cand_.getPlane(ai)){
 			case Plane_X:
-				dis = avgColor.distance(cand_.getColor(ai));	//multi-channel use sqare distance!
-				if (xMinColor > dis)
-				{
-					xMinColor = dis;
-					xCoord = cand_.getCoordinate(ai);
+				dis = color_avg.distance(cand_.getColor(ai));	
+				//multi-channel use sqare distance!
+				if (xMinDis > dis){
+					xMinDis = dis;
+					closestIdx_x = cand_.getCoordinate(ai);
 				}
 				break;
 			case Plane_Y:
-				dis = avgColor.distance(cand_.getColor(ai));
-				if (yMinColor > dis)
-				{
-					yMinColor = dis;
-					yCoord = cand_.getCoordinate(ai);
+				dis = color_avg.distance(cand_.getColor(ai));
+				if (yMinDis > dis){
+					yMinDis = dis;
+					closestIdx_y = cand_.getCoordinate(ai);
 				}
 				break;
 			case Plane_Z:
-				dis = avgColor.distance(cand_.getColor(ai));
-				if (zMinColor > dis)
-				{
-					zMinColor = dis;
-					zCoord = cand_.getCoordinate(ai);
+				dis = color_avg.distance(cand_.getColor(ai));
+				if (zMinDis > dis){
+					zMinDis = dis;
+					closestIdx_z = cand_.getCoordinate(ai);
 				}
 				break;
-			default:
-				break;
 			}
 		}
-		solid->setPosIndex(i, j, k, 0, xCoord);					//update isUnchangeblock
-		if (!isWoodType_)
-			solid->setPosIndex(i, j, k, 1, yCoord);
-		solid->setPosIndex(i, j, k, 2, zCoord);
+		setOrigin(level, 0, idx, closestIdx_x);										//update isUnchangeblock, origin
+		setOrigin(level, 1, idx, closestIdx_y);
+		setOrigin(level, 2, idx, closestIdx_z);
 
-		if (xMinColor < yMinColor && xMinColor < zMinColor)
-		{
-			tc = xexemplar.getColor(xCoord);
-			if (isWoodType_)
-			{
-				xCoord.swapXY();
-			}
-			solid->setColor(i, j, k, tc, xCoord, his);			//PosHis update
+		if (xMinDis < yMinDis && xMinDis < zMinDis){
+			tempcolor = m_exemplar_x[level][closestIdx_x];
+			updatePosHis(level, 0, idx, tempcolor, closestIdx_x);					//PosHis update, update pos,color
 		}
-		else if (yMinColor < xMinColor && yMinColor < zMinColor && !isWoodType_)
-		{
-			tc = yexemplar.getColor(yCoord);
-			yCoord.swapXY();
-			solid->setColor(i, j, k, tc, yCoord, his);
+		else if (yMinDis < xMinDis && yMinDis < zMinDis){
+			tempcolor = m_exemplar_y[level][closestIdx_y];
+			updatePosHis(level, 1, idx, tempcolor, closestIdx_y);
 		}
-		else
-		{
-			tc = zexemplar.getColor(zCoord);
-			solid->setColor(i, j, k, tc, zCoord, his);
+		else{
+			tempcolor = m_exemplar_z[level][closestIdx_z];
+			updatePosHis(level, 2, idx, tempcolor, closestIdx_z);
 		}
 
 	}//for (ANNidx i2 = 0; i2 < Size; ++i2) {
