@@ -69,34 +69,25 @@ private:
 	static ANNidx TEXSIZE[MULTIRES];					// size of input exemplar
 	const ANNidx GRID = 2;								// sparse grid
 	const int COHERENCENUM = 9;							// K-coherence
-	static const ANNdist factor[MULTIRES];				// linear weighting factor
-	static ANNdist deltaIndexHis[MULTIRES];				// update IndexHis value per operation
-	static ANNdist deltaPosHis[MULTIRES];				// update PosHis value per operation
 	static const short MAXITERATION[MULTIRES];			// max iteration time
+	const bool useRandomSeed = false;					// Use random seed or fixed (0) for test
+	const bool GAUSSRESIZE = true;						// use gauss filter to resize
 
-	static const bool INDEXHIS_ON = true;				// Index Histogram in search step	
-	static const bool POSITIONHIS_ON = true;			// Position Histogram	in optimize step
+	ANNdist factorIndex[MULTIRES];						// linear weighting factor
+	ANNdist factorPos[MULTIRES];
+	ANNdist deltaIndexHis[MULTIRES];					// update IndexHis value per operation
+	ANNdist deltaPosHis[MULTIRES];						// update PosHis value per operation
+	ANNdist avgIndexHis[MULTIRES];						// default average value of IndexHis
+	ANNdist avgPosHis[MULTIRES];						// default average value of PosHis
 
+
+	//static const bool INDEXHIS_ON = true;				// Index Histogram in search step	
+	//static const bool POSITIONHIS_ON = true;			// Position Histogram	in optimize step
 	//static const bool BIMODAL_ON = false;				// Using bimodal TI
 	//static const bool DISTANCEMAP_ON = false;			// convert to distance map model
 	//static const bool DISCRETETHRESHOLD_ON = false;	// dynamic thresholding in optimize step. 	will slightly affect quality. dont use in double peak distribution
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
-	string modelFilename3D;								
-	vector<uchar> load3Dmodel(const char* filename);
-	bool loadVolume();
-	vector<vector<ANNcoord>> m_volume;		// synthesized volume				//[level][idx3d] = color	//can be short, others can also use unsignedint_16
-	void InitRandomVolume(int level);
-	void upsampleVolume(int level);
-	void outputmodel(int level);
-	void writeHistogram(bool scaling, int level, vector<float> &histogram, int rows, int cols, const string filename);
-
-	//release data
-	void cleardata(int level);
-
-	void DoANNOptimization();
-	void init();
 
 	inline ANNidx trimIndex(int level, ANNidx index, bool isToroidal = true) {
 		//if (isToroidal) {
@@ -125,14 +116,14 @@ private:
 		return ((i + bias)*TEXSIZE[level] + (j + bias));
 	}
 	inline ANNidx sparseIdx(int level, ANNidx index) {
-		//convert idx to sparsed grid
-		ANNidx i, j, height;
+		//convert idx to sparsed grid --> width/2!
+		ANNidx i, j, height, sheight;
 		height = TEXSIZE[level];
+		sheight = height / 2;
 		i = (index / height) / GRID;
 		j = (index % height) / GRID;
-		return (i*height + j);
+		return (i*sheight + j);
 	}
-	
 	static const float inv_sqrt_2pi;
 	inline float gaussian_pdf(float x, float mean, float stddev)
 	{		
@@ -141,22 +132,44 @@ private:
 	}
 
 
-	// exemplar
-	vector<vector<ANNcoord> >  m_exemplar_x;
-	vector<vector<ANNcoord> >  m_exemplar_y;
-	vector<vector<ANNcoord> >  m_exemplar_z;									
-	bool loadExemplar();
+	void DoANNOptimization();
+	
+	void init();
 
+	void allocateVectors(int level);
+
+	// exemplar
+	vector<vector<ANNcoord> >  m_exemplar_x;									//[level][idx2d] = color
+	vector<vector<ANNcoord> >  m_exemplar_y;
+	vector<vector<ANNcoord> >  m_exemplar_z;
+	bool loadExemplar();
+	void gaussImage(int level, vector<vector<ANNcoord>>& exemplar);
+
+	// 3D Model
+	string modelFilename3D;
+	vector<uchar> load3Dmodel(const char* filename);
+	bool loadVolume();
+	vector<vector<ANNcoord>> m_volume;		// synthesized volume				//[level][idx3d] = color	//can be short, others can also use unsignedint_16
+	void outputmodel(int level);
+
+	void InitRandomVolume(int level);
+	
 	// random permutation (precomputed)
-	vector<ANNidx>	 m_permutation_xyz;											//[level][idx3d] = idx3d
+	vector<ANNidx>	 m_permutation;												//[idx3d] = idx3d
 	void initPermutation(int level);
 
-	// =========== K-coherence search ======================
+	// upsample
+	void upsampleVolume(int level);
+
+	//release data
+	void cleardata(int level);
+
+	// =========== K-coherence search =============
 	vector<vector<vector<ANNidx>>> KCoherence_x, KCoherence_y, KCoherence_z;	//[level][idx2d][k] = TIindex2d
 	void computeKCoherence();
 
 
-	//=========== phase 1: search ===========================
+	//=========== phase 1: search ================================
 	bool searchVolume(int level);
 
 	ANNdist getFullDistance(int level, vector<ANNcoord>& exemplar, ANNidx idx2d, CvMat* dataMat);
@@ -165,36 +178,30 @@ private:
 	bool isUnchangedBlock(int level, int direction, ANNidx i, ANNidx j, ANNidx k);
 
 
-	//========== phase 2: optimization ======================
+	//========== phase 2: optimization ===========================
 	void optimizeVolume(int level);
 
 
 	//============== index histogram ============
-	vector<vector<ANNdist>> IndexHis_x, IndexHis_y, IndexHis_z;					//[level][idx2d]=IndexHis		//3TI different IndexHis, sparse grid
+	vector<vector<ANNdist>> IndexHis_x, IndexHis_y, IndexHis_z;					//[level][idx2d/4]=IndexHis		// sparse grid! //3TI different IndexHis
 	vector<vector<ANNidx>> nearestIdx_x, nearestIdx_y, nearestIdx_z;			//[level][idx3d]=nearestIdx2d
 	vector<vector<ANNdist>> nearestWeight_x, nearestWeight_y, nearestWeight_z;	//[level][idx3d]=nearestWeight	eudis^-0.6
-
-	void initIndexHis();
 
 	bool setNearestIndex(int level, vector<ANNidx>& nearestIdx, vector<ANNdist>& nearestWeight, vector<ANNdist>&IndexHis,
 		ANNidx idx3d, ANNidx newNearestIdx, ANNdist dis);
 
-	//void getNearestIndex(vector<ANNidx>& nearestIdx, vector<ANNdist>& nearestWeight,
-	//	ANNidx idx3d, ANNidx& nearestTIIdx, ANNdist& weight);
-
 
 	//=========== position histogram =============
-	vector<vector<ANNdist>> PosHis;												//[level][idx2d]=IndexHis		//3TI share same PosHis, no sparse grid
-	vector<vector<ANNidx>> SelectedPos;											//[level][idx3d]=idx2d
+	vector<vector<ANNdist>> PosHis;												//[level][idx2d*3]=IndexHis		// no sparse grid
+	vector<vector<ANNidx>> SelectedPos;											//[level][idx3d]=idx2d (TIsize*3)
 	vector<vector<ANNidx>> Origin_x, Origin_y, Origin_z;						//[level][idx3d]=OriginTIidx2d
 
-	void initPosHis();
+	void updatePosHis(int level, vector<ANNdist>& PosHis, vector<ANNidx>& selectedPos, ANNidx idx3d, ANNidx newPos);
 
 	//void getOrigin(vector<ANNidx>& origin, ANNidx idx3d, ANNidx& originx, ANNidx& originy);
 	//void setOrigin(vector<ANNidx>& origin, vector<bool>& isUnchanged, ANNidx idx3d, ANNidx tiIdx);
 
-	void updatePosHis(int level, vector<ANNdist>& PosHis, vector<ANNidx>& selectedPos, ANNidx idx3d, ANNidx newPos);
-
+	void writeHistogram(bool scaling, int level, vector<float> &histogram, int rows, int cols, const string filename);
 
 };
 
