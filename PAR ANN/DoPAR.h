@@ -111,9 +111,9 @@ private:
 		ANNidx i, j, height, bias;
 		height = TEXSIZE[level] - blockSize[level] + 1;
 		bias = static_cast<ANNidx>(blockSize[level] / 2);
-		i = index / height;
-		j = index % height;
-		return ((i + bias)*TEXSIZE[level] + (j + bias));
+		i = index / height + bias;
+		j = index % height + bias;
+		return (i*TEXSIZE[level] + j);
 	}
 	inline ANNidx sparseIdx(int level, ANNidx index) {
 		//convert idx to sparsed grid --> width/2!
@@ -177,6 +177,7 @@ private:
 	vector<vector<bool>> isUnchanged_x, isUnchanged_y, isUnchanged_z;			//[level][idx3d]=isUnchanged	bool
 	bool isUnchangedBlock(int level, int direction, ANNidx i, ANNidx j, ANNidx k);
 
+	ANNidx DoPAR::getRandomNearestIndex(int level, vector<ANNdist>& IndexHis);	//for bad points
 
 	//========== phase 2: optimization ===========================
 	void optimizeVolume(int level);
@@ -201,7 +202,7 @@ private:
 	//void getOrigin(vector<ANNidx>& origin, ANNidx idx3d, ANNidx& originx, ANNidx& originy);
 	//void setOrigin(vector<ANNidx>& origin, vector<bool>& isUnchanged, ANNidx idx3d, ANNidx tiIdx);
 
-	void writeHistogram(bool scaling, int level, vector<float> &histogram, int rows, int cols, const string filename);
+	void writeHistogram(int level, vector<ANNdist>& PosHis);
 
 };
 
