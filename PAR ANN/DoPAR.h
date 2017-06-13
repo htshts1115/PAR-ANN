@@ -64,14 +64,14 @@ private:
 	///========================== optimization based =====================
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////
-	static const int MULTIRES = 4;						// # of multi-resolution (0 -> MULTIRES - 1 :: coarsest -> finest)
+	static const int MULTIRES = 3;						// # of multi-resolution (0 -> MULTIRES - 1 :: coarsest -> finest)
 	static const int blockSize[MULTIRES];				// template size
 	static ANNidx TEXSIZE[MULTIRES];					// size of input exemplar
 	const ANNidx GRID = 2;								// sparse grid
 	const int COHERENCENUM = 11;						// K-coherence
 	static const short MAXITERATION[MULTIRES];			// max iteration time
-	const bool useRandomSeed = false;					// Use random seed or fixed (0) for test
 	const bool GAUSSRESIZE = true;						// use gauss filter to resize
+	const bool useRandomSeed = false;					// Use random seed or fixed (0) for test
 	
 	const ANNdist min_dist = 0.00001f;
 	ANNdist factorIndex[MULTIRES];						// linear weighting factor
@@ -203,7 +203,7 @@ private:
 	//void getOrigin(vector<ANNidx>& origin, ANNidx idx3d, ANNidx& originx, ANNidx& originy);
 	//void setOrigin(vector<ANNidx>& origin, vector<bool>& isUnchanged, ANNidx idx3d, ANNidx tiIdx);
 
-	void writeHistogram(int level, vector<ANNdist>& PosHis);
+	void writeHistogram(int level);
 
 };
 
