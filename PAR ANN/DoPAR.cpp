@@ -502,9 +502,9 @@ const float DoPAR::inv_sqrt_2pi = 0.398942280401433f;
 
 ////////////////////////////////////////////////////////////////////////////////////////
 //MULTIRES: larger number means finner level
-const int DoPAR::blockSize[MULTIRES] = {8, 8, 6};
+const int DoPAR::blockSize[MULTIRES] = {8, 8, 6, 4};
 ANNidx DoPAR::TEXSIZE[MULTIRES];
-const short DoPAR::MAXITERATION[MULTIRES] = {40, 20, 10};
+const short DoPAR::MAXITERATION[MULTIRES] = {40, 20, 10, 5};
 
 ////////////////////////////////////////////////////////////////////////////////////////
 
@@ -550,6 +550,7 @@ void DoPAR::DoANNOptimization() {
 
 	time_t NewTime;		time(&NewTime);
 	cout << endl << "Total reconstruction time: " << unsigned long(NewTime - StartTime);
+	cleardata(MULTIRES - 1);
 }
 
 void DoPAR::allocateVectors(int level) {
@@ -565,10 +566,10 @@ void DoPAR::allocateVectors(int level) {
 		PosHis.resize(MULTIRES);
 		SelectedPos.resize(MULTIRES);
 	}
-	isUnchanged_x[level].resize(S3d_, false);	isUnchanged_y[level].resize(S3d_, false);	isUnchanged_z[level].resize(S3d_, false);
-	nearestIdx_x[level].resize(S3d_, 205000);	nearestIdx_y[level].resize(S3d_, 205000);	nearestIdx_z[level].resize(S3d_, 205000);
-	nearestWeight_x[level].resize(S3d_, 0.001f);nearestWeight_y[level].resize(S3d_, 0.001f);nearestWeight_z[level].resize(S3d_, 0.001f);
-	Origin_x[level].resize(S3d_, 205000);		Origin_y[level].resize(S3d_, 205000);		Origin_z[level].resize(S3d_, 205000);	
+	isUnchanged_x[level].resize(S3d_, false);		isUnchanged_y[level].resize(S3d_, false);		isUnchanged_z[level].resize(S3d_, false);
+	nearestIdx_x[level].resize(S3d_, 205000);		nearestIdx_y[level].resize(S3d_, 205000);		nearestIdx_z[level].resize(S3d_, 205000);
+	nearestWeight_x[level].resize(S3d_, min_dist);	nearestWeight_y[level].resize(S3d_, min_dist);	nearestWeight_z[level].resize(S3d_, min_dist);
+	Origin_x[level].resize(S3d_, 205000);			Origin_y[level].resize(S3d_, 205000);			Origin_z[level].resize(S3d_, 205000);	
 	//!PosHis size=3*TI
 	SelectedPos[level].resize(S3d_, 615000);
 	PosHis[level].resize(S2d_*3, 0.0f);
@@ -612,8 +613,10 @@ void DoPAR::init() {
 	for (int i = 0; i < MULTIRES; i++){
 		deltaIndexHis[i] = (1.0f * (TEXSIZE[i] - blockSize[i] + 2)*(TEXSIZE[i] - blockSize[i] + 2)) / (TEXSIZE[i] * TEXSIZE[i] * TEXSIZE[i]);
 		deltaPosHis[i] = 1.0f / TEXSIZE[i];
+		avgIndexHis[i] = deltaIndexHis[i] * TEXSIZE[i];
+		avgPosHis[i] = deltaPosHis[i] * TEXSIZE[i] / 3.0f;
 		factorIndex[i] = 2.0f * TEXSIZE[i];
-		factorPos[i] = 3* 2.0f * TEXSIZE[i];
+		factorPos[i] = 3 * 2.0f * TEXSIZE[i];
 	}
 }
 
@@ -661,10 +664,13 @@ void DoPAR::InitRandomVolume(int level) {
 }
 
 void DoPAR::cleardata(int level) {
+	//vector<ANNdist> tvf;	vector<ANNidx> tvl;		vector<bool> tvb;
+	//m_volume[level].swap(tvf);
+	//m_exemplar_x[level].swap(tvf);	m_exemplar_y[level].swap(tvf);	m_exemplar_z[level].swap(tvf);
+	
 	m_volume[level].clear();
 	m_exemplar_x[level].clear();	m_exemplar_y[level].clear();	m_exemplar_z[level].clear();
 	KCoherence_x[level].clear();	KCoherence_y[level].clear();	KCoherence_z[level].clear();
-
 	isUnchanged_x[level].clear();	isUnchanged_y[level].clear();	isUnchanged_z[level].clear();
 	nearestIdx_x[level].clear();	nearestIdx_y[level].clear();	nearestIdx_z[level].clear();
 	nearestWeight_x[level].clear(); nearestWeight_y[level].clear(); nearestWeight_z[level].clear();
@@ -672,6 +678,18 @@ void DoPAR::cleardata(int level) {
 	IndexHis_x[level].clear();		IndexHis_y[level].clear();		IndexHis_z[level].clear();
 	PosHis[level].clear();
 	SelectedPos[level].clear();
+
+	m_exemplar_x[level].shrink_to_fit();	m_exemplar_y[level].shrink_to_fit();	m_exemplar_z[level].shrink_to_fit();
+	KCoherence_x[level].shrink_to_fit();	KCoherence_y[level].shrink_to_fit();	KCoherence_z[level].shrink_to_fit();
+	isUnchanged_x[level].shrink_to_fit();	isUnchanged_y[level].shrink_to_fit();	isUnchanged_z[level].shrink_to_fit();
+	nearestIdx_x[level].shrink_to_fit();	nearestIdx_y[level].shrink_to_fit();	nearestIdx_z[level].shrink_to_fit();
+	nearestWeight_x[level].shrink_to_fit();	nearestWeight_y[level].shrink_to_fit();	nearestWeight_z[level].shrink_to_fit();
+	Origin_x[level].shrink_to_fit();		Origin_y[level].shrink_to_fit();		Origin_z[level].shrink_to_fit();
+	IndexHis_x[level].shrink_to_fit();		IndexHis_y[level].shrink_to_fit();		IndexHis_z[level].shrink_to_fit();
+	PosHis[level].shrink_to_fit();
+	SelectedPos[level].shrink_to_fit();
+
+	if (level == MULTIRES - 1) { m_permutation.clear(); m_permutation.shrink_to_fit(); }
 }
 
 
@@ -942,7 +960,6 @@ void DoPAR::computeKCoherence(){
 bool DoPAR::searchVolume(int level) {
 	const ANNidx TEXSIZE_ = TEXSIZE[level];
 	const ANNidx blockSize_ = blockSize[level];
-	const ANNdist min_dist = 0.00001f;
 	const ANNidx Sx = TEXSIZE_;
 	const ANNidx Sy = TEXSIZE_;
 	const ANNidx Sz = TEXSIZE_;
@@ -950,13 +967,14 @@ bool DoPAR::searchVolume(int level) {
 	const ANNidx Sxz = Sx * Sz;
 	const ANNidx Syz = Sy * Sz;
 	const ANNidx Size = Sxy * Sz;
-	const ANNidx start = static_cast<ANNidx>(blockSize_ / 2);			//4
-	const ANNidx end = static_cast<ANNidx>((blockSize_-1) / 2);			//3
+	const ANNidx start = static_cast<ANNidx>(blockSize_ / 2);			//4	//4	//3	//2
+	const ANNidx end = static_cast<ANNidx>((blockSize_-1) / 2);			//3	//3	//2	//1
 	ANNidx cstart(start), cend(end);
-	if (level > 0) {
-		cstart -=1;														//3
-		cend -=1;														//2
-	}
+	//if (level > 0 && end>2) {
+	//	cstart -=1;														//4	//3	//3	//2
+	//	cend -=1;														//3	//2	//2	//1
+	//}
+
 	vector<ANNidx> compareIdx; 
 	ANNdist curDis, curError, IndexHisWeight;
 	CvMat* current_neighbor = cvCreateMat(1, blockSize_*blockSize_, CV_32F);		//rows = 1, cols = dimesnion
@@ -1010,8 +1028,8 @@ bool DoPAR::searchVolume(int level) {
 						if (compareIdx[p] == temp2didx)	break;
 					}
 					if (p < compareNum)	continue;
-
-					IndexHisWeight = 1.0f + factorIndex[level] * max(0.0f, IndexHis_z[level][sparseIdx(level, temp2didx)] - 1.0f);			//IndexHis needs sparse grid
+					//IndexHis needs sparse grid
+					IndexHisWeight = 1.0f + factorIndex[level] * max(0.0f, IndexHis_z[level][sparseIdx(level, temp2didx)] - avgIndexHis[level]);			
 					curDis = getFullDistance(level, m_exemplar_z[level], temp2didx, current_neighbor);
 					curError = IndexHisWeight * curDis;
 
@@ -1088,7 +1106,7 @@ bool DoPAR::searchVolume(int level) {
 					}
 					if (p < compareNum)	continue;
 
-					IndexHisWeight = 1.0f + factorIndex[level] * max(0.0f, IndexHis_y[level][sparseIdx(level, temp2didx)] - 1.0f);			//IndexHis needs sparse grid
+					IndexHisWeight = 1.0f + factorIndex[level] * max(0.0f, IndexHis_y[level][sparseIdx(level, temp2didx)] - avgIndexHis[level]);			//IndexHis needs sparse grid
 					curDis = getFullDistance(level, m_exemplar_y[level], temp2didx, current_neighbor);
 					curError = IndexHisWeight * curDis;
 
@@ -1166,7 +1184,7 @@ bool DoPAR::searchVolume(int level) {
 					if (p < compareNum)	continue;
 					
 					//IndexHis needs sparse grid
-					IndexHisWeight = 1.0f + factorIndex[level] * max(0.0f, IndexHis_x[level][sparseIdx(level, temp2didx)] - 1.0f);			
+					IndexHisWeight = 1.0f + factorIndex[level] * max(0.0f, IndexHis_x[level][sparseIdx(level, temp2didx)] - avgIndexHis[level]);
 					curDis = getFullDistance(level, m_exemplar_x[level], temp2didx, current_neighbor);
 					curError = IndexHisWeight * curDis;
 
@@ -1220,7 +1238,6 @@ ANNidx DoPAR::getRandomNearestIndex(int level, vector<ANNdist>& IndexHis) {
 
 ANNdist DoPAR::getFullDistance(int level, vector<ANNcoord>& exemplar, ANNidx idx2d, CvMat * dataMat) {
 	//2d square distance
-	ANNdist min_dist = 0.00001f;
 	ANNdist sum = 0.0f;
 	ANNidx R = static_cast<ANNidx>(blockSize[level] / 2);
 	ANNidx n = 0;
@@ -1243,11 +1260,11 @@ bool DoPAR::isUnchangedBlock(int level, int direction, ANNidx i, ANNidx j, ANNid
 	const ANNidx jSx = j*Sx;
 	const ANNidx Sxy = TEXSIZE[level] * TEXSIZE[level];
 	const ANNidx iSxy = i*Sxy;
-	ANNidx start = static_cast<ANNidx>(blockSize[level] / 2);
-	ANNidx end = static_cast<ANNidx>((blockSize[level] - 1) / 2);
-	if (level > 0) {
-		start -= 1;	
-		end -= 1;
+	ANNidx start = static_cast<ANNidx>(blockSize[level] / 2);			//4	//4	//3	//2
+	ANNidx end = static_cast<ANNidx>((blockSize[level] - 1) / 2);		//3	//3	//2	//1
+	if (level > 0 && end>2) {
+		start -= 1;														//4	//3	//3	//2
+		end -= 1;														//3	//2	//2	//1
 	}
 
 	ANNidx tempidx;
@@ -1299,13 +1316,13 @@ void DoPAR::optimizeVolume(int level) {
 	const ANNidx Syz = Sy * Sz;
 	const ANNidx Size = Sxy * Sz;
 	const ANNidx candSize = static_cast<ANNidx>(blockSize_ / 2) * static_cast<ANNidx>(blockSize_ / 2);	//candidate has sparse grid
-	const ANNidx start = static_cast<ANNidx>(blockSize_ / (2 * GRID)) + 1;
-	const ANNidx end = start;
-	ANNidx s1 = -static_cast<ANNidx>(blockSize_ / 2);
-	ANNidx e1 = static_cast<ANNidx>((blockSize_ - 1) / 2);
-	if (level > 0) {								//reduce average blurring
-		s1 += 1;
-		e1 -= 1;
+	const ANNidx start = static_cast<ANNidx>(blockSize_ / (2 * GRID)) + 1;	//3	//3	//2	//2
+	const ANNidx end = start;					
+	ANNidx s1 = -static_cast<ANNidx>(blockSize_ / 2);						//-4//-4//-3//-2
+	ANNidx e1 = static_cast<ANNidx>((blockSize_ - 1) / 2);					//3	//3	//2	//1
+	if (/*level > 0 &&*/ e1>2) {								//reduce average blurring
+		s1 += 1;															//-3//-3//-3//-2
+		e1 -= 1;															//2	//2	//2	//1
 	}
 	
 	shuffle(m_permutation.begin(), m_permutation.end(), mersennetwistergenerator);
@@ -1364,7 +1381,7 @@ void DoPAR::optimizeVolume(int level) {
 				posCand_z.push_back(tempnearestidx);
 				
 				tempnearestidx += Sxy * 2;															//PosHis size=3TI!
-				weight = 1.0f + factorPos[level] * max(0.0f, PosHis[level][tempnearestidx] - 1.0f/3.0f);	// 1/3 is average PosHis
+				weight = 1.0f + factorPos[level] * max(0.0f, PosHis[level][tempnearestidx] - avgPosHis[level]);	// 1/3 is average PosHis
 				weight = tempnearestweight / weight;
 				color_acc += weight * tempcolor;
 				weight_acc += weight;
@@ -1390,14 +1407,13 @@ void DoPAR::optimizeVolume(int level) {
 				tempnearestweight = nearestWeight_y[level][tempidx];
 
 				tempnearestidx += deltax * Sx + deltay;
-				//if (tempnearestidx >= Sxy || tempnearestidx < 0) { cout << endl << "nearestIdx_y error"; _getch(); }
 				tempcolor = m_exemplar_y[level][tempnearestidx];
 			
 				colorCand_y.push_back(tempcolor);													//discrete solver
 				posCand_y.push_back(tempnearestidx);
 
 				tempnearestidx += Sxy * 1;															//PosHis size=3TI!
-				weight = 1.0f + factorPos[level] * max(0.0f, PosHis[level][tempnearestidx] - 1.0f/3.0f);
+				weight = 1.0f + factorPos[level] * max(0.0f, PosHis[level][tempnearestidx] - avgPosHis[level]);
 				weight = tempnearestweight / weight;
 				color_acc += weight * tempcolor;
 				weight_acc += weight;
@@ -1423,13 +1439,12 @@ void DoPAR::optimizeVolume(int level) {
 				tempnearestweight = nearestWeight_x[level][tempidx];										//nearestidx from search step, weight=eudis^-0.6
 				
 				tempnearestidx += deltax * Sx + deltay;
-				//if (tempnearestidx >= Sxy || tempnearestidx < 0) { cout << endl << "nearestIdx_x error"; _getch(); }
 				tempcolor = m_exemplar_x[level][tempnearestidx];
 				
 				colorCand_x.push_back(tempcolor);															//discrete solver
 				posCand_x.push_back(tempnearestidx);
 
-				weight = 1.0f + factorPos[level] * max(0.0f, PosHis[level][tempnearestidx] - 1.0f/3.0f);	//PosHis weighted
+				weight = 1.0f + factorPos[level] * max(0.0f, PosHis[level][tempnearestidx] - avgPosHis[level]);	//PosHis weighted
 				weight = tempnearestweight / weight;
 				color_acc += weight * tempcolor;
 				weight_acc += weight;
@@ -1511,9 +1526,9 @@ bool DoPAR::setNearestIndex(int level, vector<ANNidx>& nearestIdx, vector<ANNdis
 	ANNidx idx3d, ANNidx newNearestIdx, ANNdist dis) {
 	//update IndexHis	//update NearestIndex, store EuDis^-0.6 -- search step
 	ANNidx formerNearestIdx = nearestIdx[idx3d];
-	//if (dis == 0.0f) dis = 0.00001f;
-	nearestWeight[idx3d] = pow(dis, -0.6f);											//update nearestWeight
-	
+	//nearestWeight[idx3d] = pow(dis, -0.6f);											//update nearestWeight
+	nearestWeight[idx3d] = 1/dis;
+
 	if (formerNearestIdx == newNearestIdx)	return true;
 	nearestIdx[idx3d] = newNearestIdx;												//update nearestIdx
 
@@ -1728,8 +1743,10 @@ void DoPAR::writeHistogram(int level, vector<ANNdist>& PosHis) {
 	for (ANNidx i = 0; i < Sx; ++i){									//IndexHis is sparsed. 
 		idx_i = i*Sxy;
 		for (ANNidx j = 0; j < Sy; j += GRID){
+		//for (ANNidx j = 0; j < Sy; j += 1) {
 			idx_j = j*Sx;
 			for (ANNidx k = 0; k < Sz; k += GRID){
+			//for (ANNidx k = 0; k < Sz; k += 1) {
 				idx3d = idx_i + idx_j + k;
 				idx2d = nearestIdx_x[level][idx3d];						//X
 				Index[idx2d] += 1;
