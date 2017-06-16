@@ -2,22 +2,8 @@
 
 #include "stdafx.h"
 
-typedef struct{
-	int x, y, z;
-} _ThreeCorr;
-
-typedef struct{
-	int x, y;
-} _TwoCorr;
-
-typedef struct{ long idx; double weight; } _Filter;
-
-typedef struct{ long x, y, z; } _XyzStrType;
-
-//typedef class Graph<int, int, int> GraphType;
-
+typedef struct { long x, y, z; } _XyzStrType;		//BarDMap()
 const unsigned long iSTEPLENGTH = 524288L;
-
 static void iCGetDirFileName(string OStr, string& Dir, string & FName)
 {
 	FName = "";		Dir = "";
@@ -40,7 +26,6 @@ private:
 	bool ReadTxtFiles(const string PFName, vector<string>& ResLines);
 	bool GetNextRowParameters(short Cno, vector<string>& ValidParStr, vector<string>& ParV);
 	long FileLength(const string& FName);
-	//bool Read(const string FPathName, vector<uchar>& Data);
 	bool Write(const string FPathName, vector<uchar> Data);
 	bool iFileExistYN(const string& PFileName);		
 	void ReadRunPar(string CurExeFile); //Read running parameters
@@ -48,13 +33,7 @@ private:
 	string FNameXY, FNameXZ, FNameYZ;
 	string workpath, outputpath, outputfilename, parameterstring;
 	vector<string> FNameAddition;  //file path names of the training images
-	//vector<uchar> Model;
-	double PorosityX, PorosityY, PorosityZ, PorosityM; //Original porosities from 3 training images
-
-	//void ReadPBMImage(string FName, char DirID, double UpPro); //Read each training image
-	////DirID: '1' - XY plane, '2' - XZ plane, '3' - YZ plane
-	////       otherwise a single image for three direction 
-	////UpPro: upper porosity, 0.5 for default. 
+	//double PorosityX, PorosityY, PorosityZ, PorosityM; //Original porosities from 3 training images
 	
 	random_device randomseed;
 	mt19937 mersennetwistergenerator;
@@ -64,15 +43,16 @@ private:
 	///========================== optimization based =====================
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////
-	static const int MULTIRES = 3;						// # of multi-resolution (0 -> MULTIRES - 1 :: coarsest -> finest)
+	static const int MULTIRES = 4;						// # of multi-resolution (0 -> MULTIRES - 1 :: coarsest -> finest)
 	static const int blockSize[MULTIRES];				// template size
 	static ANNidx TEXSIZE[MULTIRES];					// size of input exemplar
 	const ANNidx GRID = 2;								// sparse grid
 	const int COHERENCENUM = 11;						// K-coherence
 	static const short MAXITERATION[MULTIRES];			// max iteration time
-	const bool GAUSSRESIZE = true;						// use gauss filter to resize
+	const bool DISTANCEMAP_ON = true;					// convert to distance map model
+
 	const bool useRandomSeed = false;					// Use random seed or fixed (0) for test
-	
+
 	const ANNdist min_dist = 0.00001f;
 	ANNdist factorIndex[MULTIRES];						// linear weighting factor
 	ANNdist factorPos[MULTIRES];
@@ -80,13 +60,8 @@ private:
 	ANNdist deltaPosHis[MULTIRES];						// update PosHis value per operation
 	ANNdist avgIndexHis[MULTIRES];						// default average value of IndexHis
 	ANNdist avgPosHis[MULTIRES];						// default average value of PosHis
-
-
-	//static const bool INDEXHIS_ON = true;				// Index Histogram in search step	
-	//static const bool POSITIONHIS_ON = true;			// Position Histogram	in optimize step
-	//static const bool BIMODAL_ON = false;				// Using bimodal TI
-	//static const bool DISTANCEMAP_ON = false;			// convert to distance map model
-	//static const bool DISCRETETHRESHOLD_ON = false;	// dynamic thresholding in optimize step. 	will slightly affect quality. dont use in double peak distribution
+	
+	//const bool GAUSSRESIZE = true;						// use gauss filter to resize
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -139,12 +114,22 @@ private:
 
 	void allocateVectors(int level);
 
-	// exemplar
+	// 2D Exemplar 
 	vector<vector<ANNcoord> >  m_exemplar_x;									//[level][idx2d] = color
 	vector<vector<ANNcoord> >  m_exemplar_y;
 	vector<vector<ANNcoord> >  m_exemplar_z;
 	bool loadExemplar();
 	void gaussImage(int level, vector<vector<ANNcoord>>& exemplar);
+
+	//=============== distance map ===============
+	ANNcoord Solid_Upper, Pore_Upper;						//Redistribute DMap. Use same Solid_Upper,Pore_Lower for 3TIs and loaded model
+	void binaryChar(vector<short>& DMap, vector<char>& Binarised, short threshold);
+	void binaryUchar(vector<short>& DMap, vector<uchar>& Binarised, short threshold);
+	vector<unsigned short> BarDMap(short tSx, short tSy, short tSz, vector<char>& OImg);
+	vector<short> GetDMap(short Sx, short Sy, short Sz, vector<char>& OImg, char DM_Type, bool DisValYN);		//calculate Distance Map
+	//redistribute TI based on DM, no need to resize to 0-255
+	void transformDM(vector<ANNcoord>& exemplar1, vector<ANNcoord>& exemplar2, vector<ANNcoord>& exemplar3);
+
 
 	// 3D Model
 	string modelFilename3D;
@@ -200,10 +185,8 @@ private:
 
 	void updatePosHis(int level, vector<ANNdist>& PosHis, vector<ANNidx>& selectedPos, ANNidx idx3d, ANNidx newPos);
 
-	//void getOrigin(vector<ANNidx>& origin, ANNidx idx3d, ANNidx& originx, ANNidx& originy);
-	//void setOrigin(vector<ANNidx>& origin, vector<bool>& isUnchanged, ANNidx idx3d, ANNidx tiIdx);
-
 	void writeHistogram(int level);
+
 
 };
 

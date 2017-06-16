@@ -5,7 +5,7 @@
 #include "DoPAR.h"
 
 int main(int argc, const char* argv[])
-{
+{	
 	string CurWorkExeFile = argv[0];
 
 	DoPAR DoItNow;
@@ -18,10 +18,18 @@ int main(int argc, const char* argv[])
 	return 0;
 }
 
+//vector<float> t1 = { 100.0f, 255.0f, 256.0f, 511.0f };
+//vector<uchar> t2 = { 100, 125, 200, 255};
+//cout << endl << (int)t2[0] << "," << (int)t2[1] << "," << (int)t2[2] << "," << (int)t2[3];
+//transform(t1.begin(), t1.end(), t2.begin(),
+//	std::bind2nd(std::multiplies<float>(), 0.5));
+//cout << endl << (int)t2[0] << "," << (int)t2[1] << "," << (int)t2[2] << "," << (int)t2[3]; _getch();
+
 //cout << endl << rand(); cin.get(); //without initial seed, rand() will give the same results!
 
 //Toroidal
-//cout << endl << (-1 & 255) << " " << (258 & 255) << " " << (20 & 255);	//!!needs to be 127,255... otherwise wrong
+//cout << endl << (-1 & 127) << " " << (258 & 127) << " " << (20 & 127);	//!!needs to be 127,255... otherwise wrong
+////cout << endl << trimIndex(2, -1) << " " << trimIndex(2, 258) << " " << trimIndex(2, 20);	//same
 //cin.get();
 
 //cout << endl <<"opencv optimization enabled? " <<useOptimized(); _getch();	//true
