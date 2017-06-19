@@ -110,7 +110,8 @@ private:
 	//	size_dist a = (x - mean) / stddev;
 	//	return inv_sqrt_2pi / stddev * exp(-0.5 * a * a);
 	//}
-	inline size_dist normal_cdf(size_dist x, size_dist stddev = 1.0f/6.0f, size_dist mean = 0.0f){		
+	const size_dist	gwdev = 1.0f / 6.0f;
+	inline size_dist normal_cdf(size_dist x, size_dist stddev, size_dist mean = 0.0f){
 		if (x == 0.0f) return 1.0f;
 		size_dist tx = (x - mean) / (stddev * sqrt(2.0f));
 		size_dist y = 1.0f / (1.0f + 0.3275911f * tx);
@@ -121,7 +122,7 @@ private:
 			- 0.284496736f) * y
 			+ 0.254829592f) * y)
 			* exp(-tx * tx);
-		size_dist cdf = (1.0f - 0.5f * (1.0f + erf)) / 0.5f;
+		size_dist cdf = (1.0f - 0.5f * (1.0f + erf)) * 2.0f;	// =/0.5f
 		if (cdf == 0.0f) cdf = 2e-9f;
 		return cdf;
 	}

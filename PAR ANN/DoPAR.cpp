@@ -1343,9 +1343,10 @@ bool DoPAR::searchVolume(int level) {
 					}
 					if (p < compareNum)	continue;
 					//IndexHis needs sparse grid
-					IndexHisWeight = 1.0f + factorIndex[level] * max(0.0f, IndexHis_z[level][sparseIdx(level, temp2didx)] - avgIndexHis[level]);			
 					curDis = getFullDistance(level, m_exemplar_z[level], temp2didx, current_neighbor);
-					curError = IndexHisWeight * curDis;
+					//IndexHisWeight = 1.0f + factorIndex[level] * max(0.0f, IndexHis_z[level][sparseIdx(level, temp2didx)] - avgIndexHis[level]);								
+					//curError = IndexHisWeight * curDis;
+					curError = curDis / normal_cdf(max(0.0f, IndexHis_z[level][sparseIdx(level, temp2didx)] - avgIndexHis[level]), gwdev);
 
 					if (minError > curError) {								//min error			
 						minError = curError;
@@ -1419,10 +1420,10 @@ bool DoPAR::searchVolume(int level) {
 						if (compareIdx[p] == temp2didx)	break;
 					}
 					if (p < compareNum)	continue;
-
-					IndexHisWeight = 1.0f + factorIndex[level] * max(0.0f, IndexHis_y[level][sparseIdx(level, temp2didx)] - avgIndexHis[level]);			//IndexHis needs sparse grid
 					curDis = getFullDistance(level, m_exemplar_y[level], temp2didx, current_neighbor);
-					curError = IndexHisWeight * curDis;
+					//IndexHisWeight = 1.0f + factorIndex[level] * max(0.0f, IndexHis_y[level][sparseIdx(level, temp2didx)] - avgIndexHis[level]);			//IndexHis needs sparse grid			
+					//curError = IndexHisWeight * curDis;
+					curError = curDis / normal_cdf(max(0.0f, IndexHis_y[level][sparseIdx(level, temp2didx)] - avgIndexHis[level]), gwdev);
 
 					if (minError > curError) {								//min error			
 						minError = curError;
@@ -1498,9 +1499,10 @@ bool DoPAR::searchVolume(int level) {
 					if (p < compareNum)	continue;
 					
 					//IndexHis needs sparse grid
-					IndexHisWeight = 1.0f + factorIndex[level] * max(0.0f, IndexHis_x[level][sparseIdx(level, temp2didx)] - avgIndexHis[level]);
 					curDis = getFullDistance(level, m_exemplar_x[level], temp2didx, current_neighbor);
-					curError = IndexHisWeight * curDis;
+					//IndexHisWeight = 1.0f + factorIndex[level] * max(0.0f, IndexHis_x[level][sparseIdx(level, temp2didx)] - avgIndexHis[level]);
+					//curError = IndexHisWeight * curDis;
+					curError = curDis / normal_cdf(max(0.0f, IndexHis_x[level][sparseIdx(level, temp2didx)] - avgIndexHis[level]), gwdev);
 
 					if (minError > curError){								//min error			
 						minError = curError;
@@ -1695,9 +1697,10 @@ void DoPAR::optimizeVolume(int level) {
 				posCand_z.push_back(tempnearestidx);
 				
 				tempnearestidx += Sxy * 2;															//PosHis size=3TI!
-				weight = 1.0f + factorPos[level] * max(0.0f, PosHis[level][tempnearestidx] - avgPosHis[level]);	// 1/3 is average PosHis
-				weight = tempnearestweight / weight;
-				color_acc += weight * tempcolor;
+				//weight = 1.0f + factorPos[level] * max(0.0f, PosHis[level][tempnearestidx] - avgPosHis[level]);	// 1/3 is average PosHis
+				//weight = tempnearestweight / weight;
+				weight = tempnearestweight * normal_cdf(max(0.0f, PosHis[level][tempnearestidx] - avgPosHis[level]), gwdev/3.0f);
+				color_acc += weight * tempcolor;			
 				weight_acc += weight;
 			}
 		}		
@@ -1727,8 +1730,9 @@ void DoPAR::optimizeVolume(int level) {
 				posCand_y.push_back(tempnearestidx);
 
 				tempnearestidx += Sxy * 1;															//PosHis size=3TI!
-				weight = 1.0f + factorPos[level] * max(0.0f, PosHis[level][tempnearestidx] - avgPosHis[level]);
-				weight = tempnearestweight / weight;
+				//weight = 1.0f + factorPos[level] * max(0.0f, PosHis[level][tempnearestidx] - avgPosHis[level]);
+				//weight = tempnearestweight / weight;
+				weight = tempnearestweight * normal_cdf(max(0.0f, PosHis[level][tempnearestidx] - avgPosHis[level]), gwdev / 3.0f);
 				color_acc += weight * tempcolor;
 				weight_acc += weight;
 			}
@@ -1758,8 +1762,9 @@ void DoPAR::optimizeVolume(int level) {
 				colorCand_x.push_back(tempcolor);															//discrete solver
 				posCand_x.push_back(tempnearestidx);
 
-				weight = 1.0f + factorPos[level] * max(0.0f, PosHis[level][tempnearestidx] - avgPosHis[level]);	//PosHis weighted
-				weight = tempnearestweight / weight;
+				//weight = 1.0f + factorPos[level] * max(0.0f, PosHis[level][tempnearestidx] - avgPosHis[level]);	//PosHis weighted
+				//weight = tempnearestweight / weight;
+				weight = tempnearestweight * normal_cdf(max(0.0f, PosHis[level][tempnearestidx] - avgPosHis[level]), gwdev / 3.0f);
 				color_acc += weight * tempcolor;
 				weight_acc += weight;
 			}
