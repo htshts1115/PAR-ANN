@@ -48,7 +48,7 @@ private:
 	///========================== optimization based =====================
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////
-	static const int MULTIRES = 5;						// # of multi-resolution (0 -> MULTIRES - 1 :: coarsest -> finest)
+	static const int MULTIRES = 4;						// # of multi-resolution (0 -> MULTIRES - 1 :: coarsest -> finest)
 	static const int blockSize[MULTIRES];				// template size
 	static size_idx TEXSIZE[MULTIRES];					// size of input exemplar
 	const size_idx GRID = 2;							// sparse grid
@@ -56,9 +56,9 @@ private:
 	static const int MAXITERATION[MULTIRES];			// max iteration time
 	const bool DISTANCEMAP_ON = true;					// convert to distance map model
 
-	const bool useRandomSeed = false;					// Use random seed or fixed (0) for test
+	const bool useRandomSeed = true;					// Use random seed or fixed (0) for test
 
-	const size_dist min_dist = 0.0000001f;
+	const size_dist min_dist = 0.0001f;
 	size_dist factorIndex[MULTIRES];					// linear weighting factor
 	size_dist factorPos[MULTIRES];
 	size_dist deltaIndexHis[MULTIRES];					// update IndexHis value per operation
@@ -66,7 +66,7 @@ private:
 	size_dist avgIndexHis[MULTIRES];					// default average value of IndexHis
 	size_dist avgPosHis[MULTIRES];						// default average value of PosHis
 	
-	//const bool GAUSSRESIZE = true;						// use gauss filter to resize
+	const bool GenerateDMTI = false;					// generate DM transformed TI
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -106,26 +106,27 @@ private:
 		return (i*sheight + j);
 	}
 	static const size_dist inv_sqrt_2pi;
-	//inline size_dist gaussian_pdf(size_dist x, size_dist mean, size_dist stddev){		
-	//	size_dist a = (x - mean) / stddev;
-	//	return inv_sqrt_2pi / stddev * exp(-0.5 * a * a);
-	//}
-	const size_dist	gwdev = 1.0f / 6.0f;
-	inline size_dist normal_cdf(size_dist x, size_dist stddev, size_dist mean = 0.0f){
-		if (x == 0.0f) return 1.0f;
-		size_dist tx = (x - mean) / (stddev * sqrt(2.0f));
-		size_dist y = 1.0f / (1.0f + 0.3275911f * tx);
-		size_dist erf = 1.0f - (((((
-			+1.061405429f  * y
-			- 1.453152027f) * y
-			+ 1.421413741f) * y
-			- 0.284496736f) * y
-			+ 0.254829592f) * y)
-			* exp(-tx * tx);
-		size_dist cdf = (1.0f - 0.5f * (1.0f + erf)) * 2.0f;	// =/0.5f
-		if (cdf == 0.0f) cdf = 2e-9f;
-		return cdf;
+	const size_dist pdfdevS = 0.05f;
+	const size_dist pdfdevO = 0.05f/3.0f;
+	inline size_dist gaussian_pdf(size_dist x, size_dist dev /*, size_dist mean = 0.0f*/){		
+		return exp(-0.5f * (x * x / dev / dev));
 	}
+	//const size_dist	gwdev = 1.0f / 6.0f;
+	//inline size_dist normal_cdf(size_dist x, size_dist stddev, size_dist mean = 0.0f){
+	//	if (x == 0.0f) return 1.0f;
+	//	size_dist tx = (x - mean) / (stddev * sqrt(2.0f));
+	//	size_dist y = 1.0f / (1.0f + 0.3275911f * tx);
+	//	size_dist erf = 1.0f - (((((
+	//		+1.061405429f  * y
+	//		- 1.453152027f) * y
+	//		+ 1.421413741f) * y
+	//		- 0.284496736f) * y
+	//		+ 0.254829592f) * y)
+	//		* exp(-tx * tx);
+	//	size_dist cdf = (1.0f - 0.5f * (1.0f + erf)) * 2.0f;	// =/0.5f
+	//	if (cdf < FLT_MIN) cdf = FLT_MIN;
+	//	return cdf;
+	//}
 
 
 	void DoANNOptimization();
