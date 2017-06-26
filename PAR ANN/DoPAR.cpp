@@ -489,6 +489,13 @@ void DoPAR::showMat(const cv::String& winname, const cv::Mat& mat)
 
 const float DoPAR::inv_sqrt_2pi = 0.398942280401433f;
 
+/////////////////////////////////////////////////////////////
+//exemplar_x --> YZ, exemplar_y --> ZX, exemplar_z --> XY
+//using imagej, XY slice is XY, ememplar_z
+//ZX slice can be attained by: 1. reslice top + flip virtical 2. then rotate 90 degrees left
+//YZ slice is done by: reslice left
+/////////////////////////////////////////////////////////////
+
 ////////////////////////////////////////////////////////////////////////////////////////
 const int DoPAR::blockSize[MULTIRES] = {8, 8, 6, 6};
 size_idx DoPAR::TEXSIZE[MULTIRES];
@@ -1157,19 +1164,19 @@ void DoPAR::outputmodel(int level) {
 	tempoutputfilename = outputfilename.substr(0, outputfilename.find('.')) + "_Size" + to_string(TEXSIZE[level]) + "_binary.RAW";
 	Write(outputpath + tempoutputfilename, tempUchar);	
 
-	// Distance model up to 8 bit grayscale
-	if (DISTANCEMAP_ON && Pore_Upper<256) {												
-		size_color scalingfactor(1.0f);
-		if (Pore_Upper > 255) {											// scale to [0-255], for output vector<uchar>
-			scalingfactor = 255.0f / Pore_Upper;
-			resizedSolid_Upper = Solid_Upper * scalingfactor;
-			transform(m_volume[level].begin(), m_volume[level].end(), tempUchar.begin(),
-				std::bind2nd(std::multiplies<size_color>(), scalingfactor));			//multiply by scalingfactor
-		}
-		tempoutputfilename = outputfilename.substr(0, outputfilename.find('.')) + "_Size" + to_string(TEXSIZE[level])
-			+ "_S" + to_string(resizedSolid_Upper) + ".RAW";
-		Write(outputpath + tempoutputfilename, tempUchar);
-	}
+	//// Distance model up to 8 bit grayscale
+	//if (DISTANCEMAP_ON && Pore_Upper<256) {												
+	//	size_color scalingfactor(1.0f);
+	//	if (Pore_Upper > 255) {											// scale to [0-255], for output vector<uchar>
+	//		scalingfactor = 255.0f / Pore_Upper;
+	//		resizedSolid_Upper = Solid_Upper * scalingfactor;
+	//		transform(m_volume[level].begin(), m_volume[level].end(), tempUchar.begin(),
+	//			std::bind2nd(std::multiplies<size_color>(), scalingfactor));			//multiply by scalingfactor
+	//	}
+	//	tempoutputfilename = outputfilename.substr(0, outputfilename.find('.')) + "_Size" + to_string(TEXSIZE[level])
+	//		+ "_S" + to_string(resizedSolid_Upper) + ".RAW";
+	//	Write(outputpath + tempoutputfilename, tempUchar);
+	//}
 
 	cout << endl << "output done.";
 }
@@ -1729,9 +1736,8 @@ void DoPAR::optimizeVolume(int level) {
 				tempnearestidx += Sxy * 2;															//PosHis size=3TI!
 				tempHisDiff = max(0.0f, PosHis[level][tempnearestidx] - avgPosHis[level]);
 				weight = 1.0f + factorPos[level] * tempHisDiff;										//PosHis weighted
-				weight = tempnearestweight / weight;
-				//weight = tempnearestweight * gaussian_pdf(tempHisDiff, pdfdevO);
-				//weight = tempnearestweight * max(1.0f / weight, gaussian_pdf(tempHisDiff, pdfdevO));
+				//weight = tempnearestweight / weight;
+				weight = tempnearestweight * min(1.0f / weight, gaussian_pdf(tempHisDiff, pdfdevO));
 				color_acc += weight * tempcolor;			
 				weight_acc += weight;
 			}
@@ -1764,9 +1770,8 @@ void DoPAR::optimizeVolume(int level) {
 				tempnearestidx += Sxy * 1;															//PosHis size=3TI!
 				tempHisDiff = max(0.0f, PosHis[level][tempnearestidx] - avgPosHis[level]);
 				weight = 1.0f + factorPos[level] * tempHisDiff;										//PosHis weighted
-				weight = tempnearestweight / weight;
-				//weight = tempnearestweight * gaussian_pdf(tempHisDiff, pdfdevO);
-				//weight = tempnearestweight * max(1.0f / weight, gaussian_pdf(tempHisDiff, pdfdevO));
+				//weight = tempnearestweight / weight;
+				weight = tempnearestweight * min(1.0f / weight, gaussian_pdf(tempHisDiff, pdfdevO));
 				color_acc += weight * tempcolor;
 				weight_acc += weight;
 			}
@@ -1798,9 +1803,8 @@ void DoPAR::optimizeVolume(int level) {
 				
 				tempHisDiff = max(0.0f, PosHis[level][tempnearestidx] - avgPosHis[level]);
 				weight = 1.0f + factorPos[level] * tempHisDiff;												//PosHis weighted
-				weight = tempnearestweight / weight;
-				//weight = tempnearestweight * gaussian_pdf(tempHisDiff, pdfdevO);
-				//weight = tempnearestweight * max(1.0f / weight, gaussian_pdf(tempHisDiff, pdfdevO));
+				//weight = tempnearestweight / weight;
+				weight = tempnearestweight * min(1.0f / weight, gaussian_pdf(tempHisDiff, pdfdevO));
 				color_acc += weight * tempcolor;
 				weight_acc += weight;
 			}

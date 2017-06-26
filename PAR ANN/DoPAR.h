@@ -56,9 +56,9 @@ private:
 	static const int MAXITERATION[MULTIRES];			// max iteration time
 	const bool DISTANCEMAP_ON = true;					// convert to distance map model
 
-	const bool useRandomSeed = true;					// Use random seed or fixed (0) for test
+	const bool useRandomSeed = false;					// Use random seed or fixed (0) for test
 
-	const size_dist min_dist = 0.0001f;
+	const size_dist min_dist = 0.01f;
 	size_dist factorIndex[MULTIRES];					// linear weighting factor
 	size_dist factorPos[MULTIRES];
 	size_dist deltaIndexHis[MULTIRES];					// update IndexHis value per operation
@@ -106,8 +106,8 @@ private:
 		return (i*sheight + j);
 	}
 	static const size_dist inv_sqrt_2pi;
-	const size_dist pdfdevS = 0.05f;
-	const size_dist pdfdevO = 0.05f/3.0f;
+	const size_dist pdfdevS = 0.1f / 3.0f;
+	const size_dist pdfdevO = 0.1f / 9.0f;
 	inline size_dist gaussian_pdf(size_dist x, size_dist dev /*, size_dist mean = 0.0f*/){		
 		return exp(-0.5f * (x * x / dev / dev));
 	}
