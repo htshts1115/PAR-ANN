@@ -48,25 +48,27 @@ private:
 	///========================== optimization based =====================
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////
-	static const int MULTIRES = 4;						// # of multi-resolution (0 -> MULTIRES - 1 :: coarsest -> finest)
-	static const int blockSize[MULTIRES];				// template size
-	static size_idx TEXSIZE[MULTIRES];					// size of input exemplar
-	const size_idx GRID = 2;							// sparse grid
-	const int COHERENCENUM = 9;							// K-coherence
-	static const int MAXITERATION[MULTIRES];			// max iteration time
-	const bool DISTANCEMAP_ON = true;					// convert to distance map model
-
-	const bool useRandomSeed = false;					// Use random seed or fixed (0) for test
-
-	const size_dist min_dist = 0.01f;
-	size_dist factorIndex[MULTIRES];					// linear weighting factor
-	size_dist factorPos[MULTIRES];
-	size_dist deltaIndexHis[MULTIRES];					// update IndexHis value per operation
-	size_dist deltaPosHis[MULTIRES];					// update PosHis value per operation
-	size_dist avgIndexHis[MULTIRES];					// default average value of IndexHis
-	size_dist avgPosHis[MULTIRES];						// default average value of PosHis
+	int MULTIRES;										// # of multi-resolution (0 -> MULTIRES - 1 :: coarsest -> finest)
+	vector<int> blockSize;								// template size
+	vector<size_idx> TEXSIZE;							// size of input exemplar
+	vector<int> MAXITERATION;							// max iteration time	
 	
+	int COHERENCENUM = 9;								// K-coherence (9)
+	bool useRandomSeed;									// Use random seed or fixed (0) for test (false)
+	
+	const size_idx GRID = 2;							// sparse grid
+	const size_dist min_dist = 0.1f;
+	const bool DISTANCEMAP_ON = true;					// convert to distance map model
 	const bool GenerateDMTI = false;					// generate DM transformed TI
+
+	vector<size_dist> factorIndex;						// linear weighting factor
+	vector<size_dist> factorPos;
+	vector<size_dist> deltaIndexHis;					// update IndexHis value per operation
+	vector<size_dist> deltaPosHis;						// update PosHis value per operation
+	vector<size_dist> avgIndexHis;						// default average value of IndexHis
+	vector<size_dist> avgPosHis;						// default average value of PosHis
+	vector<size_dist> pdfdevS;							// gaussian distribution factor for search step
+	vector<size_dist> pdfdevO;							// gaussian distribution factor for optimize step
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -100,14 +102,12 @@ private:
 		//convert idx to sparsed grid --> width/2!
 		size_idx i, j, height, sheight;
 		height = TEXSIZE[level];
-		sheight = height / 2;
+		sheight = height / GRID;
 		i = (index / height) / GRID;
 		j = (index % height) / GRID;
 		return (i*sheight + j);
 	}
 	static const size_dist inv_sqrt_2pi;
-	const size_dist pdfdevS = 0.1f / 3.0f;
-	const size_dist pdfdevO = 0.1f / 9.0f;
 	inline size_dist gaussian_pdf(size_dist x, size_dist dev /*, size_dist mean = 0.0f*/){		
 		return exp(-0.5f * (x * x / dev / dev));
 	}
@@ -191,7 +191,7 @@ private:
 
 
 	//============== index histogram ============
-	vector<vector<size_dist>> IndexHis_x, IndexHis_y, IndexHis_z;					//[level][idx2d/4]=IndexHis		// sparse grid! //3TI different IndexHis
+	vector<vector<size_dist>> IndexHis_x, IndexHis_y, IndexHis_z;//sparse grid!		//[level][idx2d/4]=IndexHis		 //3TI different IndexHis
 	vector<vector<size_idx>> nearestIdx_x, nearestIdx_y, nearestIdx_z;				//[level][idx3d]=nearestIdx2d
 	vector<vector<size_dist>> nearestWeight_x, nearestWeight_y, nearestWeight_z;	//[level][idx3d]=nearestWeight	eudis^-0.6 or eudis^-1
 
