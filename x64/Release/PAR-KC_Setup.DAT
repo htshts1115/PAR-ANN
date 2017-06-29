@@ -2,20 +2,26 @@
 /* &&&&&&&&&       22 03 17   PAR ANN             &&&&&&
 /* &&&&&&&&&       Tianshen Huang                 &&&&&&
 /* &&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&
+/* Use Random seed or fixed seed (0:fixed seed, else:random seed)
+/*=============================================
+0
+/*=============================================
 /* Specify working directory (e.g. d:\test\)
-/* Note: last character is '\' !!
 /*=============================================
 //C:\Users\Tianshen Huang\Documents\PRM\PAR\PAR ANN\x64\Release\Two-scale-B\TIs
 //C:\Users\Tianshen Huang\Documents\PRM\PAR\PAR ANN\x64\Release\Berea512\TI
-C:\Users\Tianshen Huang\Documents\PRM\PAR\PAR ANN\x64\Release\CrossScale\TIs
+C:\Users\Tianshen Huang\Documents\PRM\PAR\PAR ANN\x64\Release\Berea_300-400\TI
+//C:\Users\Tianshen Huang\Documents\PRM\PAR\PAR ANN\x64\Release\CrossScale\TIs
+//C:\Users\Tianshen Huang\Documents\PRM\PAR\PAR ANN\x64\Release\TwoScale512
+//C:\Users\Tianshen Huang\Documents\PRM\PAR\PAR ANN\x64\Release\Anderson\TIs
 /*=============================================
-/* Specify training images in XY, XZ and YZ-plane
+/* Specify training images in YZ, ZX and XY-plane
 /*=============================================
 //TwoScaleB_256_YZ2.png, TwoScaleB_256_ZX2.png, TwoScaleB_256_XY2.png
-//Berea512_YZ_200.png, Berea512_ZX_200.png, Berea512_XY_200.png
-MaMiPores_256_YZ128.png, MaMiPores_256_ZX128.png, MaMiPores_256_XY128.png
+Berea_256_YZ111.png, Berea_256_ZX112.png, Berea_256_XY117.png
+//MaMiPores_256_YZ128.png, MaMiPores_256_ZX128.png, MaMiPores_256_XY128.png
+//TwoScale512.png, TwoScale512_swapXY.png, TwoScale512.png
 /*=============================================
 /* Specify 3D model 
 /*=============================================
-MaMiPores.raw
-/*=============================================
+Berea_111217.raw

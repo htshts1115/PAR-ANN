@@ -6,7 +6,6 @@ DoPAR::DoPAR(){
 }
 
 DoPAR::~DoPAR(){
-	cleardata(MULTIRES - 1);
 }
 
 long DoPAR::FileLength(const string& FName)
@@ -523,8 +522,9 @@ void DoPAR::DoANNOptimization() {
 		}	
 		if (curlevel == MULTIRES - 1 || TEXSIZE[curlevel] >= 256) {// ouput model & histogram
 			outputmodel(curlevel);
-			writeHistogram(curlevel);
+			//writeHistogram(curlevel);
 		}
+		if (TEXSIZE[curlevel] < 256 && TEXSIZE[curlevel] >= 128)	writeHistogram(curlevel);
 
 		if (curlevel < MULTIRES - 1) {// level up
 			allocateVectors(curlevel+1);
@@ -536,6 +536,7 @@ void DoPAR::DoANNOptimization() {
 
 	time_t NewTime;		time(&NewTime);
 	cout << endl << "Total reconstruction time: " << unsigned long(NewTime - StartTime)/60 << " mins";
+	cleardata(MULTIRES-1);
 }
 
 void DoPAR::allocateVectors(int level) {
@@ -676,7 +677,7 @@ void DoPAR::cleardata(int level) {
 	}
 }
 
-// 2D Exemplar 
+// load 2D Exemplar, initialize multi-level!
 bool DoPAR::loadExemplar() {
 	/////////////////////////////////////////////////////////////
 	//exemplar_x --> YZ, exemplar_y --> ZX, exemplar_z --> XY
@@ -700,7 +701,7 @@ bool DoPAR::loadExemplar() {
 	if (tempSize == 1024) {
 		MULTIRES = 6;
 		blockSize = { 8, 8, 8, 8, 6, 6 };
-		MAXITERATION = { 30, 15, 8, 4, 3, 3 };
+		MAXITERATION = { 30, 15, 8, 5, 3, 3 };
 		COHERENCENUM = 7;		//To speed up a bit
 	}
 	if (tempSize >= 512) { 
@@ -708,21 +709,21 @@ bool DoPAR::loadExemplar() {
 		MULTIRES = 5;
 		if (tempSize == 512) blockSize = {8, 8, 8, 6, 6};
 		else blockSize = { 10, 8, 8, 6, 6 };
-		MAXITERATION = { 30, 15, 8, 4, 3 };
+		MAXITERATION = { 30, 15, 8, 5, 3 };
 	}
 	else if (tempSize >= 256) {
 		if (tempSize % 16 != 0) { cout << endl << "TI size%16 != 0, change TI size!"; _getch(); exit(0); }
 		MULTIRES = 4;
 		if (tempSize == 256) blockSize = { 8, 8, 8, 6 };
 		else blockSize = { 10, 8, 8, 6 };
-		MAXITERATION = { 30, 20, 10, 5 };
+		MAXITERATION = { 30, 15, 8, 5 };
 	}
 	else if (tempSize >= 128) {
 		if (tempSize % 8 != 0) { cout << endl << "TI size%8 != 0, change TI size!"; _getch(); exit(0); }
 		MULTIRES = 3;
 		if (tempSize == 128) blockSize = { 8, 8, 6 };
 		else blockSize = { 10, 8, 6 };
-		MAXITERATION = { 40, 20, 10};
+		MAXITERATION = { 30, 15, 8};
 	}
 	TEXSIZE.resize(MULTIRES);
 	factorIndex.resize(MULTIRES); factorPos.resize(MULTIRES);
@@ -1623,11 +1624,12 @@ size_dist DoPAR::getFullDistance(int level, vector<size_color>& exemplar, size_i
 	size_idx n = 0;
 	size_idx Sx = TEXSIZE[level];
 	size_idx tempIdx;
+	size_dist dif;
 
 	for (size_idx i = -R; i < R; ++i) {
 		tempIdx = idx2d + i*Sx;
 		for (size_idx j = -R; j < R; ++j) {
-			size_dist dif = exemplar[tempIdx + j] - cvmGet(dataMat, 0, n++);
+			dif = exemplar[tempIdx + j] - cvmGet(dataMat, 0, n++);
 			sum += (dif * dif);
 		}
 	}

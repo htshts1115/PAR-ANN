@@ -53,7 +53,7 @@ private:
 	vector<size_idx> TEXSIZE;							// size of input exemplar
 	vector<int> MAXITERATION;							// max iteration time	
 	
-	int COHERENCENUM = 9;								// K-coherence (9)
+	int COHERENCENUM = 11;								// K-coherence (9)
 	bool useRandomSeed;									// Use random seed or fixed (0) for test (false)
 	
 	const size_idx GRID = 2;							// sparse grid
