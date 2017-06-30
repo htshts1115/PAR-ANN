@@ -6,6 +6,9 @@
 
 int main(int argc, const char* argv[])
 {	
+	
+
+
 	string CurWorkExeFile = argv[0];
 
 	DoPAR DoItNow;
@@ -17,6 +20,32 @@ int main(int argc, const char* argv[])
 
 	return 0;
 }
+//t = omp_get_wtime();
+//cout << endl << omp_get_num_procs();
+//	vector<int> a(1000, 1);
+//	vector<int> b(1000, 2);
+//	vector<int> c(1000);	
+//#pragma omp parallel for
+//	for (int i = 0; i < 1000; i++) {
+////#pragma omp atomic
+////		b[0]+=a[0];	//wrong
+//#pragma omp atomic
+//		b[0] += 1;	//right
+//
+//		c[i] = a[i] + b[i];	
+//	}
+//vector<int> a(40, 0);
+//vector<int> b(10000, 1);
+//#pragma omp parallel for schedule(static)
+//#pragma omp parallel for schedule(dynamic)	//too slow in our case
+//for (int i = 0; i < a.size(); i++) {
+//	for (int j = 0; j < b.size(); j++) {
+//		if (i % 8 == 1) break;			//inside loop can use break
+//		a[i] += b[j];
+//	}
+//	printf("%d = %d, from thread %d\n", i, a[i], omp_get_thread_num());		//i,j are private
+//}
+//_getch();
 
 //vector<float> t1 = { 100.0f, 255.0f, 256.0f, 511.0f };
 //vector<uchar> t2 = { 100, 125, 200, 255};
@@ -145,8 +174,8 @@ int main(int argc, const char* argv[])
 ////
 ////	queryPt = annAllocPt(dim);					// allocate query point
 ////	dataPts = annAllocPts(maxPts, dim);			// allocate data points
-////	nnIdx = new ANNidx[k];						// allocate near neigh indices
-////	dists = new ANNdist[k];						// allocate near neighbor dists
+////	nnIdx = new size_idx[k];						// allocate near neigh indices
+////	dists = new size_dist[k];						// allocate near neighbor dists
 ////
 ////	nPts = 0;									// read data points
 ////

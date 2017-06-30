@@ -1,6 +1,7 @@
 ﻿#include "stdafx.h"
 #include "DoPAR.h"
 
+
 DoPAR::DoPAR(){	
 
 }
@@ -524,7 +525,8 @@ void DoPAR::DoANNOptimization() {
 			outputmodel(curlevel);
 			//writeHistogram(curlevel);
 		}
-		if (TEXSIZE[curlevel] < 256 && TEXSIZE[curlevel] >= 128)	writeHistogram(curlevel);
+		if (TEXSIZE[curlevel] < 256 && TEXSIZE[curlevel] >= 128)	writeHistogram(curlevel);		
+		//checkHisError(curlevel);	//very little error
 
 		if (curlevel < MULTIRES - 1) {// level up
 			allocateVectors(curlevel+1);
@@ -535,7 +537,7 @@ void DoPAR::DoANNOptimization() {
 	}
 
 	time_t NewTime;		time(&NewTime);
-	cout << endl << "Total reconstruction time: " << unsigned long(NewTime - StartTime)/60 << " mins";
+	cout << endl << "Total reconstruction time: " << unsigned long(NewTime - StartTime) << " s (" << unsigned long(NewTime - StartTime)/60 <<" min)";
 	cleardata(MULTIRES-1);
 }
 
@@ -578,8 +580,6 @@ void DoPAR::init() {
 
 	// init deltaHis, linear factor
 	for (int i = 0; i < MULTIRES; i++){
-		deltaIndexHis[i] = 1.0;
-		deltaPosHis[i] = 1.0;
 		avgIndexHis[i] = (1.0f * TEXSIZE[i] * TEXSIZE[i] * TEXSIZE[i])/((TEXSIZE[i] - blockSize[i] + 2)*(TEXSIZE[i] - blockSize[i] + 2));	
 		avgPosHis[i] = TEXSIZE[i] / 3.0;					
 		factorIndex[i] = 1.0;											// IndexHis weight = Dis * linearweight
@@ -701,7 +701,7 @@ bool DoPAR::loadExemplar() {
 	if (tempSize == 1024) {
 		MULTIRES = 6;
 		blockSize = { 8, 8, 8, 8, 6, 6 };
-		MAXITERATION = { 30, 15, 8, 5, 3, 3 };
+		MAXITERATION = { 40, 20, 10, 6, 5, 3 };
 		COHERENCENUM = 7;		//To speed up a bit
 	}
 	if (tempSize >= 512) { 
@@ -709,25 +709,25 @@ bool DoPAR::loadExemplar() {
 		MULTIRES = 5;
 		if (tempSize == 512) blockSize = {8, 8, 8, 6, 6};
 		else blockSize = { 10, 8, 8, 6, 6 };
-		MAXITERATION = { 30, 15, 8, 5, 3 };
+		MAXITERATION = { 40, 20, 10, 5, 3 };
 	}
 	else if (tempSize >= 256) {
 		if (tempSize % 16 != 0) { cout << endl << "TI size%16 != 0, change TI size!"; _getch(); exit(0); }
 		MULTIRES = 4;
 		if (tempSize == 256) blockSize = { 8, 8, 8, 6 };
 		else blockSize = { 10, 8, 8, 6 };
-		MAXITERATION = { 30, 15, 8, 5 };
+		MAXITERATION = { 40, 20, 10, 5 };
 	}
 	else if (tempSize >= 128) {
 		if (tempSize % 8 != 0) { cout << endl << "TI size%8 != 0, change TI size!"; _getch(); exit(0); }
 		MULTIRES = 3;
 		if (tempSize == 128) blockSize = { 8, 8, 6 };
 		else blockSize = { 10, 8, 6 };
-		MAXITERATION = { 30, 15, 8};
+		MAXITERATION = { 40, 20, 10};
 	}
 	TEXSIZE.resize(MULTIRES);
 	factorIndex.resize(MULTIRES); factorPos.resize(MULTIRES);
-	deltaIndexHis.resize(MULTIRES); deltaPosHis.resize(MULTIRES);
+	//deltaIndexHis.resize(MULTIRES); deltaPosHis.resize(MULTIRES);
 	avgIndexHis.resize(MULTIRES); avgPosHis.resize(MULTIRES);
 	pdfdevS.resize(MULTIRES); pdfdevO.resize(MULTIRES);
 	//--------------[end] initial global parameters -------------
@@ -1278,6 +1278,7 @@ void DoPAR::computeKCoherence(){
 		kdTree_y = new ANNkd_tree(p_source_y, numData, dim);
 		kdTree_z = new ANNkd_tree(p_source_z, numData, dim);
 
+	//! annkSearch write on shared data, so cannot use parallel for here
 		for (size_idx i = 0; i < width; ++i) {
 			for (size_idx j = 0; j < height; ++j) {
 				size_idx num = 0;
@@ -1291,6 +1292,7 @@ void DoPAR::computeKCoherence(){
 						num++;
 					}
 				}
+
 				kdTree_x->annkSearch(queryPt_x, COHERENCENUM, ann_index_x, ann_dist_x, 0);
 				kdTree_y->annkSearch(queryPt_y, COHERENCENUM, ann_index_y, ann_dist_y, 0);
 				kdTree_z->annkSearch(queryPt_z, COHERENCENUM, ann_index_z, ann_dist_z, 0);
@@ -1316,7 +1318,7 @@ void DoPAR::computeKCoherence(){
 	}
 	delete[] ann_index_x;		delete[] ann_index_y;		delete[] ann_index_z;
 	delete[] ann_dist_x;		delete[] ann_dist_y;		delete[] ann_dist_z;
-
+	
 	long time_end = clock();
 	cout << endl << "done. clocks = " << (time_end - time_start) / CLOCKS_PER_SEC;
 }
@@ -1341,16 +1343,13 @@ bool DoPAR::searchVolume(int level) {
 		cend -=1;														//3	//2	//1	//1
 	}
 
-	vector<size_idx> compareIdx; 
-	size_dist curDis, curError, IndexHisWeight;
-	CvMat* current_neighbor = cvCreateMat(1, blockSize_*blockSize_, CV_32F);		//rows = 1, cols = dimesnion
 	bool isUnchanged = true;
 	int direction;
-	size_dist tempHisDiff;
 
 	//For Z
 	direction = 2;
 	shuffle(m_permutation.begin(), m_permutation.end(), mersennetwistergenerator);
+#pragma omp parallel for schedule(static)
 	for (size_idx i2 = 0; i2 < Size; ++i2) {
 		size_idx idx = m_permutation[i2];			//[i][j][k] idx=i*Sxy+j*Sx+k
 		size_idx k = idx % Sx;
@@ -1359,6 +1358,7 @@ bool DoPAR::searchVolume(int level) {
 		if (i % GRID != 0 || j % GRID != 0)	continue;						//sparse grid			
 		if (isUnchangedBlock(level, direction, i, j, k)) continue;			//check neighbours all unchanged or not
 
+		CvMat* current_neighbor = cvCreateMat(1, blockSize_*blockSize_, CV_32F);
 		size_idx index = 0;
 		for (size_idx du = -start; du <= end; ++du) {	//N is neighbourhood size.
 			size_idx VCurIdx1 = Sxy * trimIndex(level, i + du) + k;
@@ -1368,7 +1368,10 @@ bool DoPAR::searchVolume(int level) {
 				index++;
 			}
 		}
-
+		
+		vector<size_idx> compareIdx; 
+		size_dist curDis, curError, IndexHisWeight;
+		size_dist tempHisDiff;
 		bool countedYN = false;
 		size_dist minError = INFINITY, minDis = INFINITY;
 		size_idx bestTIIdx;
@@ -1415,23 +1418,54 @@ bool DoPAR::searchVolume(int level) {
 			}//for (int v = -start; v <= end; ++v){
 		}//for (int u = -start; u <= end; ++u){
 
-		if (minError < INFINITY) {
-			//update NearestIndex, IndexHis, store EuDis
-			if (!setNearestIndex(level, nearestIdx_z[level], nearestWeight_z[level], IndexHis_z[level], idx, bestTIIdx, minDis))	
+
+		if (minError < INFINITY) {		
+			//if (!setNearestIndex(level, nearestIdx_z[level], nearestWeight_z[level], IndexHis_z[level], idx, bestTIIdx, minDis))	//update NearestIndex, IndexHis, store EuDis
+			//	isUnchanged = false;
+			nearestWeight_z[level][idx] = 1.0f / minDis;
+			size_idx formerNearestIdx = nearestIdx_z[level][idx];
+			if (formerNearestIdx != bestTIIdx) {
+				nearestIdx_z[level][idx] = bestTIIdx;											//update nearestIdx
+//#pragma omp critical (Z) 	
+//				{
+				if (formerNearestIdx < Sxy && formerNearestIdx >= 0) {
+					size_idx sparsedFormerNearestIdx = sparseIdx(level, formerNearestIdx);			//update IndexHis sparse grid
+					if (IndexHis_z[level][sparsedFormerNearestIdx] > 0)	IndexHis_z[level][sparsedFormerNearestIdx] -= 1.0f;
+				}
+				IndexHis_z[level][sparseIdx(level, bestTIIdx)] += 1.0f;							//update IndexHis sparse grid 	
+//				}
 				isUnchanged = false;
+			}
 		}
 		else{
 			if (!countedYN) cout << "bad...";	
 			else cout << "infinity...";
 			bestTIIdx = getRandomNearestIndex(level, IndexHis_z[level]);
-			setNearestIndex(level, nearestIdx_z[level], nearestWeight_z[level], IndexHis_z[level], idx, bestTIIdx, 100);
-			isUnchanged = false;
+			//setNearestIndex(level, nearestIdx_z[level], nearestWeight_z[level], IndexHis_z[level], idx, bestTIIdx, 100);			
+			//isUnchanged = false;
+			nearestWeight_z[level][idx] = 1.0f / 100;
+			size_idx formerNearestIdx = nearestIdx_z[level][idx];
+			if (formerNearestIdx != bestTIIdx) {
+				nearestIdx_z[level][idx] = bestTIIdx;											//update nearestIdx				 
+//#pragma omp critical (Z) 	
+//				{
+				if (formerNearestIdx < Sxy && formerNearestIdx >= 0) {		
+					size_idx sparsedFormerNearestIdx = sparseIdx(level, formerNearestIdx);			//update IndexHis sparse grid
+					if (IndexHis_z[level][sparsedFormerNearestIdx] > 0)	IndexHis_z[level][sparsedFormerNearestIdx] -= 1.0f;
+				}				
+				IndexHis_z[level][sparseIdx(level, bestTIIdx)] += 1.0f;							//update IndexHis sparse grid 	
+//				}
+				isUnchanged = false;
+			}
 		}
+		cvReleaseMat(&current_neighbor);
 	}//for (size_idx i2 = 0; i2 < Size; ++i2) {	//Z
+//#pragma omp parallel for
 
 	//For Y	
 	direction = 1;
 	shuffle(m_permutation.begin(), m_permutation.end(), mersennetwistergenerator);
+#pragma omp parallel for schedule(static)
 	for (size_idx i2 = 0; i2 < Size; ++i2) {
 		size_idx idx = m_permutation[i2];			//[i][j][k] idx=i*Sxy+j*Sx+k
 		size_idx k = idx % Sx;				
@@ -1440,6 +1474,7 @@ bool DoPAR::searchVolume(int level) {
 		if (i % GRID != 0 || k % GRID != 0)	continue;						//sparse grid			
 		if (isUnchangedBlock(level, direction, i, j, k)) continue;			//check neighbours all unchanged or not
 
+		CvMat* current_neighbor = cvCreateMat(1, blockSize_*blockSize_, CV_32F);
 		size_idx index = 0;		
 		size_idx jSx = j*Sx;
 		for (size_idx du = -start; du <= end; ++du) {	//N is neighbourhood size.
@@ -1451,6 +1486,9 @@ bool DoPAR::searchVolume(int level) {
 			}
 		}
 		
+		vector<size_idx> compareIdx;
+		size_dist curDis, curError, IndexHisWeight;
+		size_dist tempHisDiff;
 		bool countedYN = false;
 		size_dist minError = INFINITY, minDis = INFINITY;
 		size_idx bestTIIdx;
@@ -1496,23 +1534,54 @@ bool DoPAR::searchVolume(int level) {
 			}//for (int v = -start; v <= end; ++v){
 		}//for (int u = -start; u <= end; ++u){
 
-		if (minError < INFINITY) {
-			//update NearestIndex, IndexHis, store EuDis
-			if (!setNearestIndex(level, nearestIdx_y[level], nearestWeight_y[level], IndexHis_y[level], idx, bestTIIdx, minDis))	
+		if (minError < INFINITY) {//update NearestIndex, IndexHis, store EuDis
+			
+			//if (!setNearestIndex(level, nearestIdx_y[level], nearestWeight_y[level], IndexHis_y[level], idx, bestTIIdx, minDis))
+			//	isUnchanged = false;
+			size_idx formerNearestIdx = nearestIdx_y[level][idx];
+			nearestWeight_y[level][idx] = 1.0f / minDis;
+			if (formerNearestIdx != bestTIIdx) {
+				nearestIdx_y[level][idx] = bestTIIdx;											//update nearestIdx
+//#pragma omp critical (Y) 	
+//				{
+				if (formerNearestIdx < Sxy && formerNearestIdx >= 0) {
+					size_idx sparsedFormerNearestIdx = sparseIdx(level, formerNearestIdx);			//update IndexHis sparse grid
+					if (IndexHis_y[level][sparsedFormerNearestIdx] > 0)	IndexHis_y[level][sparsedFormerNearestIdx] -= 1.0f;
+				}
+				IndexHis_y[level][sparseIdx(level, bestTIIdx)] += 1.0f;							//update IndexHis sparse grid 	
+//				}
 				isUnchanged = false;
+			}
 		}
 		else {
 			if (!countedYN) cout << "bad...";
 			else cout << "infinity...";
 			bestTIIdx = getRandomNearestIndex(level, IndexHis_y[level]);
-			setNearestIndex(level, nearestIdx_y[level], nearestWeight_y[level], IndexHis_y[level], idx, bestTIIdx, 100);
-			isUnchanged = false;
+			//setNearestIndex(level, nearestIdx_y[level], nearestWeight_y[level], IndexHis_y[level], idx, bestTIIdx, 100);		
+			//isUnchanged = false;
+			size_idx formerNearestIdx = nearestIdx_y[level][idx];
+			nearestWeight_y[level][idx] = 1.0f / 100;
+			if (formerNearestIdx != bestTIIdx) {
+				nearestIdx_y[level][idx] = bestTIIdx;											//update nearestIdx
+//#pragma omp critical (Y) 	
+//				{
+				if (formerNearestIdx < Sxy && formerNearestIdx >= 0) {
+					size_idx sparsedFormerNearestIdx = sparseIdx(level, formerNearestIdx);			//update IndexHis sparse grid
+					if (IndexHis_y[level][sparsedFormerNearestIdx] > 0)	IndexHis_y[level][sparsedFormerNearestIdx] -= 1.0f;
+				}
+				IndexHis_y[level][sparseIdx(level, bestTIIdx)] += 1.0f;							//update IndexHis sparse grid 	
+//				}
+				isUnchanged = false;
+			}
 		}
+		cvReleaseMat(&current_neighbor);
 	}//for (size_idx i2 = 0; i2 < Size; ++i2) {	//Y
+//#pragma omp parallel for
 
 	//For X		
 	direction = 0;
 	shuffle(m_permutation.begin(), m_permutation.end(), mersennetwistergenerator);
+#pragma omp parallel for schedule(static)
 	for (size_idx i2 = 0; i2 < Size; ++i2) {
 		size_idx idx = m_permutation[i2];			//[i][j][k] idx=i*Sxy+j*Sx+k
 		size_idx k = idx % Sx;				
@@ -1521,6 +1590,7 @@ bool DoPAR::searchVolume(int level) {
 		if (j % GRID != 0 || k % GRID != 0)	continue;					//sparse grid			
 		if(isUnchangedBlock(level,direction, i,j,k)) continue;			//check neighbours all unchanged or not
 		
+		CvMat* current_neighbor = cvCreateMat(1, blockSize_*blockSize_, CV_32F);
 		size_idx index = 0;		
 		size_idx iSxy = Sxy * i;
 		for (size_idx du = -start; du <= end; ++du) {	//N is neighbourhood size.
@@ -1532,6 +1602,9 @@ bool DoPAR::searchVolume(int level) {
 			}
 		}
 
+		vector<size_idx> compareIdx;
+		size_dist curDis, curError, IndexHisWeight;
+		size_dist tempHisDiff;
 		bool countedYN = false;
 		size_dist minError = INFINITY, minDis = INFINITY;
 		size_idx bestTIIdx;
@@ -1579,20 +1652,50 @@ bool DoPAR::searchVolume(int level) {
 			}//for (int v = -start; v <= end; ++v){
 		}//for (int u = -start; u <= end; ++u){
 
-		if (minError < INFINITY){
-			//update NearestIndex, IndexHis, store EuDis
-			if (!setNearestIndex(level, nearestIdx_x[level], nearestWeight_x[level], IndexHis_x[level], idx, bestTIIdx, minDis))
-				isUnchanged = false;	
-		}else{
+		if (minError < INFINITY){//update NearestIndex, IndexHis, store EuDis		
+			
+			//if (!setNearestIndex(level, nearestIdx_y[level], nearestWeight_y[level], IndexHis_y[level], idx, bestTIIdx, minDis))
+			//	isUnchanged = false;
+			size_idx formerNearestIdx = nearestIdx_x[level][idx];		
+			nearestWeight_x[level][idx] = 1.0f / minDis;
+			if (formerNearestIdx != bestTIIdx) {
+				nearestIdx_x[level][idx] = bestTIIdx;											//update nearestIdx				
+//#pragma omp critical (X) 
+//				{
+					if (formerNearestIdx < Sxy && formerNearestIdx >= 0) {
+						size_idx sparsedFormerNearestIdx = sparseIdx(level, formerNearestIdx);		//update IndexHis sparse grid 
+						if (IndexHis_x[level][sparsedFormerNearestIdx] > 0)	IndexHis_x[level][sparsedFormerNearestIdx] -= 1.0f;
+					}				
+					IndexHis_x[level][sparseIdx(level, bestTIIdx)] += 1.0f;							//update IndexHis sparse grid 	
+//				}
+				isUnchanged = false;
+			}
+		}
+		else{
 			if (!countedYN) cout << "bad...";
 			else cout << "infinity...";
 			bestTIIdx = getRandomNearestIndex(level, IndexHis_x[level]);
-			setNearestIndex(level, nearestIdx_x[level], nearestWeight_x[level], IndexHis_x[level], idx, bestTIIdx, 100);
-			isUnchanged = false;
+			//setNearestIndex(level, nearestIdx_x[level], nearestWeight_x[level], IndexHis_x[level], idx, bestTIIdx, 100);
+			//isUnchanged = false;
+			size_idx formerNearestIdx = nearestIdx_x[level][idx];
+			nearestWeight_x[level][idx] = 1.0f / 100;
+			if (formerNearestIdx != bestTIIdx) {
+				nearestIdx_x[level][idx] = bestTIIdx;											//update nearestIdx				
+//#pragma omp critical (X) 
+//				{
+					if (formerNearestIdx < Sxy && formerNearestIdx >= 0) {
+						size_idx sparsedFormerNearestIdx = sparseIdx(level, formerNearestIdx);		//update IndexHis sparse grid 
+						if (IndexHis_x[level][sparsedFormerNearestIdx] > 0)	IndexHis_x[level][sparsedFormerNearestIdx] -= 1.0f;
+					}
+					IndexHis_x[level][sparseIdx(level, bestTIIdx)] += 1.0f;							//update IndexHis sparse grid 	
+//				}
+				isUnchanged = false;
+			}
 		}
+		cvReleaseMat(&current_neighbor);
 	}//for (size_idx i2 = 0; i2 < Size; ++i2) {	//X
+//#pragma omp parallel for
 
-	cvReleaseMat(&current_neighbor);
 	return isUnchanged;
 }
 
@@ -1697,6 +1800,7 @@ void DoPAR::optimizeVolume(int level) {
 	const size_idx Sxz = Sx * Sz;
 	const size_idx Syz = Sy * Sz;
 	const size_idx Size = Sxy * Sz;
+	const size_idx Sxy3 = 3 * Sxy;
 	const size_idx candSize = static_cast<size_idx>(blockSize_ / GRID) * static_cast<size_idx>(blockSize_ / GRID);	//candidate has sparse grid
 	const size_idx start = static_cast<size_idx>(blockSize_ / (2 * GRID)) + 1;	//3	//3	//2	//2
 	const size_idx end = start;					
@@ -1708,6 +1812,8 @@ void DoPAR::optimizeVolume(int level) {
 	}
 	
 	shuffle(m_permutation.begin(), m_permutation.end(), mersennetwistergenerator);
+
+#pragma omp parallel for schedule(static)
 	for (size_idx i2 = 0; i2 < Size; ++i2) {
 		size_idx idx = m_permutation[i2];			//[i][j][k]	
 		size_idx k = idx % Sx;
@@ -1855,7 +1961,6 @@ void DoPAR::optimizeVolume(int level) {
 		tempnum = distance(colorCand_z.begin(), temporder);
 		minDis_z = abs(colorCand_z[tempnum] - color_avg);
 		closestIdx_z = posCand_z[tempnum];
-
 		if (Origin_z[level][idx] != closestIdx_z) {											// update Z origin, isUnchangeblock
 			Origin_z[level][idx] = closestIdx_z;
 			isUnchanged_z[level][idx] = false;
@@ -1869,7 +1974,6 @@ void DoPAR::optimizeVolume(int level) {
 		tempnum = distance(colorCand_y.begin(), temporder);
 		minDis_y = abs(colorCand_y[tempnum] - color_avg);
 		closestIdx_y = posCand_y[tempnum];
-
 		if (Origin_y[level][idx] != closestIdx_y) {											// update Y origin, isUnchangeblock
 			Origin_y[level][idx] = closestIdx_y;
 			isUnchanged_y[level][idx] = false;
@@ -1883,28 +1987,13 @@ void DoPAR::optimizeVolume(int level) {
 		tempnum = distance(colorCand_x.begin(), temporder);
 		minDis_x = abs(colorCand_x[tempnum] - color_avg);
 		closestIdx_x = posCand_x[tempnum];
-
 		if (Origin_x[level][idx] != closestIdx_x) {											// update X origin, isUnchangeblock
 			Origin_x[level][idx] = closestIdx_x;
 			isUnchanged_x[level][idx] = false;
 		}
 		else isUnchanged_x[level][idx] = true;
 
-
-		size_idx newPos;																		//PosHis size = 3TI
-		
-		//if (minDis_z <= minDis_x && minDis_z < minDis_y) {//Z
-		//	tempcolor = m_exemplar_z[level][closestIdx_z];
-		//	newPos = Sxy * 2 + closestIdx_z;												
-		//}
-		//else if (minDis_y <= minDis_z && minDis_y < minDis_x) {//Y
-		//	tempcolor = m_exemplar_y[level][closestIdx_y];
-		//	newPos = Sxy + closestIdx_y;													
-		//}
-		//else {//X
-		//	tempcolor = m_exemplar_x[level][closestIdx_x];
-		//	newPos = closestIdx_x;													
-		//}
+		size_idx newPos;																	//PosHis size = 3TI		
 		if (minDis_x <= minDis_y && minDis_x < minDis_z) {
 			tempcolor = m_exemplar_x[level][closestIdx_x];
 			newPos = closestIdx_x;															// TI*0+Pos_x	
@@ -1917,7 +2006,7 @@ void DoPAR::optimizeVolume(int level) {
 			tempcolor = m_exemplar_z[level][closestIdx_z];
 			newPos = Sxy * 2 + closestIdx_z;												// TI*2+Pos_z			
 		}
-		else {
+		else {																				// if minDis_z==minDis_y==minDis_x rand.
 			int ori = rand() % 3;
 			switch (ori){
 			case(0) :
@@ -1934,10 +2023,22 @@ void DoPAR::optimizeVolume(int level) {
 				break;
 			}		
 		}
-		updatePosHis(level, PosHis[level], SelectedPos[level], idx, newPos);				// update PosHis 
+
+//#pragma omp critical (updatePosHis)
+//		{
+//			updatePosHis(level, PosHis[level], SelectedPos[level], idx, newPos);			// update PosHis 
+//		}
+		size_idx formerPos = SelectedPos[level][idx];
+		if (formerPos < Sxy3 && formerPos >= 0)
+			if (PosHis[level][formerPos] > 0)	PosHis[level][formerPos] -= 1.0f;
+		SelectedPos[level][idx] = newPos;
+		PosHis[level][newPos] += 1.0f;
+
+
 		m_volume[level][idx] = tempcolor;													// update m_volume color
 
 	}//for (size_idx i2 = 0; i2 < Size; ++i2) {
+
 }
 
 
@@ -1954,10 +2055,10 @@ bool DoPAR::setNearestIndex(int level, vector<size_idx>& nearestIdx, vector<size
 
 	if (formerNearestIdx < TEXSIZE[level] * TEXSIZE[level] && formerNearestIdx >= 0) {
 		size_idx sparsedFormerNearestIdx = sparseIdx(level, formerNearestIdx);		//update IndexHis sparse grid 
-		if (IndexHis[sparsedFormerNearestIdx] > 0)	IndexHis[sparsedFormerNearestIdx] -= deltaIndexHis[level];	
+		if (IndexHis[sparsedFormerNearestIdx] > 0)	IndexHis[sparsedFormerNearestIdx] -= 1.0f;
 	}
 
-	IndexHis[sparseIdx(level, newNearestIdx)] += deltaIndexHis[level];				//update IndexHis sparse grid 	
+	IndexHis[sparseIdx(level, newNearestIdx)] += 1.0f;				//update IndexHis sparse grid 	
 	return false;
 }
 
@@ -1967,11 +2068,15 @@ void DoPAR::updatePosHis(int level, vector<size_dist>& PosHis, vector<size_idx>&
 	// no sparse grid!
 	size_idx formerPos = selectedPos[idx3d];
 	if (formerPos < 3 * TEXSIZE[level] * TEXSIZE[level] && formerPos>=0)
-		if (PosHis[formerPos] > 0)	PosHis[formerPos] -= deltaPosHis[level];
+		if (PosHis[formerPos] > 0)	PosHis[formerPos] -= 1.0f;
 	
 	selectedPos[idx3d] = newPos;
-	PosHis[newPos] += deltaPosHis[level];
+	PosHis[newPos] += 1.0f;
 }
+
+// ========= Color Histogram for optimize step =======
+
+
 
 void DoPAR::writeHistogram(int level) {
 	const size_idx TEXSIZE_ = TEXSIZE[level];
@@ -2099,7 +2204,6 @@ void DoPAR::writeHistogram(int level) {
 
 	cout << endl << "croped Histograms are plotted.";
 }
-
 
 void DoPAR::upsampleVolume(int level) {	
 	const size_idx TEXSIZE_ = TEXSIZE[level];
@@ -2252,7 +2356,20 @@ void DoPAR::upsampleVolume(int level) {
 	cout << endl << "upsampled from " << level << " to " << level + 1;
 }
 
+void DoPAR::checkHisError(int level) {
+	const size_idx sizeIndexHis = TEXSIZE[level] * TEXSIZE[level] /4;
+	const size_idx sizePosHis = 3 * TEXSIZE[level] * TEXSIZE[level];
+	const size_idx Sum = TEXSIZE[level] * TEXSIZE[level] * TEXSIZE[level];
+	int countIndexError(0), countPosError(0);
+	size_idx realSum(0);
 
+	realSum = 0;
+#pragma omp parallel for reduction(+: realSum)   
+	for (size_idx i = 0; i < sizePosHis; i++) {
+		realSum += PosHis[level][i];
+	}
+	cout << endl << "Pos error=" << Sum - realSum << " "<< (Sum - realSum)*1.0/Sum;		//very small
+}
 
 
 

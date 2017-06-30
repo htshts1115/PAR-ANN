@@ -63,8 +63,8 @@ private:
 
 	vector<size_dist> factorIndex;						// linear weighting factor
 	vector<size_dist> factorPos;
-	vector<size_dist> deltaIndexHis;					// update IndexHis value per operation
-	vector<size_dist> deltaPosHis;						// update PosHis value per operation
+	//vector<size_dist> deltaIndexHis;					// update IndexHis value per operation
+	//vector<size_dist> deltaPosHis;					// update PosHis value per operation
 	vector<size_dist> avgIndexHis;						// default average value of IndexHis
 	vector<size_dist> avgPosHis;						// default average value of PosHis
 	vector<size_dist> pdfdevS;							// gaussian distribution factor for search step
@@ -208,7 +208,7 @@ private:
 
 	void writeHistogram(int level);
 
-
+	void checkHisError(int level);
 };
 
 //for now the total size of last level is: 4*(1+1+0.75+3+6) = 4*12 times volumesize!
