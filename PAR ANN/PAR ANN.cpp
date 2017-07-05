@@ -6,8 +6,6 @@
 
 int main(int argc, const char* argv[])
 {	
-	
-
 
 	string CurWorkExeFile = argv[0];
 
@@ -22,18 +20,20 @@ int main(int argc, const char* argv[])
 }
 //t = omp_get_wtime();
 //cout << endl << omp_get_num_procs();
-//	vector<int> a(1000, 1);
-//	vector<int> b(1000, 2);
-//	vector<int> c(1000);	
+//vector<int> a(1000, 1);
+//vector<int> b(1000, 2);
+//vector<int> c(1000);
 //#pragma omp parallel for
-//	for (int i = 0; i < 1000; i++) {
-////#pragma omp atomic
-////		b[0]+=a[0];	//wrong
+//for (int i = 0; i < 1000; i++) {
+//	int& add = b[i];
 //#pragma omp atomic
-//		b[0] += 1;	//right
+//	//		b[i]+=a[i];	//wrong
+//	//		add += a[i];//wrong
+//	add += 1;	//right
 //
-//		c[i] = a[i] + b[i];	
-//	}
+//	c[i] = a[i] + b[i];
+//}
+//cout << endl << c[0] << " " << c[1] << " " << c[2]; _getch();
 //vector<int> a(40, 0);
 //vector<int> b(10000, 1);
 //#pragma omp parallel for schedule(static)
