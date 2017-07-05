@@ -178,6 +178,7 @@ private:
 
 	//=========== phase 1: search ================================
 	bool searchVolume(int level);
+	bool searchVolume_nosparsed(int level);
 
 	size_dist getFullDistance(int level, vector<size_color>& exemplar, size_idx idx2d, CvMat* dataMat);
 
@@ -188,7 +189,7 @@ private:
 
 	//========== phase 2: optimization ===========================
 	void optimizeVolume(int level);
-
+	void optimizeVolume_nosparsed(int level);
 
 	//============== index histogram ============
 	vector<vector<size_dist>> IndexHis_x, IndexHis_y, IndexHis_z;//sparse grid!		//[level][idx2d/4]=IndexHis		 //3TI different IndexHis
