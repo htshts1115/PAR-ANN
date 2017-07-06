@@ -1303,7 +1303,7 @@ void DoPAR::computeKCoherence(){
 				kdTree_z->annkSearch(queryPt_z, COHERENCENUM, ann_index_z, ann_dist_z, 0);
 
 				//Set K-Coherence
-				size_idx bias_TIindex = TIindex + bias*TEXSIZE_ + bias;
+				size_idx bias_TIindex = TIindex + bias*TEXSIZE_ + bias;									//
 				KCoherence_x[level][bias_TIindex].resize(COHERENCENUM);
 				KCoherence_y[level][bias_TIindex].resize(COHERENCENUM);
 				KCoherence_z[level][bias_TIindex].resize(COHERENCENUM);
@@ -1377,7 +1377,7 @@ bool DoPAR::searchVolume(int level) {
 		}
 		
 		int countz(1);
-		size_dist temphis(0), curhis(0);
+		size_dist besthis(0), curhis(0);
 
 		vector<size_idx> compareIdx; 
 		size_dist curDis, curError, IndexHisWeight;
@@ -1415,25 +1415,38 @@ bool DoPAR::searchVolume(int level) {
 					tempHisDiff = max(0.0f, curhis - avgIndexHis[level]);
 					IndexHisWeight = 1.0f + factorIndex[level] * tempHisDiff;								
 					//curError = IndexHisWeight * curDis;
-					curError = curDis * max(IndexHisWeight, 1.0f / gaussian_pdf(tempHisDiff, pdfdevS[level]));
-					
+					curError = curDis * max(IndexHisWeight, 1.0f / gaussian_pdf(tempHisDiff, pdfdevS[level]));					
 					countedYN = true;
-					//if (minError == curError) {
-					//	if (curhis < temphis) {
-					//		minDis = curDis;
-					//		bestTIIdx = temp2didx;
-					//		temphis = curhis;
-					//		countz = 1;
-					//	}
-					//	else if (curhis == temphis) countz++;
-					//}
+					
 					if (minError > curError) {								//min error			
 						minError = curError;
 						minDis = curDis;									
 						bestTIIdx = temp2didx;
-
-						//temphis = curhis;
+						besthis = curhis;
 						//countz = 1;
+					}
+					else if (minError == curError) {
+						if (curhis < besthis) {
+							minDis = curDis;
+							bestTIIdx = temp2didx;
+							besthis = curhis;
+							//countz = 1;
+						}
+						//int tempcurrent_neighbor = cvmGet(current_neighbor, 0, 1 + blockSize[level] * blockSize[level] / 2);
+						//tempcurrent_neighbor = m_volume[level][idx];
+						else if (curhis == besthis) {
+							//if (abs(m_volume[level][idx] - m_exemplar_z[level][temp2didx]) < abs(m_volume[level][idx] - m_exemplar_z[level][bestTIIdx])) {
+							//	bestTIIdx = temp2didx;
+							//	countz = 1;
+							//}
+							//else if (abs(m_volume[level][idx] - m_exemplar_z[level][temp2didx]) == abs(m_volume[level][idx] - m_exemplar_z[level][bestTIIdx]) 
+							//	&& m_exemplar_z[level][temp2didx]!= m_exemplar_z[level][bestTIIdx])
+							//	countz++;
+							//level 0,1,2 no. level 3+: 2~8... 
+
+							// if IndexHis same, choose ColorHis
+
+						}
 					}
 					compareNum++;
 					compareIdx.push_back(temp2didx);
@@ -1446,7 +1459,7 @@ bool DoPAR::searchVolume(int level) {
 			//if (!setNearestIndex(level, nearestIdx_z[level], nearestWeight_z[level], IndexHis_z[level], idx, bestTIIdx, minDis))	//update NearestIndex, IndexHis, store EuDis
 			//	isUnchanged = false;
 
-			//if (countz > 1) printf("%d ", countz);	//level 0,1 almost no. level 2+: 2,3,4... (based on atomic already!)
+			//if (countz > 1) printf(" %d", countz);	//level 0,1 almost no. level 2+: 2,3,4... (based on atomic already!)
 
 			nearestWeight_z[level][idx] = 1.0f / minDis;
 			size_idx formerNearestIdx = nearestIdx_z[level][idx];
@@ -2139,7 +2152,7 @@ size_dist DoPAR::getFullDistance(int level, vector<size_color>& exemplar, size_i
 	size_idx tempIdx;
 	size_dist dif;
 
-	for (size_idx i = -R; i < R; ++i) {
+	for (size_idx i = -R; i < R; ++i) {		//[-4,3]
 		tempIdx = idx2d + i*Sx;
 		for (size_idx j = -R; j < R; ++j) {
 			dif = exemplar[tempIdx + j] - cvmGet(dataMat, 0, n++);
@@ -2744,7 +2757,13 @@ void DoPAR::updatePosHis(int level, vector<size_dist>& PosHis, vector<size_idx>&
 }
 
 // ========= Color Histogram for optimize step =======
+void DoPAR::initColorHis_exemplar() {
 
+}
+
+void DoPAR::initColorHis_synthesis(int level) {
+
+}
 
 
 void DoPAR::writeHistogram(int level) {
