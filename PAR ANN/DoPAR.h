@@ -194,7 +194,7 @@ private:
 	//========== phase 2: optimization ===========================
 	void optimizeVolume(int level);
 	//void optimizeVolume_nosparsed(int level);
-	bool FIRSTRUN = false;
+	bool FIRSTRUN = true;
 	void optimizeVolume_firstrun(int level);	//firstrun without colorhis
 
 	//============== index histogram ============

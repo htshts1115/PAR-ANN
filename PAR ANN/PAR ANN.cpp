@@ -38,6 +38,7 @@ int main(int argc, const char* argv[])
 //vector<int> b(10000, 1);
 //#pragma omp parallel for schedule(static)
 //#pragma omp parallel for schedule(dynamic)	//too slow in our case
+//#pragma omp for nowait schedule(static)		//used in search step, 3 direction search no wait, but last one needs waiting otherwise will return isUnchanged
 //for (int i = 0; i < a.size(); i++) {
 //	for (int j = 0; j < b.size(); j++) {
 //		if (i % 8 == 1) break;			//inside loop can use break
