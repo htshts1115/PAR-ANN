@@ -65,6 +65,15 @@ int main(int argc, const char* argv[])
 //cout << endl << 124999999 * (1.0f / (500 * 500));	//=500 should be 499!
 //_getch();
 
+
+//auto result = std::minmax_element(foo.begin(), foo.end());
+//// print result:
+//std::cout << "min is " << *result.first;
+//std::cout << ", at position " << (result.first - foo.begin()) << '\n';
+//std::cout << "max is " << *result.second;
+//std::cout << ", at position " << (result.second - foo.begin()) << '\n';
+
+
 ////--------------check address
 
 //vector<int> list = { 0,1,2,3,4,5,6,7,8,9 };

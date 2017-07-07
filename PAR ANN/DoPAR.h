@@ -7,6 +7,7 @@ typedef struct { long x, y, z; } _XyzStrType;		//BarDMap()
 typedef float size_color;
 typedef long size_idx;
 typedef float size_dist;
+typedef long size_hiscount;
 
 const unsigned long iSTEPLENGTH = 524288L;
 static void iCGetDirFileName(string OStr, string& Dir, string & FName)
@@ -59,6 +60,8 @@ private:
 	const size_idx GRID = 2;							// sparse grid
 	const size_dist min_dist = 0.1f;
 	const bool DISTANCEMAP_ON = true;					// convert to distance map model
+	const bool ColorHis_ON = true;			
+	
 	const bool GenerateDMTI = false;					// generate DM transformed TI
 
 	vector<size_dist> factorIndex;						// linear weighting factor
@@ -69,6 +72,7 @@ private:
 	vector<size_dist> avgPosHis;						// default average value of PosHis
 	vector<size_dist> pdfdevS;							// gaussian distribution factor for search step
 	vector<size_dist> pdfdevO;							// gaussian distribution factor for optimize step
+	vector<size_dist> pdfdevColor;						// gaussian distribution factor for colorHis
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -178,38 +182,48 @@ private:
 
 	//=========== phase 1: search ================================
 	bool searchVolume(int level);
-	bool searchVolume_nosparsed(int level);
+	//bool searchVolume_nosparsed(int level);
 
 	size_dist getFullDistance(int level, vector<size_color>& exemplar, size_idx idx2d, CvMat* dataMat);
 
 	vector<vector<bool>> isUnchanged_x, isUnchanged_y, isUnchanged_z;				//[level][idx3d]=isUnchanged	bool
 	bool isUnchangedBlock(int level, int direction, size_idx i, size_idx j, size_idx k);
 
-	size_idx DoPAR::getRandomNearestIndex(int level, vector<size_dist>& IndexHis);	//for bad points
+	size_idx DoPAR::getRandomNearestIndex(int level, vector<size_hiscount>& IndexHis);	//for bad points
 
 	//========== phase 2: optimization ===========================
 	void optimizeVolume(int level);
-	void optimizeVolume_nosparsed(int level);
+	//void optimizeVolume_nosparsed(int level);
+	bool FIRSTRUN = false;
+	void optimizeVolume_firstrun(int level);	//firstrun without colorhis
 
 	//============== index histogram ============
-	vector<vector<size_dist>> IndexHis_x, IndexHis_y, IndexHis_z;//sparse grid!		//[level][idx2d/4]=IndexHis		 //3TI different IndexHis
+	vector<vector<size_hiscount>> IndexHis_x, IndexHis_y, IndexHis_z;//sparse grid!	//[level][idx2d/4]=IndexHis		 //3TI different IndexHis
 	vector<vector<size_idx>> nearestIdx_x, nearestIdx_y, nearestIdx_z;				//[level][idx3d]=nearestIdx2d
 	vector<vector<size_dist>> nearestWeight_x, nearestWeight_y, nearestWeight_z;	//[level][idx3d]=nearestWeight	eudis^-0.6 or eudis^-1
 
-	bool setNearestIndex(int level, vector<size_idx>& nearestIdx, vector<size_dist>& nearestWeight, vector<size_dist>&IndexHis,
+	bool setNearestIndex(int level, vector<size_idx>& nearestIdx, vector<size_dist>& nearestWeight, vector<size_hiscount>&IndexHis,
 		size_idx idx3d, size_idx newNearestIdx, size_dist dis);
 
 
 	//=========== position histogram =============
-	vector<vector<size_dist>> PosHis;												//[level][idx2d*3]=IndexHis		// no sparse grid
+	vector<vector<size_hiscount>> PosHis;											//[level][idx2d*3]=IndexHis		// no sparse grid
 	vector<vector<size_idx>> SelectedPos;											//[level][idx3d]=idx2d (TIsize*3)
 	vector<vector<size_idx>> Origin_x, Origin_y, Origin_z;							//[level][idx3d]=OriginTIidx2d
 
-	void updatePosHis(int level, vector<size_dist>& PosHis, vector<size_idx>& selectedPos, size_idx idx3d, size_idx newPos);
+	//void updatePosHis(int level, vector<size_hiscount>& PosHis, vector<size_idx>& selectedPos, size_idx idx3d, size_idx newPos);
 
 	void writeHistogram(int level);
 
 	void checkHisError(int level);
+
+	//============ Color Histogram ===============
+	int ColorHis_BinNum;
+	vector<vector<size_hiscount>> ColorHis_exemplar;								//[level][BinNum], BinNum is the same for all level
+	vector<vector<size_hiscount>> ColorHis_synthesis;
+
+	void initColorHis_exemplar();
+	void initColorHis_synthesis(int level);
 };
 
 //for now the total size of last level is: 4*(1+1+0.75+3+6) = 4*12 times volumesize!
