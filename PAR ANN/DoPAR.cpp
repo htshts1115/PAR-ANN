@@ -524,9 +524,9 @@ void DoPAR::DoANNOptimization() {
 		}	
 		if (curlevel == MULTIRES - 1 || TEXSIZE[curlevel] >= 256) {// ouput model & histogram
 			outputmodel(curlevel);
-			writeHistogram(curlevel);
+			//writeHistogram(curlevel);
 		}
-		//if (TEXSIZE[curlevel] < 256 && TEXSIZE[curlevel] >= 128)	writeHistogram(curlevel);		
+		if (TEXSIZE[curlevel] < 256 && TEXSIZE[curlevel] >= 128)	writeHistogram(curlevel);		
 
 		//checkHisError(curlevel);	//very little error
 
@@ -705,7 +705,7 @@ bool DoPAR::loadExemplar() {
 			cropedMatzx.copyTo(matzx);
 			Mat cropedMatxy = matxy(Rect(0, 0, cropedsize, cropedsize));
 			cropedMatxy.copyTo(matxy);
-			cout << endl << "croped the TI so that TI size%32=0";
+			cout << endl << "TIs are croped to "<< cropedsize <<" to fit multi-grid";
 		}
 		MULTIRES = 5;
 		if (tempSize == 512) blockSize = {8, 8, 8, 6, 6};
@@ -721,7 +721,7 @@ bool DoPAR::loadExemplar() {
 			cropedMatzx.copyTo(matzx);
 			Mat cropedMatxy = matxy(Rect(0, 0, cropedsize, cropedsize));
 			cropedMatxy.copyTo(matxy);
-			cout << endl << "croped the TI so that TI size%16=0";
+			cout << endl << "TIs are croped to " << cropedsize << " to fit multi-grid";
 		}
 		MULTIRES = 4;
 		if (tempSize == 256) blockSize = { 8, 8, 8, 6 };
@@ -737,7 +737,7 @@ bool DoPAR::loadExemplar() {
 			cropedMatzx.copyTo(matzx);
 			Mat cropedMatxy = matxy(Rect(0, 0, cropedsize, cropedsize));
 			cropedMatxy.copyTo(matxy);
-			cout << endl << "croped the TI so that TI size%8=0";
+			cout << endl << "TIs are croped to " << cropedsize << " to fit multi-grid";
 		}
 		MULTIRES = 3;
 		if (tempSize == 128) blockSize = { 8, 8, 6 };
@@ -1251,13 +1251,13 @@ void DoPAR::computeKCoherence(){
 	KCoherence_x.resize(MULTIRES);
 	KCoherence_y.resize(MULTIRES);
 	KCoherence_z.resize(MULTIRES);
-	//==========multiple nearest index, position control=========
-	ANNidxArray ann_index_x = new size_idx[COHERENCENUM];
-	ANNidxArray ann_index_y = new size_idx[COHERENCENUM];
-	ANNidxArray ann_index_z = new size_idx[COHERENCENUM];
-	ANNdistArray ann_dist_x = new size_dist[COHERENCENUM];
-	ANNdistArray ann_dist_y = new size_dist[COHERENCENUM];
-	ANNdistArray ann_dist_z = new size_dist[COHERENCENUM];
+	////==========multiple nearest index, position control=========
+	//ANNidxArray ann_index_x = new size_idx[COHERENCENUM];
+	//ANNidxArray ann_index_y = new size_idx[COHERENCENUM];
+	//ANNidxArray ann_index_z = new size_idx[COHERENCENUM];
+	//ANNdistArray ann_dist_x = new size_dist[COHERENCENUM];
+	//ANNdistArray ann_dist_y = new size_dist[COHERENCENUM];
+	//ANNdistArray ann_dist_z = new size_dist[COHERENCENUM];
 
 	for (int level = 0; level < MULTIRES; ++level) {
 		size_idx TEXSIZE_ = TEXSIZE[level];
@@ -1265,6 +1265,7 @@ void DoPAR::computeKCoherence(){
 
 		size_idx width = TEXSIZE_ - blockSize_ + 1;
 		size_idx height = TEXSIZE_ - blockSize_ + 1;
+		size_idx maxSize2d = TEXSIZE_ * height + width;
 		size_idx dim = blockSize_ * blockSize_;
 		size_idx bias = blockSize_ / 2;
 		size_idx numData = width * height;
@@ -1281,10 +1282,10 @@ void DoPAR::computeKCoherence(){
 		p_source_x = annAllocPts(numData, dim);			//rows='area' numData, cols=dimension (Neighbour size)
 		p_source_y = annAllocPts(numData, dim);
 		p_source_z = annAllocPts(numData, dim);
-		ANNpoint queryPt_x, queryPt_y, queryPt_z;
-		queryPt_x = annAllocPt(dim);
-		queryPt_y = annAllocPt(dim);
-		queryPt_z = annAllocPt(dim);
+		//ANNpoint queryPt_x, queryPt_y, queryPt_z;
+		//queryPt_x = annAllocPt(dim);
+		//queryPt_y = annAllocPt(dim);
+		//queryPt_z = annAllocPt(dim);
 
 		size_idx row = 0;
 		for (size_idx i = 0; i < width; ++i) {
@@ -1304,54 +1305,98 @@ void DoPAR::computeKCoherence(){
 				++row;
 			}
 		}
-
 		//ANNpoint* data point array = m_neighbor_kdTree_ptr_x, number of points = numData, dimension
 		kdTree_x = new ANNkd_tree(p_source_x, numData, dim);		//build ANNkd_tree
 		kdTree_y = new ANNkd_tree(p_source_y, numData, dim);
 		kdTree_z = new ANNkd_tree(p_source_z, numData, dim);
 
-	//! annkSearch write on shared data, so cannot use parallel for here
-		for (size_idx i = 0; i < width; ++i) {
-			for (size_idx j = 0; j < height; ++j) {
-				size_idx num = 0;
-				size_idx TIindex = TEXSIZE_ * i + j;
-				for (size_idx m = 0; m < blockSize_; ++m) {
-					for (size_idx n = 0; n < blockSize_; ++n) {
-						size_idx index = TIindex + TEXSIZE_ * m + n;	//[i+m][j+n]
-						queryPt_x[num] = m_exemplar_x[level][index];
-						queryPt_y[num] = m_exemplar_y[level][index];
-						queryPt_z[num] = m_exemplar_z[level][index];
-						num++;
-					}
-				}
+	////! annkSearch write on shared data, so cannot use parallel for here
+	//	for (size_idx i = 0; i < width; ++i) {
+	//		for (size_idx j = 0; j < height; ++j) {
+	//			size_idx num = 0;
+	//			size_idx TIindex = TEXSIZE_ * i + j;
+	//			for (size_idx m = 0; m < blockSize_; ++m) {
+	//				for (size_idx n = 0; n < blockSize_; ++n) {
+	//					size_idx index = TIindex + TEXSIZE_ * m + n;	//[i+m][j+n]
+	//					queryPt_x[num] = m_exemplar_x[level][index];
+	//					queryPt_y[num] = m_exemplar_y[level][index];
+	//					queryPt_z[num] = m_exemplar_z[level][index];
+	//					num++;
+	//				}
+	//			}
+	//
+	//			kdTree_x->annkSearch(queryPt_x, COHERENCENUM, ann_index_x, ann_dist_x, 0);
+	//			kdTree_y->annkSearch(queryPt_y, COHERENCENUM, ann_index_y, ann_dist_y, 0);
+	//			kdTree_z->annkSearch(queryPt_z, COHERENCENUM, ann_index_z, ann_dist_z, 0);
+	//
+	//			//Set K-Coherence
+	//			size_idx bias_TIindex = TIindex + bias*TEXSIZE_ + bias;									//
+	//			KCoherence_x[level][bias_TIindex].resize(COHERENCENUM);
+	//			KCoherence_y[level][bias_TIindex].resize(COHERENCENUM);
+	//			KCoherence_z[level][bias_TIindex].resize(COHERENCENUM);
+	//			for (int k = 0; k < COHERENCENUM; ++k) {
+	//				KCoherence_x[level][bias_TIindex][k] = convertIndexANN(level, ann_index_x[k]);		//direction=0
+	//				KCoherence_y[level][bias_TIindex][k] = convertIndexANN(level, ann_index_y[k]);		//direction=1
+	//				KCoherence_z[level][bias_TIindex][k] = convertIndexANN(level, ann_index_z[k]);		//direction=2
+	//			}
+	//			//if (bias_TIindex != KCoherence_x[level][bias_TIindex][0]) { cout << endl << bias_TIindex <<" != KCoherence_x[level][bias_TIindex][0]"; _getch(); }
+	//			// K-coherence: C1(idx) = Kcoherence[0] = Origin
+	//		}
+	//	}
 
-				kdTree_x->annkSearch(queryPt_x, COHERENCENUM, ann_index_x, ann_dist_x, 0);
-				kdTree_y->annkSearch(queryPt_y, COHERENCENUM, ann_index_y, ann_dist_y, 0);
-				kdTree_z->annkSearch(queryPt_z, COHERENCENUM, ann_index_z, ann_dist_z, 0);
+#pragma omp parallel for schedule(static)
+		for (size_idx idx = 0; idx < maxSize2d; idx++) {
+			if (idx%TEXSIZE_ > width) continue;
+			ANNpoint queryPt_x, queryPt_y, queryPt_z;
+			queryPt_x = annAllocPt(dim);
+			queryPt_y = annAllocPt(dim);
+			queryPt_z = annAllocPt(dim);
+			ANNidxArray ann_index_x = new size_idx[COHERENCENUM];
+			ANNidxArray ann_index_y = new size_idx[COHERENCENUM];
+			ANNidxArray ann_index_z = new size_idx[COHERENCENUM];
+			ANNdistArray ann_dist_x = new size_dist[COHERENCENUM];
+			ANNdistArray ann_dist_y = new size_dist[COHERENCENUM];
+			ANNdistArray ann_dist_z = new size_dist[COHERENCENUM];
 
-				//Set K-Coherence
-				size_idx bias_TIindex = TIindex + bias*TEXSIZE_ + bias;									//
-				KCoherence_x[level][bias_TIindex].resize(COHERENCENUM);
-				KCoherence_y[level][bias_TIindex].resize(COHERENCENUM);
-				KCoherence_z[level][bias_TIindex].resize(COHERENCENUM);
-				for (int k = 0; k < COHERENCENUM; ++k) {
-					KCoherence_x[level][bias_TIindex][k] = convertIndexANN(level, ann_index_x[k]);		//direction=0
-					KCoherence_y[level][bias_TIindex][k] = convertIndexANN(level, ann_index_y[k]);		//direction=1
-					KCoherence_z[level][bias_TIindex][k] = convertIndexANN(level, ann_index_z[k]);		//direction=2
+			int num = 0;
+			for (size_idx m = 0; m < blockSize_; ++m) {
+				for (size_idx n = 0; n < blockSize_; ++n) {
+					size_idx index = idx + TEXSIZE_ * m + n;	//[i+m][j+n]
+					queryPt_x[num] = m_exemplar_x[level][index];
+					queryPt_y[num] = m_exemplar_y[level][index];
+					queryPt_z[num] = m_exemplar_z[level][index];
+					num++;
 				}
-				//if (bias_TIindex != KCoherence_x[level][bias_TIindex][0]) { cout << endl << bias_TIindex <<" != KCoherence_x[level][bias_TIindex][0]"; _getch(); }
-				// K-coherence: C1(idx) = Kcoherence[0] = Origin
 			}
-		}
+			
+			kdTree_x->annkSearch(queryPt_x, COHERENCENUM, ann_index_x, ann_dist_x, 0);
+			kdTree_y->annkSearch(queryPt_y, COHERENCENUM, ann_index_y, ann_dist_y, 0);
+			kdTree_z->annkSearch(queryPt_z, COHERENCENUM, ann_index_z, ann_dist_z, 0);
 
+			//Set K-Coherence
+			size_idx bias_TIindex = idx + bias*TEXSIZE_ + bias;
+			KCoherence_x[level][bias_TIindex].resize(COHERENCENUM);
+			KCoherence_y[level][bias_TIindex].resize(COHERENCENUM);
+			KCoherence_z[level][bias_TIindex].resize(COHERENCENUM);
+			for (int k = 0; k < COHERENCENUM; ++k) {
+				KCoherence_x[level][bias_TIindex][k] = convertIndexANN(level, ann_index_x[k]);		//direction=0
+				KCoherence_y[level][bias_TIindex][k] = convertIndexANN(level, ann_index_y[k]);		//direction=1
+				KCoherence_z[level][bias_TIindex][k] = convertIndexANN(level, ann_index_z[k]);		//direction=2
+			}	
+
+			annDeallocPt(queryPt_x);		annDeallocPt(queryPt_y);		annDeallocPt(queryPt_z);
+			delete[] ann_index_x;		delete[] ann_index_y;		delete[] ann_index_z;
+			delete[] ann_dist_x;		delete[] ann_dist_y;		delete[] ann_dist_z;
+		}//#pragma omp parallel for schedule(static)
+		
 		//release
 		annClose();
 		delete kdTree_x;				delete kdTree_y;				delete kdTree_z;
 		annDeallocPts(p_source_x);		annDeallocPts(p_source_y);		annDeallocPts(p_source_z);
-		annDeallocPt(queryPt_x);		annDeallocPt(queryPt_y);		annDeallocPt(queryPt_z);
+		//annDeallocPt(queryPt_x);		annDeallocPt(queryPt_y);		annDeallocPt(queryPt_z);
 	}
-	delete[] ann_index_x;		delete[] ann_index_y;		delete[] ann_index_z;
-	delete[] ann_dist_x;		delete[] ann_dist_y;		delete[] ann_dist_z;
+	//delete[] ann_index_x;		delete[] ann_index_y;		delete[] ann_index_z;
+	//delete[] ann_dist_x;		delete[] ann_dist_y;		delete[] ann_dist_z;
 	
 	long time_end = clock();
 	cout << endl << "done. clocks = " << (time_end - time_start) / CLOCKS_PER_SEC;

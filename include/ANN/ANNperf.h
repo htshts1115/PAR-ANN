@@ -84,11 +84,11 @@ public:
 //----------------------------------------------------------------------
 class DLL_API ANNsampStat {
 	int				n;				// number of samples
-	//double			sum;			// sum
+	//double sum;			// sum
 	float sum;
-	//double			sum2;			// sum of squares
+	//double sum2;			// sum of squares
 	float sum2;
-	//double			minVal, maxVal;	// min and max
+	//double minVal, maxVal;	// min and max
 	float minVal, maxVal;
 public :
 	void reset()				// reset everything
@@ -113,11 +113,9 @@ public :
 
 	int samples() { return n; }		// number of samples
 
-	float/*double*/ mean() { return sum/n; } // mean
-
-									// standard deviation
-	float/*double*/ stdDev() { return sqrt((sum2 - (sum*sum) / n) / (n - 1)); }
-
+	//============ hts changed to float
+	float/*double*/ mean() { return sum / n; } // mean									
+	float/*double*/ stdDev() { return sqrt((sum2 - (sum*sum) / n) / (n - 1)); }// standard deviation
 	float/*double*/ min() { return minVal; } // minimum
 	float/*double*/ max() { return maxVal; } // maximum
 };
