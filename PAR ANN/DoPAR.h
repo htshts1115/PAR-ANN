@@ -64,8 +64,8 @@ private:
 	
 	const bool GenerateDMTI = false;					// generate DM transformed TI
 
-	vector<size_dist> factorIndex;						// linear weighting factor
-	vector<size_dist> factorPos;
+	//vector<size_dist> factorIndex;						// linear weighting factor
+	//vector<size_dist> factorPos;
 	//vector<size_dist> deltaIndexHis;					// update IndexHis value per operation
 	//vector<size_dist> deltaPosHis;					// update PosHis value per operation
 	vector<size_dist> avgIndexHis;						// default average value of IndexHis
@@ -182,6 +182,7 @@ private:
 
 	//=========== phase 1: search ================================
 	bool searchVolume(int level);
+
 	//bool searchVolume_nosparsed(int level);
 
 	size_dist getFullDistance(int level, vector<size_color>& exemplar, size_idx idx2d, CvMat* dataMat);
