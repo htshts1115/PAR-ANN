@@ -70,9 +70,10 @@ private:
 	//vector<size_dist> deltaPosHis;					// update PosHis value per operation
 	vector<size_dist> avgIndexHis;						// default average value of IndexHis
 	vector<size_dist> avgPosHis;						// default average value of PosHis
-	vector<size_dist> pdfdevS;							// gaussian distribution factor for search step
+	//vector<size_dist> pdfdevS;							// gaussian distribution factor for search step
 	vector<size_dist> pdfdevO;							// gaussian distribution factor for optimize step
 	vector<size_dist> pdfdevColor;						// gaussian distribution factor for colorHis
+	size_dist factorC;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -112,7 +113,8 @@ private:
 		return (i*sheight + j);
 	}
 	static const size_dist inv_sqrt_2pi;
-	inline size_dist gaussian_pdf(size_dist x, size_dist dev /*, size_dist mean = 0.0f*/){		
+	inline size_dist gaussian_pdf(size_dist x, size_dist dev){		
+		if (x == 0.0f) return 1.0f;
 		return exp(-0.5f * (x * x / dev / dev));
 	}
 	//const size_dist	gwdev = 1.0f / 6.0f;
@@ -181,6 +183,7 @@ private:
 
 
 	//=========== phase 1: search ================================
+	size_dist TotalDis;
 	bool searchVolume(int level);
 
 	//bool searchVolume_nosparsed(int level);
