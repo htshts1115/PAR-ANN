@@ -37,5 +37,7 @@
 
 #include <ANN/ANN.h>
 
+//#include <omp.h>		//OpenMP multi-thread!
+
 using namespace std;
 using namespace cv;

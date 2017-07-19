@@ -163,6 +163,9 @@ bool DoPAR::iFileExistYN(const string& PFileName)
 void DoPAR::ReadRunPar(string CurExeFile)
 {
 	cout << endl << "===========================================";
+	cout << endl << "PAR-KC                     ";
+	cout << endl << "Tianshen Huang    th2@hw.ac.uk  ";
+	cout << endl << "===========================================";
 	cout << endl << "Set up your running parameters... ";
 	cout << endl << "===========================================";
 
@@ -209,13 +212,11 @@ void DoPAR::ReadRunPar(string CurExeFile)
 	short Row(0);
 	
 	///////////////////////// check random seed
-	if (ResLines.size() > ++Row) {
-		vector<string> ParV;
-		GetNextRowParameters(Row, ResLines, ParV);
-		if (ParV.size() > 0) {
-			if (atoi(ParV[0].c_str()) == 0) useRandomSeed = false;
-			else useRandomSeed = true;
-		}
+	vector<string> ParV;
+	GetNextRowParameters(Row, ResLines, ParV);
+	if (ParV.size() > 0) {
+		if (atoi(ParV[0].c_str()) == 0) useRandomSeed = false;
+		else useRandomSeed = true;
 	}
 	if (useRandomSeed) {
 		cout << endl << "use Random Seed";
@@ -231,7 +232,7 @@ void DoPAR::ReadRunPar(string CurExeFile)
 
 
 	///////////////////////// Working directory
-	workpath = ResLines[Row];
+	workpath = ResLines[++Row];
 	if (workpath.back() != '\\') workpath += '\\';
 	
 
@@ -537,7 +538,7 @@ void DoPAR::DoANNOptimization() {
 			outputmodel(curlevel);
 			//writeHistogram(curlevel);
 		}
-		if (TEXSIZE[curlevel] < 256 && TEXSIZE[curlevel] >= 128)	writeHistogram(curlevel);		
+		//if (/*TEXSIZE[curlevel] < 256 && */TEXSIZE[curlevel] >= 128)	writeHistogram(curlevel);		
 
 		//checkHisError(curlevel);	//very little error
 
@@ -589,28 +590,29 @@ void DoPAR::init() {
 	// load Model
 	if (!loadVolume()) return;			
 
-	// K-Coherence
-	computeKCoherence();				
-
 	// init deltaHis, linear factor
 	for (int i = 0; i < MULTIRES; i++){
 		//deltaIndexHis[i] = 1;				
-		//deltaPosHis[i] = 1;								
+		//deltaPosHis[i] = 1;	
 		//factorIndex[i] = 1.0f;												// IndexHis weight = Dis * linearweight
 		//factorPos[i] = 1.0f;													// PosHis weight = (Dis^-1)/linearweight
 		//avgIndexHis[i] = (1.0f * TEXSIZE[i] * TEXSIZE[i] * TEXSIZE[i]) / ((TEXSIZE[i] - blockSize[i] + 1)*(TEXSIZE[i] - blockSize[i] + 1));
 		//pdfdevS[i] = floor(avgIndexHis[i] * 1.0/3.0/4.0);	//search weight use linear is enough
-
+		factorIndex = 10.0f;
 		avgIndexHis[i] = floor((1.0f * TEXSIZE[i] * (TEXSIZE[i] / 2) * (TEXSIZE[i] / 2)) / ((TEXSIZE[i] / 2 - blockSize[i] / 2 + 1)*(TEXSIZE[i] / 2 - blockSize[i] / 2 + 1)));
 		avgIndexHis[i] -= 1;
 		avgPosHis[i] = floor((TEXSIZE[i] * TEXSIZE[i] * TEXSIZE[i]) / ((TEXSIZE[i] - 2)*(TEXSIZE[i] - 2)) / 3.0);
 		avgPosHis[i] -= 1;
-		pdfdevO[i] = avgPosHis[i] * 1.0/3.0/10.0;
+		pdfdevO[i] = (avgPosHis[i]+1) * 1.0/3.0/20.0;
 		factorC = 1.0 / 3.0 / 100.0;
-		//pdfdevColor[level] = (Size3d / actualBinNum) * factorC;	
+		//pdfdevColor[level] = (floor(Size3d / actualBinNum)) * factorC;
 	}
+	//if (gaussian_pdf(21, pdfdevO[2])==0.0f) cout<<endl<< gaussian_pdf(21, pdfdevO[2]); _getch();
 
 	initColorHis_exemplar();
+
+	// K-Coherence
+	computeKCoherence();
 }
 
 void DoPAR::initPermutation(int level) {// random permutation (precomputed)
@@ -698,6 +700,11 @@ bool DoPAR::loadExemplar() {
 	Mat matyz = cv::imread(FNameXY, CV_LOAD_IMAGE_ANYDEPTH);		 // ti grayscale, could be 16 bit!
 	Mat matzx = cv::imread(FNameXZ, CV_LOAD_IMAGE_ANYDEPTH);
 	Mat matxy = cv::imread(FNameYZ, CV_LOAD_IMAGE_ANYDEPTH);
+	if (FNameXY == FNameXZ && FNameXY == FNameYZ) {
+		cout << endl << "Only one TI, flip 2nd TI by switching X,Y";
+		flip(matzx, matzx, 0);
+		flip(matzx, matzx, 1);
+	}
 	if (matyz.cols != matyz.rows) { cout << endl << "matyz.cols != matyz.rows"; _getch(); exit(0); }
 	if (matzx.cols != matzx.rows) { cout << endl << "matzx.cols != matzx.rows"; _getch(); exit(0); }
 	if (matxy.cols != matxy.rows) { cout << endl << "matxy.cols != matxy.rows"; _getch(); exit(0); }
@@ -708,8 +715,8 @@ bool DoPAR::loadExemplar() {
 	else if (tempSize > 1024) { cout << endl << "TI size > 1024, too big!"; _getch(); exit(0); }
 	if (tempSize == 1024) {
 		MULTIRES = 6;
-		blockSize = { 8, 8, 8, 8, 6, 6 };
-		MAXITERATION = { 40, 20, 10, 5, 4, 3 };
+		blockSize = { 10, 10, 8, 8, 8, 6 };
+		MAXITERATION = { 40, 20, 10, 6, 5, 5 };
 	}
 	if (tempSize >= 512) { 
 		if (tempSize % 32 != 0) { 
@@ -723,9 +730,9 @@ bool DoPAR::loadExemplar() {
 			cout << endl << "TIs are croped to "<< cropedsize <<" to fit multi-grid";
 		}
 		MULTIRES = 5;
-/*		if (tempSize == 512) blockSize = {10, 8, 8, 6, 6};
-		else */blockSize = { 10, 8, 8, 6, 6 };
-		MAXITERATION = { 40, 20, 10, 5, 4 };
+		if (tempSize == 512) blockSize = {8, 8, 8, 6, 6};
+		else blockSize = { 10, 8, 8, 8, 6 };
+		MAXITERATION = { 40, 20, 10, 5, 5 };
 	}
 	else if (tempSize >= 256) {
 		if (tempSize % 16 != 0) { 
@@ -756,11 +763,11 @@ bool DoPAR::loadExemplar() {
 		}
 		MULTIRES = 3;
 		if (tempSize == 128) blockSize = { 8, 8, 6 };
-		else blockSize = { 10, 8, 6 };
+		else blockSize = { 8, 8, 6 };
 		MAXITERATION = { 40, 20, 10};
 	}
 	TEXSIZE.resize(MULTIRES);
-	//factorIndex.resize(MULTIRES); factorPos.resize(MULTIRES);
+	//factorIndex.resize(MULTIRES); //factorPos.resize(MULTIRES);
 	//deltaIndexHis.resize(MULTIRES); deltaPosHis.resize(MULTIRES);
 	avgIndexHis.resize(MULTIRES); avgPosHis.resize(MULTIRES);
 	//pdfdevS.resize(MULTIRES); 
@@ -1500,7 +1507,8 @@ bool DoPAR::searchVolume(int level) {
 						//IndexHis needs sparse grid
 						curhis = IndexHis_z[level][sparseIdx(level, temp2didx)];
 						tempHisDiff = max(0.0f, curhis - avgIndexHis[level]);
-						IndexHisWeight = 1.0f + tempHisDiff;
+						IndexHisWeight = 1.0f + factorIndex * tempHisDiff;
+						//IndexHisWeight = 1.0f + tempHisDiff;
 						curError = IndexHisWeight * curDis;		
 						//curError = curDis * max(IndexHisWeight, 1.0f / gaussian_pdf(tempHisDiff, pdfdevS[level]));
 						countedYN = true;
@@ -1545,7 +1553,8 @@ bool DoPAR::searchVolume(int level) {
 
 
 			if (minError < INFINITY) {
-				//if (countz > 1) printf(" %d", countz);	//level 0,1 almost no. level 2+: 2,3,4... (based on atomic already!) (by comparing indexhis & colorhis, problem solved)
+				//if (IndexHis_z[level][sparseIdx(level, bestTIIdx)] >(avgIndexHis[level] * 6 / 5))  bestTIIdx = getRandomNearestIndex(level, IndexHis_z[level]);
+				
 				nearestWeight_z[level][idx] = 1.0f / minDis;
 				size_idx formerNearestIdx = nearestIdx_z[level][idx];
 				if (formerNearestIdx != bestTIIdx) {
@@ -1641,7 +1650,8 @@ bool DoPAR::searchVolume(int level) {
 						curDis = getFullDistance(level, m_exemplar_y[level], temp2didx, current_neighbor);
 						curhis = IndexHis_y[level][sparseIdx(level, temp2didx)];
 						tempHisDiff = max(0.0f, curhis - avgIndexHis[level]);
-						IndexHisWeight = 1.0f + tempHisDiff;			//IndexHis needs sparse grid			
+						IndexHisWeight = 1.0f + factorIndex * tempHisDiff;
+						//IndexHisWeight = 1.0f + tempHisDiff;			//IndexHis needs sparse grid			
 						curError = IndexHisWeight * curDis;
 						//curError = curDis * max(IndexHisWeight, 1.0f / gaussian_pdf(tempHisDiff, pdfdevS[level]));
 						countedYN = true;
@@ -1680,6 +1690,8 @@ bool DoPAR::searchVolume(int level) {
 			}//for (int u = -start; u <= end; ++u){
 
 			if (minError < INFINITY) {//update NearestIndex, IndexHis, store EuDis
+				//if (IndexHis_y[level][sparseIdx(level, bestTIIdx)] >(avgIndexHis[level] * 6 / 5))  bestTIIdx = getRandomNearestIndex(level, IndexHis_y[level]);
+
 				size_idx formerNearestIdx = nearestIdx_y[level][idx];
 				nearestWeight_y[level][idx] = 1.0f / minDis;
 				if (formerNearestIdx != bestTIIdx) {
@@ -1778,7 +1790,8 @@ bool DoPAR::searchVolume(int level) {
 						curDis = getFullDistance(level, m_exemplar_x[level], temp2didx, current_neighbor);
 						curhis = IndexHis_x[level][sparseIdx(level, temp2didx)];
 						tempHisDiff = max(0.0f, curhis - avgIndexHis[level]);
-						IndexHisWeight = 1.0f + tempHisDiff;			//IndexHis needs sparse grid			
+						IndexHisWeight = 1.0f + factorIndex * tempHisDiff;
+						//IndexHisWeight = 1.0f + tempHisDiff;			//IndexHis needs sparse grid			
 						curError = IndexHisWeight * curDis;
 						//curError = curDis * max(IndexHisWeight, 1.0f / gaussian_pdf(tempHisDiff, pdfdevS[level]));
 						countedYN = true;
@@ -1816,7 +1829,9 @@ bool DoPAR::searchVolume(int level) {
 				}//for (int v = -start; v <= end; ++v){
 			}//for (int u = -start; u <= end; ++u){
 
-			if (minError < INFINITY) {//update NearestIndex, IndexHis, store EuDis		
+			if (minError < INFINITY) {//update NearestIndex, IndexHis, store EuDis
+				//if (IndexHis_x[level][sparseIdx(level, bestTIIdx)] > (avgIndexHis[level] *6 / 5))	bestTIIdx = getRandomNearestIndex(level, IndexHis_x[level]);
+
 				size_idx formerNearestIdx = nearestIdx_x[level][idx];
 				nearestWeight_x[level][idx] = 1.0f / minDis;
 				if (formerNearestIdx != bestTIIdx) {
@@ -2232,10 +2247,11 @@ bool DoPAR::searchVolume(int level) {
 
 size_idx DoPAR::getRandomNearestIndex(int level, vector<size_hiscount>& IndexHis) {
 	size_idx TEXSIZE_h = TEXSIZE[level]/2;
-	size_idx start = 5, end = TEXSIZE_h - 5;
-	if (end <= start) { start = 3; end = TEXSIZE_h - 3; }
+	size_idx start = 2, end = TEXSIZE_h - 2;
+	//size_idx start = 5, end = TEXSIZE_h - 5;	
+	//if (end <= start) { start = 3; end = TEXSIZE_h - 3; }
 	size_idx coordx, coordy, tempidx;
-	size_hiscount minVal = INFINITY, curVal = 0.0f;
+	size_hiscount minVal = LONG_MAX, curVal = 0;
 
 	for (size_idx i = start; i < end; i += GRID){
 		tempidx = i* TEXSIZE_h;
@@ -2243,9 +2259,14 @@ size_idx DoPAR::getRandomNearestIndex(int level, vector<size_hiscount>& IndexHis
 			//!!IndexHis is sparsed
 			curVal = IndexHis[tempidx + j] + IndexHis[tempidx + TEXSIZE_h + j]
 				+ IndexHis[tempidx + j + 1]	+ IndexHis[tempidx + TEXSIZE_h + j + 1];
-			if (minVal > curVal) { coordx = i; coordy = j; }
+			if (curVal < minVal) {
+				coordx = i; coordy = j; 
+				minVal = curVal;
+			}
 		}
 	}
+	//cout << endl << "(i,j)=" << coordx << "," << coordy;
+	
 	coordx *= 2; coordy *= 2;
 	coordx += rand() % 4; coordy += rand() % 4;
 	return (coordx*TEXSIZE[level] + coordy);
@@ -2403,16 +2424,16 @@ void DoPAR::optimizeVolume(int level) {
 				inttempcolor = (int)tempcolor;				
 				tempColorHisDiff = max(0.0f, 1.0f*(ColorHis_synthesis[level][inttempcolor] - ColorHis_exemplar[level][inttempcolor]));				
 				//colorHis weight
-				weightc = gaussian_pdf(tempColorHisDiff, min(pdfdevColor[level], 1.0f+ColorHis_exemplar[level][inttempcolor] * factorC));  //pdfdevColor[level]
+				//weightc = gaussian_pdf(tempColorHisDiff, min(pdfdevColor[level], 1.0f+ColorHis_exemplar[level][inttempcolor]/* * factorC*/));  //pdfdevColor[level]
+				weightc = gaussian_pdf(tempColorHisDiff, pdfdevColor[level]); 
 
 				tempPosIdx = tempnearestidx + Sxy * 2;																//PosHis size=3TI!
 				tempHisDiff = max(0.0f, PosHis[level][tempPosIdx] - avgPosHis[level]);
 				//if (tempHisDiff > 9 * pdfdevO[level]) continue;
 				weightp = gaussian_pdf(tempHisDiff, pdfdevO[level]);									//PosHis weighted
-				//weightp = min(1.0f / (1.0f + tempHisDiff), gaussian_pdf(tempHisDiff, pdfdevO[level]));	
-				
+				//weightp = min(1.0f / (1.0f + tempHisDiff), gaussian_pdf(tempHisDiff, pdfdevO[level]));				
 				minweight = min(weightc, weightp);		
-				//if (weightp - weightc > 0.3 && i2 < 16) printf("\n%.0f %d; %.2f  %.2f", tempColorHisDiff, ColorHis_exemplar[level][inttempcolor], weightc, weightp);
+				if (minweight < FLT_MIN) continue;
 
 				colorCand_z.push_back(tempcolor);														//discrete solver
 				posCand_z.push_back(tempnearestidx);
@@ -2448,19 +2469,21 @@ void DoPAR::optimizeVolume(int level) {
 				inttempcolor = (int)tempcolor;
 				tempColorHisDiff = max(0.0f, 1.0f*(ColorHis_synthesis[level][inttempcolor] - ColorHis_exemplar[level][inttempcolor]));
 				//colorHis weight
-				weightc = gaussian_pdf(tempColorHisDiff, min(pdfdevColor[level], 1.0f + ColorHis_exemplar[level][inttempcolor] * factorC));  //pdfdevColor[level]
+				//weightc = gaussian_pdf(tempColorHisDiff, min(pdfdevColor[level], 1.0f + ColorHis_exemplar[level][inttempcolor]/* * factorC*/));  //pdfdevColor[level]
+				weightc = gaussian_pdf(tempColorHisDiff, pdfdevColor[level]);
 
 				tempPosIdx = tempnearestidx + Sxy;																//PosHis size=3TI!
 				tempHisDiff = max(0.0f, PosHis[level][tempPosIdx] - avgPosHis[level]);
 				//if (tempHisDiff > 9 * pdfdevO[level]) continue;
 				weightp = gaussian_pdf(tempHisDiff, pdfdevO[level]);									//PosHis weighted
-				//weightp = min(1.0f / (1.0f + tempHisDiff), gaussian_pdf(tempHisDiff, pdfdevO[level]));	
+				//weightp = min(1.0f / (1.0f + tempHisDiff), gaussian_pdf(tempHisDiff, pdfdevO[level]));			
+				minweight = min(weightp, weightc);		//if (ColorHis_ON)	
+				if (minweight < FLT_MIN) continue;
 
 				colorCand_y.push_back(tempcolor);													//discrete solver
 				posCand_y.push_back(tempnearestidx);
 				//nearestweightCand_y.push_back(tempnearestweight);
 
-				minweight = min(weightp, weightc);		//if (ColorHis_ON)	
 				weight = tempnearestweight * minweight;
 				color_acc += weight * tempcolor;
 				weight_acc += weight;
@@ -2491,19 +2514,21 @@ void DoPAR::optimizeVolume(int level) {
 				inttempcolor = (int)tempcolor;
 				tempColorHisDiff = max(0.0f, 1.0f*(ColorHis_synthesis[level][inttempcolor] - ColorHis_exemplar[level][inttempcolor]));
 				//colorHis weight
-				weightc = gaussian_pdf(tempColorHisDiff, min(pdfdevColor[level], 1.0f + ColorHis_exemplar[level][inttempcolor] * factorC));  //pdfdevColor[level]
-				
+				//weightc = gaussian_pdf(tempColorHisDiff, min(pdfdevColor[level], 1.0f + ColorHis_exemplar[level][inttempcolor]/* * factorC*/));  //pdfdevColor[level]
+				weightc = gaussian_pdf(tempColorHisDiff, pdfdevColor[level]);
+
 				tempPosIdx = tempnearestidx;
 				tempHisDiff = max(0.0f, PosHis[level][tempPosIdx] - avgPosHis[level]);					//PosHis size=3TI
 				//if (tempHisDiff > 9 * pdfdevO[level]) continue;
 				weightp = gaussian_pdf(tempHisDiff, pdfdevO[level]);									//PosHis weighted
 				//weightp = min(1.0f / (1.0f + tempHisDiff), gaussian_pdf(tempHisDiff, pdfdevO[level]));	
+				minweight = min(weightp, weightc);		//if (ColorHis_ON)
+				if (minweight < FLT_MIN) continue;
 
 				colorCand_x.push_back(tempcolor);													//discrete solver
 				posCand_x.push_back(tempnearestidx);
 				//nearestweightCand_x.push_back(tempnearestweight);
 
-				minweight = min(weightp, weightc);		//if (ColorHis_ON)
 				weight = tempnearestweight * minweight;
 				color_acc += weight * tempcolor;
 				weight_acc += weight;
@@ -2519,22 +2544,20 @@ void DoPAR::optimizeVolume(int level) {
 		int bestorder=0;
 
 		// Z	
+		bestorder = 0;
 		for (int s = 0; s < colorCand_z.size(); s++) {
 			tempColorDiff = abs(colorCand_z[s] - color_avg);
 			if (tempColorDiff < minDis_z) {
 				minDis_z = tempColorDiff;
 				bestorder = s;
 			}
-			else if (tempColorDiff == minDis_z
-				&& IndexHis_z[level][sparseIdx(level, posCand_z[s])] < IndexHis_z[level][sparseIdx(level, bestorder)])
-				bestorder = s;
-			//else if (tempColorDiff == minDis_z) {			//if colordiff same, compare nearestweight, then indexhis
-			//	if (nearestweightCand_z[s] > nearestweightCand_z[bestorder])
-			//		bestorder = s;
-			//	else if (nearestweightCand_z[s] == nearestweightCand_z[bestorder] 
-			//		&& IndexHis_z[level][sparseIdx(level, posCand_z[s])] < IndexHis_z[level][sparseIdx(level, bestorder)])
-			//			bestorder = s;
-			//}
+			else if (tempColorDiff == minDis_z) {				//if colordiff same, compare PosHis, then IndexHis
+				if (PosHis[level][posCand_z[s] + 2 * Sxy] < PosHis[level][posCand_z[bestorder] + 2 * Sxy])
+					bestorder = s;
+				else if (PosHis[level][posCand_z[s] + 2 * Sxy] == PosHis[level][posCand_z[bestorder] + 2 * Sxy]
+					&& IndexHis_z[level][sparseIdx(level, posCand_z[s])] < IndexHis_z[level][sparseIdx(level, bestorder)]) 
+					bestorder = s;		
+			}
 		}
 		closestIdx_z = posCand_z[bestorder];	
 		//if (level > 1) {
@@ -2549,23 +2572,21 @@ void DoPAR::optimizeVolume(int level) {
 		}
 		else isUnchanged_z[level][idx] = true;
 
-		// Y	
+		// Y
+		bestorder = 0;
 		for (int s = 0; s < colorCand_y.size(); s++) {
 			tempColorDiff = abs(colorCand_y[s] - color_avg);
 			if (tempColorDiff < minDis_y) {
 				minDis_y = tempColorDiff;
 				bestorder = s;
 			}
-			else if (tempColorDiff == minDis_y 
-				&& IndexHis_y[level][sparseIdx(level, posCand_y[s])] < IndexHis_y[level][sparseIdx(level, bestorder)]) 
+			else if (tempColorDiff == minDis_y) {				//if colordiff same, compare PosHis, then IndexHis
+				if (PosHis[level][posCand_y[s] + Sxy] < PosHis[level][posCand_y[bestorder] + Sxy])
 					bestorder = s;
-			//else if (tempColorDiff == minDis_y) {			//if colordiff same, compare nearestweight, then indexhis
-			//	if (nearestweightCand_y[s] > nearestweightCand_y[bestorder])
-			//		bestorder = s;
-			//	else if (nearestweightCand_y[s] == nearestweightCand_y[bestorder]
-			//		&& IndexHis_y[level][sparseIdx(level, posCand_y[s])] < IndexHis_y[level][sparseIdx(level, bestorder)])
-			//		bestorder = s;
-			//}
+				else if (PosHis[level][posCand_y[s] + Sxy] == PosHis[level][posCand_y[bestorder] + Sxy]
+					&& IndexHis_y[level][sparseIdx(level, posCand_y[s])] < IndexHis_y[level][sparseIdx(level, bestorder)])
+					bestorder = s;
+			}
 		}
 		closestIdx_y = posCand_y[bestorder];
 		if (Origin_y[level][idx] != closestIdx_y) {											// update Y origin, isUnchangeblock
@@ -2575,22 +2596,20 @@ void DoPAR::optimizeVolume(int level) {
 		else isUnchanged_y[level][idx] = true;
 
 		// X	
+		bestorder = 0;
 		for (int s = 0; s < colorCand_x.size(); s++) {
 			tempColorDiff = abs(colorCand_x[s] - color_avg);
 			if (tempColorDiff < minDis_x) {
 				minDis_x = tempColorDiff;
 				bestorder = s;
 			}
-			else if (tempColorDiff == minDis_x
-				&& IndexHis_x[level][sparseIdx(level, posCand_x[s])] < IndexHis_x[level][sparseIdx(level, bestorder)])
-				bestorder = s;
-			//else if (tempColorDiff == minDis_x) {			//if colordiff same, compare nearestweight, then indexhis
-			//	if (nearestweightCand_x[s] > nearestweightCand_x[bestorder])
-			//		bestorder = s;
-			//	else if (nearestweightCand_x[s] == nearestweightCand_x[bestorder]
-			//		&& IndexHis_x[level][sparseIdx(level, posCand_x[s])] < IndexHis_x[level][sparseIdx(level, bestorder)])
-			//		bestorder = s;
-			//}
+			else if (tempColorDiff == minDis_x) {				//if colordiff same, compare PosHis, then IndexHis
+				if (PosHis[level][posCand_x[s]] < PosHis[level][posCand_x[bestorder]])
+					bestorder = s;
+				else if (PosHis[level][posCand_x[s]] == PosHis[level][posCand_x[bestorder]]
+					&& IndexHis_x[level][sparseIdx(level, posCand_x[s])] < IndexHis_x[level][sparseIdx(level, bestorder)])
+					bestorder = s;
+			}
 		}
 		closestIdx_x = posCand_x[bestorder];
 		if (Origin_x[level][idx] != closestIdx_x) {											// update X origin, isUnchangeblock
@@ -3217,19 +3236,20 @@ void DoPAR::initColorHis_exemplar() {
 				ColorHis_exemplar[level][(int)c] ++;
 			}
 		}
-
-		//!!!need to rescale to fit ColorHis_synthesis!!!
-		float factor = Size3d*1.0f / (3 * Size2d);
-		for (int bin = 0; bin < ColorHis_BinNum; bin++) {
-			ColorHis_exemplar[level][bin] = round(ColorHis_exemplar[level][bin]*factor);
-		}
-
 		int actualBinNum = 0;
 		for (int bin = 0; bin < ColorHis_BinNum; bin++) {
 			if (ColorHis_exemplar[level][bin] >0) actualBinNum++;
 		}
 		cout << endl << "actualBinNum= " << actualBinNum;
 		pdfdevColor[level] = (floor(Size3d / actualBinNum)) * factorC;
+		if (pdfdevColor[level] < 1.0f) pdfdevColor[level] = 1.0f;
+
+		//!!!need to rescale to fit ColorHis_synthesis!!!
+		float factor = Size3d*1.0f / (3 * Size2d);
+		for (int bin = 0; bin < ColorHis_BinNum; bin++) {
+			ColorHis_exemplar[level][bin] = round(ColorHis_exemplar[level][bin]*factor);
+			if (ColorHis_exemplar[level][bin]>0) ColorHis_exemplar[level][bin] -= 1;		//similar to IndexHis,PosHis
+		}
 	}
 }
 void DoPAR::initColorHis_synthesis(int level) {
@@ -3284,7 +3304,7 @@ void DoPAR::writeHistogram(int level) {
 	vector<unsigned short> tempIHx = vector<unsigned short>(IndexHis_x[level].begin(), IndexHis_x[level].end());
 	tempMat = Mat(tempIHx, true).reshape(1, tempMat.rows);
 	Mat cropedIndexHisMat_x = tempMat(Rect(cropedIndexHisStartX, cropedIndexHisStartY, cropedIndexHisWidth, cropedIndexHisHeight));
-	name << outputMainFileName << "_IndexHis_L" << level << "_x.png";
+	name << outputMainFileName <<"_x" << "_IndexHis_L" << level << ".png";
 	imwrite(name.str(), cropedIndexHisMat_x);	//must be unsigned [short]!		
 
 	name.str("");
@@ -3292,7 +3312,7 @@ void DoPAR::writeHistogram(int level) {
 	vector<unsigned short> tempIHy = vector<unsigned short>(IndexHis_y[level].begin(), IndexHis_y[level].end());
 	tempMat = Mat(tempIHy, true).reshape(1, tempMat.rows);
 	Mat cropedIndexHisMat_y = tempMat(Rect(cropedIndexHisStartX, cropedIndexHisStartY, cropedIndexHisWidth, cropedIndexHisHeight));
-	name << outputMainFileName << "_IndexHis_L" << level << "_y.png";
+	name << outputMainFileName << "_y" << "_IndexHis_L" << level << ".png";
 	imwrite(name.str(), cropedIndexHisMat_y);
 
 	name.str("");
@@ -3300,7 +3320,7 @@ void DoPAR::writeHistogram(int level) {
 	vector<unsigned short> tempIHz = vector<unsigned short>(IndexHis_z[level].begin(), IndexHis_z[level].end());
 	tempMat = Mat(tempIHz, true).reshape(1, tempMat.rows);
 	Mat cropedIndexHisMat_z = tempMat(Rect(cropedIndexHisStartX, cropedIndexHisStartY, cropedIndexHisWidth, cropedIndexHisHeight));
-	name << outputMainFileName << "_IndexHis_L" << level << "_z.png";
+	name << outputMainFileName << "_z" << "_IndexHis_L" << level << ".png";
 	imwrite(name.str(), cropedIndexHisMat_z);
 
 	name.str("");
@@ -3378,21 +3398,21 @@ void DoPAR::writeHistogram(int level) {
 	tempMat = Mat(Sx, Sy, CV_16UC1);
 	tempMat = Mat(pos_x, true).reshape(1, tempMat.rows);
 	Mat cropedPosHisMat_x = tempMat(Rect(cropedPosHisStartX, cropedPosHisStartY, cropedPosHisWidth, cropedPosHisHeight));
-	name << outputMainFileName << "_PosHis_L" << level << "_x.png";
+	name << outputMainFileName << "_x" << "_PosHis_L" << level << ".png";
 	imwrite(name.str(), cropedPosHisMat_x);		
 
 	name.str("");
 	tempMat = Mat(Sx, Sy, CV_16UC1);
 	tempMat = Mat(pos_y, true).reshape(1, tempMat.rows);
 	Mat cropedPosHisMat_y = tempMat(Rect(cropedPosHisStartX, cropedPosHisStartY, cropedPosHisWidth, cropedPosHisHeight));
-	name << outputMainFileName << "_PosHis_L" << level << "_y.png";
+	name << outputMainFileName << "_y" << "_PosHis_L" << level << ".png";
 	imwrite(name.str(), cropedPosHisMat_y);		
 
 	name.str("");
 	tempMat = Mat(Sx, Sy, CV_16UC1);
 	tempMat = Mat(pos_z, true).reshape(1, tempMat.rows);
 	Mat cropedPosHisMat_z = tempMat(Rect(cropedPosHisStartX, cropedPosHisStartY, cropedPosHisWidth, cropedPosHisHeight));
-	name << outputMainFileName << "_PosHis_L" << level << "_z.png";
+	name << outputMainFileName << "_z" << "_PosHis_L" << level << ".png";
 	imwrite(name.str(), cropedPosHisMat_z);		
 
 	name.str("");
@@ -3431,8 +3451,8 @@ void DoPAR::upsampleVolume(int level) {
 			for (size_idx k = 0; k < Sz; k += GRID){				//sparse grid
 				idx3d = iSxy + jSx + k;		
 				nidx2d = nearestIdx_x[level][idx3d];
-				rnidx2d = KCoherence_x[level][nidx2d][1 + static_cast<unsigned int>(rand() % (COHERENCENUM - 1))];
-				//rnidx2d = KCoherence_x[level][nidx2d][static_cast<unsigned int>(rand() % (COHERENCENUM))];
+				//rnidx2d = KCoherence_x[level][nidx2d][1 + static_cast<unsigned int>(rand() % (COHERENCENUM - 1))];
+				rnidx2d = KCoherence_x[level][nidx2d][static_cast<unsigned int>(rand() % (COHERENCENUM))];
 				coordx = nidx2d / Sx;	coordy = nidx2d % Sx;
 				rcoordx = rnidx2d / Sx;	rcoordy = rnidx2d % Sx;
 

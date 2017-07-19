@@ -64,6 +64,7 @@ private:
 	
 	const bool GenerateDMTI = false;					// generate DM transformed TI
 
+	size_dist factorIndex;
 	//vector<size_dist> factorIndex;						// linear weighting factor
 	//vector<size_dist> factorPos;
 	//vector<size_dist> deltaIndexHis;					// update IndexHis value per operation
@@ -116,6 +117,7 @@ private:
 	inline size_dist gaussian_pdf(size_dist x, size_dist dev){		
 		if (x == 0.0f) return 1.0f;
 		return exp(-0.5f * (x * x / dev / dev));
+		//return max(FLT_MIN, exp(-0.5f * (x * x / dev / dev)));
 	}
 	//const size_dist	gwdev = 1.0f / 6.0f;
 	//inline size_dist normal_cdf(size_dist x, size_dist stddev, size_dist mean = 0.0f){
