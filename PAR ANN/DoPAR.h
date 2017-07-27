@@ -75,6 +75,7 @@ private:
 	vector<size_dist> pdfdevO;							// gaussian distribution factor for optimize step
 	vector<size_dist> pdfdevColor;						// gaussian distribution factor for colorHis
 	size_dist factorC;
+	size_dist factorP;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////
 

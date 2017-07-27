@@ -217,6 +217,10 @@ void DoPAR::ReadRunPar(string CurExeFile)
 	if (ParV.size() > 0) {
 		if (atoi(ParV[0].c_str()) == 0) useRandomSeed = false;
 		else useRandomSeed = true;
+
+		if (ParV.size() > 1) factorIndex = atoi(ParV[1].c_str());
+		if (ParV.size() > 2) factorP = atoi(ParV[2].c_str());
+		if (ParV.size() > 3) factorC = atoi(ParV[3].c_str());
 	}
 	if (useRandomSeed) {
 		cout << endl << "use Random Seed";
@@ -536,7 +540,7 @@ void DoPAR::DoANNOptimization() {
 		}	
 		if (curlevel == MULTIRES - 1 || TEXSIZE[curlevel] >= 256) {// ouput model & histogram
 			outputmodel(curlevel);
-			//writeHistogram(curlevel);
+			writeHistogram(curlevel);
 		}
 		//if (/*TEXSIZE[curlevel] < 256 && */TEXSIZE[curlevel] >= 128)	writeHistogram(curlevel);		
 
@@ -581,6 +585,15 @@ void DoPAR::allocateVectors(int level) {
 }
 
 void DoPAR::init() {
+	cout<<endl<<"Select maximum threads, no more than "<< omp_get_num_procs()<<endl;
+	int maxthread;
+	cin >> maxthread;
+	if (maxthread <= omp_get_num_procs()) {
+		omp_set_dynamic(0);     // Explicitly disable dynamic teams
+		omp_set_num_threads(maxthread);
+	}
+	//else use omp_get_num_procs()
+
 	// load TI
 	if (!loadExemplar()) return;
 
@@ -598,16 +611,16 @@ void DoPAR::init() {
 		//factorPos[i] = 1.0f;													// PosHis weight = (Dis^-1)/linearweight
 		//avgIndexHis[i] = (1.0f * TEXSIZE[i] * TEXSIZE[i] * TEXSIZE[i]) / ((TEXSIZE[i] - blockSize[i] + 1)*(TEXSIZE[i] - blockSize[i] + 1));
 		//pdfdevS[i] = floor(avgIndexHis[i] * 1.0/3.0/4.0);	//search weight use linear is enough
-		factorIndex = 10.0f;
+
+		factorIndex *= 1.0f;
 		avgIndexHis[i] = floor((1.0f * TEXSIZE[i] * (TEXSIZE[i] / 2) * (TEXSIZE[i] / 2)) / ((TEXSIZE[i] / 2 - blockSize[i] / 2 + 1)*(TEXSIZE[i] / 2 - blockSize[i] / 2 + 1)));
 		avgIndexHis[i] -= 1;
 		avgPosHis[i] = floor((TEXSIZE[i] * TEXSIZE[i] * TEXSIZE[i]) / ((TEXSIZE[i] - 2)*(TEXSIZE[i] - 2)) / 3.0);
 		avgPosHis[i] -= 1;
-		pdfdevO[i] = (avgPosHis[i]+1) * 1.0/3.0/20.0;
-		factorC = 1.0 / 3.0 / 100.0;
+		pdfdevO[i] = (avgPosHis[i]+1) * 1.0/3.0/factorP;
+		factorC = 1.0 / 3.0 / factorC;
 		//pdfdevColor[level] = (floor(Size3d / actualBinNum)) * factorC;
 	}
-	//if (gaussian_pdf(21, pdfdevO[2])==0.0f) cout<<endl<< gaussian_pdf(21, pdfdevO[2]); _getch();
 
 	initColorHis_exemplar();
 
@@ -715,7 +728,7 @@ bool DoPAR::loadExemplar() {
 	else if (tempSize > 1024) { cout << endl << "TI size > 1024, too big!"; _getch(); exit(0); }
 	if (tempSize == 1024) {
 		MULTIRES = 6;
-		blockSize = { 10, 10, 8, 8, 8, 6 };
+		blockSize = { 8, 8, 8, 8, 8, 6 };
 		MAXITERATION = { 40, 20, 10, 6, 5, 5 };
 	}
 	if (tempSize >= 512) { 
@@ -730,8 +743,7 @@ bool DoPAR::loadExemplar() {
 			cout << endl << "TIs are croped to "<< cropedsize <<" to fit multi-grid";
 		}
 		MULTIRES = 5;
-		if (tempSize == 512) blockSize = {8, 8, 8, 6, 6};
-		else blockSize = { 10, 8, 8, 8, 6 };
+		blockSize = {8, 8, 8, 6, 6};
 		MAXITERATION = { 40, 20, 10, 5, 5 };
 	}
 	else if (tempSize >= 256) {
@@ -746,8 +758,7 @@ bool DoPAR::loadExemplar() {
 			cout << endl << "TIs are croped to " << cropedsize << " to fit multi-grid";
 		}
 		MULTIRES = 4;
-		if (tempSize == 256) blockSize = { 8, 8, 8, 6 };
-		else blockSize = { 10, 8, 8, 6 };
+		blockSize = { 8, 8, 8, 6 };
 		MAXITERATION = { 40, 20, 10, 5 };
 	}
 	else if (tempSize >= 128) {
@@ -762,8 +773,7 @@ bool DoPAR::loadExemplar() {
 			cout << endl << "TIs are croped to " << cropedsize << " to fit multi-grid";
 		}
 		MULTIRES = 3;
-		if (tempSize == 128) blockSize = { 8, 8, 6 };
-		else blockSize = { 8, 8, 6 };
+		blockSize = { 8, 8, 6 };
 		MAXITERATION = { 40, 20, 10};
 	}
 	TEXSIZE.resize(MULTIRES);
