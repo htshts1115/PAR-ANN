@@ -1,0 +1,9 @@
+Kc = 11->7
+
+search_volume(): 
+no skip sparse grid
+ 
+
+optimize_volume():
+remove sparse grid shift
+firstrun will not use colorHis

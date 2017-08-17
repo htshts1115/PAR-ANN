@@ -54,7 +54,7 @@ private:
 	vector<size_idx> TEXSIZE;							// size of input exemplar
 	vector<int> MAXITERATION;							// max iteration time	
 	
-	int COHERENCENUM = 11;								// K-coherence (9)
+	int COHERENCENUM = 7;								// K-coherence (9) 11
 	bool useRandomSeed;									// Use random seed or fixed (0) for test (false)
 	
 	const size_idx GRID = 2;							// sparse grid
@@ -71,7 +71,7 @@ private:
 	//vector<size_dist> deltaPosHis;					// update PosHis value per operation
 	vector<size_dist> avgIndexHis;						// default average value of IndexHis
 	vector<size_dist> avgPosHis;						// default average value of PosHis
-	//vector<size_dist> pdfdevS;							// gaussian distribution factor for search step
+	//vector<size_dist> pdfdevS;						// gaussian distribution factor for search step
 	vector<size_dist> pdfdevO;							// gaussian distribution factor for optimize step
 	vector<size_dist> pdfdevColor;						// gaussian distribution factor for colorHis
 	size_dist factorC;
@@ -188,8 +188,7 @@ private:
 	//=========== phase 1: search ================================
 	size_dist TotalDis;
 	bool searchVolume(int level);
-
-	//bool searchVolume_nosparsed(int level);
+	bool searchVolume_nosparsed(int level);
 
 	size_dist getFullDistance(int level, vector<size_color>& exemplar, size_idx idx2d, CvMat* dataMat);
 
@@ -200,9 +199,10 @@ private:
 
 	//========== phase 2: optimization ===========================
 	void optimizeVolume(int level);
-	//void optimizeVolume_nosparsed(int level);
+	void optimizeVolume_nosparsed(int level);
+
 	bool FIRSTRUN = true;
-	void optimizeVolume_firstrun(int level);	//firstrun without colorhis
+	//void optimizeVolume_firstrun(int level);	//firstrun without colorhis
 
 	//============== index histogram ============
 	vector<vector<size_hiscount>> IndexHis_x, IndexHis_y, IndexHis_z;//sparse grid!	//[level][idx2d/4]=IndexHis		 //3TI different IndexHis
