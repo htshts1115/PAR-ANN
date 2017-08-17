@@ -540,7 +540,7 @@ void DoPAR::DoANNOptimization() {
 		}	
 		if (curlevel == MULTIRES - 1 || TEXSIZE[curlevel] >= 256) {// ouput model & histogram
 			outputmodel(curlevel);
-			writeHistogram(curlevel);
+			//writeHistogram(curlevel);
 		}
 		//if (/*TEXSIZE[curlevel] < 256 && */TEXSIZE[curlevel] >= 128)	writeHistogram(curlevel);		
 
@@ -591,8 +591,8 @@ void DoPAR::init() {
 	if (maxthread <= omp_get_num_procs()) {
 		omp_set_dynamic(0);     // Explicitly disable dynamic teams
 		omp_set_num_threads(maxthread);
-	}
-	//else use omp_get_num_procs()
+	}//else use omp_get_num_procs()
+	
 
 	// load TI
 	if (!loadExemplar()) return;
@@ -729,7 +729,7 @@ bool DoPAR::loadExemplar() {
 	if (tempSize == 1024) {
 		MULTIRES = 6;
 		blockSize = { 8, 8, 8, 8, 8, 6 };
-		MAXITERATION = { 40, 20, 10, 6, 5, 5 };
+		MAXITERATION = { 40, 20, 10, 6, 6, 5 };
 	}
 	if (tempSize >= 512) { 
 		if (tempSize % 32 != 0) { 
@@ -744,7 +744,7 @@ bool DoPAR::loadExemplar() {
 		}
 		MULTIRES = 5;
 		blockSize = {8, 8, 8, 6, 6};
-		MAXITERATION = { 40, 20, 10, 5, 5 };
+		MAXITERATION = { 40, 20, 10, 6, 5 };
 	}
 	else if (tempSize >= 256) {
 		if (tempSize % 16 != 0) { 
