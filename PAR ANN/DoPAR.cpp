@@ -512,19 +512,19 @@ void DoPAR::DoANNOptimization() {
 			shuffle(m_permutation.begin(), m_permutation.end(), mersennetwistergenerator);
 			if (loop % (MAXITERATION[curlevel] / 2) == 0)
 				cout << endl << "iteration: " << loop;						
-			//if (curlevel == 0 && loop == 0) searchVolume(curlevel);			//!!the first run on level0 should be started by search	
-			if (curlevel == 0 && loop == 0) searchVolume_nosparsed(curlevel);			//!!the first run on level0 should be started by search	
+			if (curlevel == 0 && loop == 0) searchVolume(curlevel);			//!!the first run on level0 should be started by search	
+			//if (curlevel == 0 && loop == 0) searchVolume_nosparsed(curlevel);			//!!the first run on level0 should be started by search	
 
 			t1 = GetTickCount();
-			//optimizeVolume(curlevel);
-			optimizeVolume_nosparsed(curlevel);
+			optimizeVolume(curlevel);
+			//optimizeVolume_nosparsed(curlevel);
 			t2 = GetTickCount();
 			if (loop % (MAXITERATION[curlevel] / 2) == 0)
 				cout << endl << "optmize: " << (t2 - t1) / 1000.0 << " s";
 	
 			if (curlevel == MULTIRES - 1 && loop == MAXITERATION[curlevel] - 1) break;	//last search step is not needed.
-			//if (searchVolume(curlevel)) {
-			if (searchVolume_nosparsed(curlevel)){
+			if (searchVolume(curlevel)) {
+			//if (searchVolume_nosparsed(curlevel)){
 				cout << endl << "converged, skip to next level.";
 				break;
 			}
@@ -540,7 +540,8 @@ void DoPAR::DoANNOptimization() {
 
 		if (curlevel < MULTIRES - 1) {// level up
 			allocateVectors(curlevel+1);
-			upsampleVolume(curlevel);			
+			upsampleVolume(curlevel);	
+			//upsampleVolume_nosparsed(curlevel);
 			cleardata(curlevel);
 			FIRSTRUN = true;
 		}
@@ -603,15 +604,15 @@ void DoPAR::init() {
 		//pdfdevS[i] = floor(avgIndexHis[i] * 1.0/3.0/4.0);	//search weight use linear is enough
 
 		factorIndex *= 1.0f;
-		//avgIndexHis[i] = floor((1.0f * TEXSIZE[i] * (TEXSIZE[i] / 2) * (TEXSIZE[i] / 2)) / ((TEXSIZE[i] / 2 - blockSize[i] / 2 + 1)*(TEXSIZE[i] / 2 - blockSize[i] / 2 + 1)));
-		avgIndexHis[i] = floor((1.0f * TEXSIZE[i] * TEXSIZE[i] * TEXSIZE[i]) / ((TEXSIZE[i] / 2 - blockSize[i] / 2 + 1)*(TEXSIZE[i] / 2 - blockSize[i] / 2 + 1)));
+		avgIndexHis[i] = floor((1.0f * TEXSIZE[i] * (TEXSIZE[i] / 2) * (TEXSIZE[i] / 2)) / ((TEXSIZE[i] / 2 - blockSize[i] / 2 + 1)*(TEXSIZE[i] / 2 - blockSize[i] / 2 + 1)));
+		//avgIndexHis[i] = floor((1.0f * TEXSIZE[i] * TEXSIZE[i] * TEXSIZE[i]) / ((TEXSIZE[i] / 2 - blockSize[i] / 2 + 1)*(TEXSIZE[i] / 2 - blockSize[i] / 2 + 1)));
 		//change avgIndexHis if no sparsed grid 
 		avgIndexHis[i] -= 1;
 		avgPosHis[i] = floor((TEXSIZE[i] * TEXSIZE[i] * TEXSIZE[i]) / ((TEXSIZE[i] - 2)*(TEXSIZE[i] - 2)) / 3.0);
 		avgPosHis[i] -= 1;
 		pdfdevO[i] = (avgPosHis[i]+1) * 1.0/3.0/factorP;
 		factorC = 1.0 / 3.0 / factorC;
-		//pdfdevColor[level] = (floor(Size3d / actualBinNum)) * factorC;
+		//pdfdevColor[level] = (floor(Size3d / actualBinNum)) * factorC; //in initColorHis_exemplar()
 	}
 
 	initColorHis_exemplar();
@@ -1386,9 +1387,9 @@ bool DoPAR::searchVolume(int level) {
 	const size_idx start = static_cast<size_idx>(blockSize_ / 2);			//4	//4	//4	//3			//-cstart<=x<=cend
 	const size_idx end = static_cast<size_idx>((blockSize_-1) / 2);			//3	//3	//3	//2
 	size_idx cstart(start), cend(end);
-	if (level > 0 && end>1) {//reduce the candidates of KCoherence. reduce computation. But the template size is not reduced in getFullDistance()
-		cstart -= 1;														//4	//3	//3	//2
-		cend -= 1;															//3	//2	//2	//1
+	if (level > 0 && end>2) {//reduce the candidates of KCoherence. reduce computation. But the template size is not reduced in getFullDistance()
+		cstart -= 1;														//4	//3	//3	//3
+		cend -= 1;															//3	//2	//2	//2
 	}
 
 	bool isUnchanged = true;	
@@ -1837,9 +1838,9 @@ bool DoPAR::searchVolume_nosparsed(int level) {
 	const size_idx start = static_cast<size_idx>(blockSize_ / 2);			//4	//4	//4	//3			//-cstart<=x<=cend
 	const size_idx end = static_cast<size_idx>((blockSize_ - 1) / 2);		//3	//3	//3	//2
 	size_idx cstart(start), cend(end);
-	if (level > 0 && end>1) {//reduce the candidates of KCoherence. reduce computation. But the template size is not reduced in getFullDistance()
-		cstart -= 1;														//4	//3	//3	//2
-		cend -= 1;															//3	//2	//2	//1
+	if (level > 0 && end>2) {//reduce the candidates of KCoherence. reduce computation. But the template size is not reduced in getFullDistance()
+		cstart -= 1;														//4	//3	//3	//3
+		cend -= 1;															//3	//2	//2	//2
 	}
 
 	bool isUnchanged = true;
@@ -2361,11 +2362,15 @@ void DoPAR::optimizeVolume(int level) {
 	const size_idx Size = Sxy * Sz;
 	const size_idx Sxy3 = 3 * Sxy;
 	const size_idx candSize = static_cast<size_idx>(blockSize_ / GRID) * static_cast<size_idx>(blockSize_ / GRID);	//candidate has sparse grid
-	const size_idx start = static_cast<size_idx>(blockSize_ / (2 * GRID)) + 1;	//3	//3	//2	//2
+	const size_idx start = static_cast<size_idx>(blockSize_ / (2 * GRID)) + 1;		//3	//3	//3	//2
 	const size_idx end = start;					
-	size_idx s1 = -static_cast<size_idx>(blockSize_ / 2);						//-4//-4//-3//-3
-	size_idx e1 = static_cast<size_idx>((blockSize_ - 1) / 2);					//3	//3	//2	//2
-	
+	//change to 7*7,5*5 from 8*8,6*6	
+	size_idx e1 = static_cast<size_idx>(blockSize_ / 2) - 1;						//3	//3	//3	//2
+	size_idx s1 = -e1;																//-3//-3//-3//-2
+
+	//size_idx s1 = -static_cast<size_idx>(blockSize_ / 2);							//-4//-4//-4//-3
+	//size_idx e1 = static_cast<size_idx>((blockSize_ - 1) / 2);					//3	//3	//3	//2
+
 	//if (level > 0 && e1>2) {								//reduce average blurring
 	//	s1 += 1;																//3>=-2l>=-4 -> 2>=l>=-1 -> 4*4 -> 7*7 actrual template; odd:
 	//	e1 -= 1;																//2>=-2l>=-3 -> 1>=l>=-1 -> 3*3 -> 5*5
@@ -2968,10 +2973,10 @@ void DoPAR::optimizeVolume_nosparsed(int level) {
 	const size_idx Size = Sxy * Sz;
 	const size_idx Sxy3 = 3 * Sxy;
 	const size_idx candSize = static_cast<size_idx>(blockSize_ / GRID) * static_cast<size_idx>(blockSize_ / GRID);	//candidate has sparse grid
-	const size_idx start = static_cast<size_idx>(blockSize_ / (2 * GRID)) + 1;	//3	//3	//2	//2
+	const size_idx start = static_cast<size_idx>(blockSize_ / (2 * GRID)) + 1;	//3	//3	//3	//2
 	const size_idx end = start;
-	size_idx s1 = -static_cast<size_idx>(blockSize_ / 2);						//-4//-4//-3//-3
-	size_idx e1 = static_cast<size_idx>((blockSize_ - 1) / 2);					//3	//3	//2	//2
+	size_idx s1 = -static_cast<size_idx>(blockSize_ / 2);						//-4//-4//-4//-3
+	size_idx e1 = static_cast<size_idx>((blockSize_ - 1) / 2);					//3	//3	//3	//2
 
 #pragma omp parallel for schedule(static)
 	for (size_idx i2 = 0; i2 < Size; ++i2) {
@@ -3004,13 +3009,22 @@ void DoPAR::optimizeVolume_nosparsed(int level) {
 		// For Z	
 		for (size_idx l = start; l >= -end; --l) {
 			tempx = i + l * GRID;
-			deltax = -l * GRID;
+			deltax = i - tempx;
 			sumidx_tempx = trimIndex(level, tempx)*Sxy + k;
 			for (size_idx h = start; h >= -end; --h) {
 				tempy = j + h * GRID;
-				deltay = -h * GRID;
+				deltay = j - tempy;
 				if (deltax < s1 || deltax > e1 || deltay < s1 || deltay > e1)
 					continue;
+		//for (size_idx l = start; l >= -end; --l) {
+		//	tempx = i + l * GRID;
+		//	deltax = i - tempx;
+		//	sumidx_tempx = trimIndex(level, tempx)*Sxy + k;
+		//	for (size_idx h = start; h >= -end; --h) {
+		//		tempy = j + h * GRID;
+		//		deltay = j - tempy;
+		//		if (deltax < s1 || deltax > e1 || deltay < s1 || deltay > e1)
+		//			continue;
 
 				tempidx = sumidx_tempx + trimIndex(level, tempy)*Sx;									//[tempx][tempy][k]
 				tempnearestidx = nearestIdx_z[level][tempidx];
@@ -3045,11 +3059,11 @@ void DoPAR::optimizeVolume_nosparsed(int level) {
 		// For Y	
 		for (size_idx l = start; l >= -end; --l) {
 			tempx = i + l * GRID;
-			deltax = - l * GRID;
+			deltax = i - tempx;
 			sumidx_tempx = trimIndex(level, tempx)*Sxy + jSx;
 			for (size_idx h = start; h >= -end; --h) {
 				tempy = k + h * GRID;
-				deltay = -h * GRID;
+				deltay = k - tempy;
 				if (deltax < s1 || deltax > e1 || deltay < s1 || deltay > e1)
 					continue;
 
@@ -3087,11 +3101,11 @@ void DoPAR::optimizeVolume_nosparsed(int level) {
 		// For X	
 		for (size_idx l = start; l >= -end; --l) {
 			tempx = j + l * GRID;
-			deltax = -l * GRID;
+			deltax = j - tempx;
 			sumidx_tempx = iSxy + trimIndex(level, tempx)*Sx;
 			for (size_idx h = start; h >= -end; --h) {
 				tempy = k + h * GRID;
-				deltay = -h * GRID;
+				deltay = k - tempy;
 				if (deltax < s1 || deltax > e1 || deltay < s1 || deltay > e1)
 					continue;
 
@@ -3549,44 +3563,6 @@ void DoPAR::upsampleVolume(int level) {
 				setNearestIndex(level + 1, nearestIdx_x[level + 1], nearestWeight_x[level + 1], IndexHis_x[level + 1]
 					, didx3d + GRID*dSx + GRID, nidx2d + GRID*dSx + GRID, 1.0f);				//[di][dj+GRID][dk+GRID]	[coordx+GRID][coordy+GRID]
 				
-				//for nosparsed grid
-				setNearestIndex(level + 1, nearestIdx_x[level + 1], nearestWeight_x[level + 1], IndexHis_x[level + 1]
-					, didx3d + 1, nidx2d, 1.0f);
-				setNearestIndex(level + 1, nearestIdx_x[level + 1], nearestWeight_x[level + 1], IndexHis_x[level + 1]
-					, didx3d + dSx, nidx2d, 1.0f);
-				setNearestIndex(level + 1, nearestIdx_x[level + 1], nearestWeight_x[level + 1], IndexHis_x[level + 1]
-					, didx3d + dSx + 1, nidx2d, 1.0f);
-				setNearestIndex(level + 1, nearestIdx_x[level + 1], nearestWeight_x[level + 1], IndexHis_x[level + 1]
-					, didx3d + GRID + 1, nidx2d + GRID, 1.0f);										
-				setNearestIndex(level + 1, nearestIdx_x[level + 1], nearestWeight_x[level + 1], IndexHis_x[level + 1]
-					, didx3d + GRID + dSx, nidx2d + GRID, 1.0f);										
-				setNearestIndex(level + 1, nearestIdx_x[level + 1], nearestWeight_x[level + 1], IndexHis_x[level + 1]
-					, didx3d + GRID + dSx + 1, nidx2d + GRID, 1.0f);								
-				setNearestIndex(level + 1, nearestIdx_x[level + 1], nearestWeight_x[level + 1], IndexHis_x[level + 1]
-					, didx3d + GRID*dSx + 1, nidx2d + GRID*dSx, 1.0f);						
-				setNearestIndex(level + 1, nearestIdx_x[level + 1], nearestWeight_x[level + 1], IndexHis_x[level + 1]
-					, didx3d + GRID*dSx + dSx, nidx2d + GRID*dSx, 1.0f);					
-				setNearestIndex(level + 1, nearestIdx_x[level + 1], nearestWeight_x[level + 1], IndexHis_x[level + 1]
-					, didx3d + GRID*dSx + dSx + 1, nidx2d + GRID*dSx, 1.0f);					
-				setNearestIndex(level + 1, nearestIdx_x[level + 1], nearestWeight_x[level + 1], IndexHis_x[level + 1]
-					, didx3d + GRID*dSx + GRID + 1, nidx2d + GRID*dSx + GRID, 1.0f);
-				setNearestIndex(level + 1, nearestIdx_x[level + 1], nearestWeight_x[level + 1], IndexHis_x[level + 1]
-					, didx3d + GRID*dSx + GRID + dSx, nidx2d + GRID*dSx + GRID, 1.0f);
-				setNearestIndex(level + 1, nearestIdx_x[level + 1], nearestWeight_x[level + 1], IndexHis_x[level + 1]
-					, didx3d + GRID*dSx + GRID + dSx + 1, nidx2d + GRID*dSx + GRID, 1.0f);
-				//nearestIdx_x[level + 1][didx3d + 1] = nearestIdx_x[level + 1][didx3d];
-				//nearestIdx_x[level + 1][didx3d + dSx] = nearestIdx_x[level + 1][didx3d];
-				//nearestIdx_x[level + 1][didx3d + dSx + 1] = nearestIdx_x[level + 1][didx3d];
-				//nearestIdx_x[level + 1][didx3d + GRID + 1] = nearestIdx_x[level + 1][didx3d + GRID];
-				//nearestIdx_x[level + 1][didx3d + GRID + dSx] = nearestIdx_x[level + 1][didx3d + GRID];
-				//nearestIdx_x[level + 1][didx3d + GRID + dSx + 1] = nearestIdx_x[level + 1][didx3d + GRID];
-				//nearestIdx_x[level + 1][didx3d + GRID*dSx + 1] = nearestIdx_x[level + 1][didx3d + GRID*dSx];
-				//nearestIdx_x[level + 1][didx3d + GRID*dSx + dSx] = nearestIdx_x[level + 1][didx3d + GRID*dSx];
-				//nearestIdx_x[level + 1][didx3d + GRID*dSx + dSx + 1] = nearestIdx_x[level + 1][didx3d + GRID*dSx];
-				//nearestIdx_x[level + 1][didx3d + GRID*dSx + GRID + 1] = nearestIdx_x[level + 1][didx3d + GRID*dSx + GRID];
-				//nearestIdx_x[level + 1][didx3d + GRID*dSx + GRID + dSx] = nearestIdx_x[level + 1][didx3d + GRID*dSx + GRID];
-				//nearestIdx_x[level + 1][didx3d + GRID*dSx + GRID + dSx + 1] = nearestIdx_x[level + 1][didx3d + GRID*dSx + GRID];
-
 				didx3d += dSxy;
 				setNearestIndex(level + 1, nearestIdx_x[level + 1], nearestWeight_x[level + 1], IndexHis_x[level + 1]
 					, didx3d , rnidx2d, 1.0f);												//[di+1][dj][dk]			[rcoordx][rcoordy]
@@ -3596,44 +3572,6 @@ void DoPAR::upsampleVolume(int level) {
 					, didx3d + GRID, rnidx2d + GRID, 1.0f);									//[di+1][dj][dk+GRID]		[rcoordx][rcoordy+GRID]
 				setNearestIndex(level + 1, nearestIdx_x[level + 1], nearestWeight_x[level + 1], IndexHis_x[level + 1]
 					, didx3d + GRID*dSx + GRID, rnidx2d + GRID*dSx + GRID, 1.0f);			//[di+1][dj+GRID][dk+GRID]	[rcoordx+GRID][rcoordy+GRID]
-			
-				//for nosparsed grid
-				setNearestIndex(level + 1, nearestIdx_x[level + 1], nearestWeight_x[level + 1], IndexHis_x[level + 1]
-					, didx3d + 1, nidx2d, 1.0f);
-				setNearestIndex(level + 1, nearestIdx_x[level + 1], nearestWeight_x[level + 1], IndexHis_x[level + 1]
-					, didx3d + dSx, nidx2d, 1.0f);
-				setNearestIndex(level + 1, nearestIdx_x[level + 1], nearestWeight_x[level + 1], IndexHis_x[level + 1]
-					, didx3d + dSx + 1, nidx2d, 1.0f);
-				setNearestIndex(level + 1, nearestIdx_x[level + 1], nearestWeight_x[level + 1], IndexHis_x[level + 1]
-					, didx3d + GRID + 1, nidx2d + GRID, 1.0f);
-				setNearestIndex(level + 1, nearestIdx_x[level + 1], nearestWeight_x[level + 1], IndexHis_x[level + 1]
-					, didx3d + GRID + dSx, nidx2d + GRID, 1.0f);
-				setNearestIndex(level + 1, nearestIdx_x[level + 1], nearestWeight_x[level + 1], IndexHis_x[level + 1]
-					, didx3d + GRID + dSx + 1, nidx2d + GRID, 1.0f);
-				setNearestIndex(level + 1, nearestIdx_x[level + 1], nearestWeight_x[level + 1], IndexHis_x[level + 1]
-					, didx3d + GRID*dSx + 1, nidx2d + GRID*dSx, 1.0f);
-				setNearestIndex(level + 1, nearestIdx_x[level + 1], nearestWeight_x[level + 1], IndexHis_x[level + 1]
-					, didx3d + GRID*dSx + dSx, nidx2d + GRID*dSx, 1.0f);
-				setNearestIndex(level + 1, nearestIdx_x[level + 1], nearestWeight_x[level + 1], IndexHis_x[level + 1]
-					, didx3d + GRID*dSx + dSx + 1, nidx2d + GRID*dSx, 1.0f);
-				setNearestIndex(level + 1, nearestIdx_x[level + 1], nearestWeight_x[level + 1], IndexHis_x[level + 1]
-					, didx3d + GRID*dSx + GRID + 1, nidx2d + GRID*dSx + GRID, 1.0f);
-				setNearestIndex(level + 1, nearestIdx_x[level + 1], nearestWeight_x[level + 1], IndexHis_x[level + 1]
-					, didx3d + GRID*dSx + GRID + dSx, nidx2d + GRID*dSx + GRID, 1.0f);
-				setNearestIndex(level + 1, nearestIdx_x[level + 1], nearestWeight_x[level + 1], IndexHis_x[level + 1]
-					, didx3d + GRID*dSx + GRID + dSx + 1, nidx2d + GRID*dSx + GRID, 1.0f);
-				//nearestIdx_x[level + 1][didx3d + 1] = nearestIdx_x[level + 1][didx3d];
-				//nearestIdx_x[level + 1][didx3d + dSx] = nearestIdx_x[level + 1][didx3d];
-				//nearestIdx_x[level + 1][didx3d + dSx + 1] = nearestIdx_x[level + 1][didx3d];
-				//nearestIdx_x[level + 1][didx3d + GRID + 1] = nearestIdx_x[level + 1][didx3d + GRID];
-				//nearestIdx_x[level + 1][didx3d + GRID + dSx] = nearestIdx_x[level + 1][didx3d + GRID];
-				//nearestIdx_x[level + 1][didx3d + GRID + dSx + 1] = nearestIdx_x[level + 1][didx3d + GRID];
-				//nearestIdx_x[level + 1][didx3d + GRID*dSx + 1] = nearestIdx_x[level + 1][didx3d + GRID*dSx];
-				//nearestIdx_x[level + 1][didx3d + GRID*dSx + dSx] = nearestIdx_x[level + 1][didx3d + GRID*dSx];
-				//nearestIdx_x[level + 1][didx3d + GRID*dSx + dSx + 1] = nearestIdx_x[level + 1][didx3d + GRID*dSx];
-				//nearestIdx_x[level + 1][didx3d + GRID*dSx + GRID + 1] = nearestIdx_x[level + 1][didx3d + GRID*dSx + GRID];
-				//nearestIdx_x[level + 1][didx3d + GRID*dSx + GRID + dSx] = nearestIdx_x[level + 1][didx3d + GRID*dSx + GRID];
-				//nearestIdx_x[level + 1][didx3d + GRID*dSx + GRID + dSx + 1] = nearestIdx_x[level + 1][didx3d + GRID*dSx + GRID];
 			}
 		}
 	}//X
@@ -3668,44 +3606,6 @@ void DoPAR::upsampleVolume(int level) {
 				setNearestIndex(level + 1, nearestIdx_y[level + 1], nearestWeight_y[level + 1], IndexHis_y[level + 1]
 					, didx3d + GRID*dSxy + GRID, nidx2d + GRID*dSx + GRID, 1.0f);			//[di+GRID][dj][dk+GRID]	[coordx+GRID][coordy+GRID]
 
-				//for nosparsed grid
-				setNearestIndex(level + 1, nearestIdx_y[level + 1], nearestWeight_y[level + 1], IndexHis_y[level + 1]
-					, didx3d + 1, nidx2d, 1.0f);
-				setNearestIndex(level + 1, nearestIdx_y[level + 1], nearestWeight_y[level + 1], IndexHis_y[level + 1]
-					, didx3d + dSxy, nidx2d, 1.0f);
-				setNearestIndex(level + 1, nearestIdx_y[level + 1], nearestWeight_y[level + 1], IndexHis_y[level + 1]
-					, didx3d + dSxy + 1, nidx2d, 1.0f);
-				setNearestIndex(level + 1, nearestIdx_y[level + 1], nearestWeight_y[level + 1], IndexHis_y[level + 1]
-					, didx3d + GRID*dSxy + 1, nidx2d + GRID*dSx, 1.0f);
-				setNearestIndex(level + 1, nearestIdx_y[level + 1], nearestWeight_y[level + 1], IndexHis_y[level + 1]
-					, didx3d + GRID*dSxy + dSxy, nidx2d + GRID*dSx, 1.0f);
-				setNearestIndex(level + 1, nearestIdx_y[level + 1], nearestWeight_y[level + 1], IndexHis_y[level + 1]
-					, didx3d + GRID*dSxy + dSxy + 1, nidx2d + GRID*dSx, 1.0f);
-				setNearestIndex(level + 1, nearestIdx_y[level + 1], nearestWeight_y[level + 1], IndexHis_y[level + 1]
-					, didx3d + GRID + 1, nidx2d + GRID, 1.0f);
-				setNearestIndex(level + 1, nearestIdx_y[level + 1], nearestWeight_y[level + 1], IndexHis_y[level + 1]
-					, didx3d + GRID + dSxy, nidx2d + GRID, 1.0f);
-				setNearestIndex(level + 1, nearestIdx_y[level + 1], nearestWeight_y[level + 1], IndexHis_y[level + 1]
-					, didx3d + GRID + dSxy + 1, nidx2d + GRID, 1.0f);
-				setNearestIndex(level + 1, nearestIdx_y[level + 1], nearestWeight_y[level + 1], IndexHis_y[level + 1]
-					, didx3d + GRID*dSxy + GRID + 1, nidx2d + GRID*dSx + GRID, 1.0f);
-				setNearestIndex(level + 1, nearestIdx_y[level + 1], nearestWeight_y[level + 1], IndexHis_y[level + 1]
-					, didx3d + GRID*dSxy + GRID + dSxy, nidx2d + GRID*dSx + GRID, 1.0f);
-				setNearestIndex(level + 1, nearestIdx_y[level + 1], nearestWeight_y[level + 1], IndexHis_y[level + 1]
-					, didx3d + GRID*dSxy + GRID + dSxy + 1, nidx2d + GRID*dSx + GRID, 1.0f);
-				//nearestIdx_y[level + 1][didx3d + 1] = nearestIdx_y[level + 1][didx3d];
-				//nearestIdx_y[level + 1][didx3d + dSxy] = nearestIdx_y[level + 1][didx3d];
-				//nearestIdx_y[level + 1][didx3d + dSxy + 1] = nearestIdx_y[level + 1][didx3d];
-				//nearestIdx_y[level + 1][didx3d + GRID + 1] = nearestIdx_y[level + 1][didx3d + GRID];
-				//nearestIdx_y[level + 1][didx3d + GRID + dSxy] = nearestIdx_y[level + 1][didx3d + GRID];
-				//nearestIdx_y[level + 1][didx3d + GRID + dSxy + 1] = nearestIdx_y[level + 1][didx3d + GRID];
-				//nearestIdx_y[level + 1][didx3d + GRID*dSxy + 1] = nearestIdx_y[level + 1][didx3d + GRID*dSxy];
-				//nearestIdx_y[level + 1][didx3d + GRID*dSxy + dSxy] = nearestIdx_y[level + 1][didx3d + GRID*dSxy];
-				//nearestIdx_y[level + 1][didx3d + GRID*dSxy + dSxy + 1] = nearestIdx_y[level + 1][didx3d + GRID*dSxy];
-				//nearestIdx_y[level + 1][didx3d + GRID*dSxy + GRID + 1] = nearestIdx_y[level + 1][didx3d + GRID*dSxy + GRID];
-				//nearestIdx_y[level + 1][didx3d + GRID*dSxy + GRID + dSxy] = nearestIdx_y[level + 1][didx3d + GRID*dSxy + GRID];
-				//nearestIdx_y[level + 1][didx3d + GRID*dSxy + GRID + dSxy + 1] = nearestIdx_y[level + 1][didx3d + GRID*dSxy + GRID];
-
 				didx3d += dSx;
 				setNearestIndex(level + 1, nearestIdx_y[level + 1], nearestWeight_y[level + 1], IndexHis_y[level + 1]
 					, didx3d, rnidx2d, 1.0f);												//[di][dj+1][dk]			[rcoordx][rcoordy]
@@ -3715,44 +3615,6 @@ void DoPAR::upsampleVolume(int level) {
 					, didx3d + GRID, rnidx2d + GRID, 1.0f);									//[di][dj+1][dk+GRID]		[rcoordx][rcoordy+GRID]
 				setNearestIndex(level + 1, nearestIdx_y[level + 1], nearestWeight_y[level + 1], IndexHis_y[level + 1]
 					, didx3d + GRID*dSxy + GRID, rnidx2d + GRID*dSx + GRID, 1.0f);			//[di+GRID][dj+1][dk+GRID]	[rcoordx+GRID][rcoordy+GRID]
-			
-				//for nosparsed grid
-				setNearestIndex(level + 1, nearestIdx_y[level + 1], nearestWeight_y[level + 1], IndexHis_y[level + 1]
-					, didx3d + 1, nidx2d, 1.0f);
-				setNearestIndex(level + 1, nearestIdx_y[level + 1], nearestWeight_y[level + 1], IndexHis_y[level + 1]
-					, didx3d + dSxy, nidx2d, 1.0f);
-				setNearestIndex(level + 1, nearestIdx_y[level + 1], nearestWeight_y[level + 1], IndexHis_y[level + 1]
-					, didx3d + dSxy + 1, nidx2d, 1.0f);
-				setNearestIndex(level + 1, nearestIdx_y[level + 1], nearestWeight_y[level + 1], IndexHis_y[level + 1]
-					, didx3d + GRID*dSxy + 1, nidx2d + GRID*dSx, 1.0f);
-				setNearestIndex(level + 1, nearestIdx_y[level + 1], nearestWeight_y[level + 1], IndexHis_y[level + 1]
-					, didx3d + GRID*dSxy + dSxy, nidx2d + GRID*dSx, 1.0f);
-				setNearestIndex(level + 1, nearestIdx_y[level + 1], nearestWeight_y[level + 1], IndexHis_y[level + 1]
-					, didx3d + GRID*dSxy + dSxy + 1, nidx2d + GRID*dSx, 1.0f);
-				setNearestIndex(level + 1, nearestIdx_y[level + 1], nearestWeight_y[level + 1], IndexHis_y[level + 1]
-					, didx3d + GRID + 1, nidx2d + GRID, 1.0f);
-				setNearestIndex(level + 1, nearestIdx_y[level + 1], nearestWeight_y[level + 1], IndexHis_y[level + 1]
-					, didx3d + GRID + dSxy, nidx2d + GRID, 1.0f);
-				setNearestIndex(level + 1, nearestIdx_y[level + 1], nearestWeight_y[level + 1], IndexHis_y[level + 1]
-					, didx3d + GRID + dSxy + 1, nidx2d + GRID, 1.0f);
-				setNearestIndex(level + 1, nearestIdx_y[level + 1], nearestWeight_y[level + 1], IndexHis_y[level + 1]
-					, didx3d + GRID*dSxy + GRID + 1, nidx2d + GRID*dSx + GRID, 1.0f);
-				setNearestIndex(level + 1, nearestIdx_y[level + 1], nearestWeight_y[level + 1], IndexHis_y[level + 1]
-					, didx3d + GRID*dSxy + GRID + dSxy, nidx2d + GRID*dSx + GRID, 1.0f);
-				setNearestIndex(level + 1, nearestIdx_y[level + 1], nearestWeight_y[level + 1], IndexHis_y[level + 1]
-					, didx3d + GRID*dSxy + GRID + dSxy + 1, nidx2d + GRID*dSx + GRID, 1.0f);
-				//nearestIdx_y[level + 1][didx3d + 1] = nearestIdx_y[level + 1][didx3d];
-				//nearestIdx_y[level + 1][didx3d + dSxy] = nearestIdx_y[level + 1][didx3d];
-				//nearestIdx_y[level + 1][didx3d + dSxy + 1] = nearestIdx_y[level + 1][didx3d];
-				//nearestIdx_y[level + 1][didx3d + GRID + 1] = nearestIdx_y[level + 1][didx3d + GRID];
-				//nearestIdx_y[level + 1][didx3d + GRID + dSxy] = nearestIdx_y[level + 1][didx3d + GRID];
-				//nearestIdx_y[level + 1][didx3d + GRID + dSxy + 1] = nearestIdx_y[level + 1][didx3d + GRID];
-				//nearestIdx_y[level + 1][didx3d + GRID*dSxy + 1] = nearestIdx_y[level + 1][didx3d + GRID*dSxy];
-				//nearestIdx_y[level + 1][didx3d + GRID*dSxy + dSxy] = nearestIdx_y[level + 1][didx3d + GRID*dSxy];
-				//nearestIdx_y[level + 1][didx3d + GRID*dSxy + dSxy + 1] = nearestIdx_y[level + 1][didx3d + GRID*dSxy];
-				//nearestIdx_y[level + 1][didx3d + GRID*dSxy + GRID + 1] = nearestIdx_y[level + 1][didx3d + GRID*dSxy + GRID];
-				//nearestIdx_y[level + 1][didx3d + GRID*dSxy + GRID + dSxy] = nearestIdx_y[level + 1][didx3d + GRID*dSxy + GRID];
-				//nearestIdx_y[level + 1][didx3d + GRID*dSxy + GRID + dSxy + 1] = nearestIdx_y[level + 1][didx3d + GRID*dSxy + GRID];
 			}
 		}
 	}//Y
@@ -3788,44 +3650,6 @@ void DoPAR::upsampleVolume(int level) {
 				setNearestIndex(level + 1, nearestIdx_z[level + 1], nearestWeight_z[level + 1], IndexHis_z[level + 1]
 					, didx3d + GRID*dSxy + GRID*dSx, nidx2d + GRID*dSx + GRID, 1.0f);		//[di+GRID][dj+GRID][dk]	[coordx+GRID][coordy+GRID]
 				
-				//for nosparsed grid
-				setNearestIndex(level + 1, nearestIdx_z[level + 1], nearestWeight_z[level + 1], IndexHis_z[level + 1]
-					, didx3d + dSxy, nidx2d, 1.0f);
-				setNearestIndex(level + 1, nearestIdx_z[level + 1], nearestWeight_z[level + 1], IndexHis_z[level + 1]
-					, didx3d + dSx, nidx2d, 1.0f);
-				setNearestIndex(level + 1, nearestIdx_z[level + 1], nearestWeight_z[level + 1], IndexHis_z[level + 1]
-					, didx3d + dSxy + dSx, nidx2d, 1.0f);
-				setNearestIndex(level + 1, nearestIdx_z[level + 1], nearestWeight_z[level + 1], IndexHis_z[level + 1]
-					, didx3d + GRID*dSxy + dSx, nidx2d + GRID*dSx, 1.0f);
-				setNearestIndex(level + 1, nearestIdx_z[level + 1], nearestWeight_z[level + 1], IndexHis_z[level + 1]
-					, didx3d + GRID*dSxy + dSxy, nidx2d + GRID*dSx, 1.0f);
-				setNearestIndex(level + 1, nearestIdx_z[level + 1], nearestWeight_z[level + 1], IndexHis_z[level + 1]
-					, didx3d + GRID*dSxy + dSxy + dSx, nidx2d + GRID*dSx, 1.0f);
-				setNearestIndex(level + 1, nearestIdx_z[level + 1], nearestWeight_z[level + 1], IndexHis_z[level + 1]
-					, didx3d + GRID*dSx + dSx, nidx2d + GRID, 1.0f);
-				setNearestIndex(level + 1, nearestIdx_z[level + 1], nearestWeight_z[level + 1], IndexHis_z[level + 1]
-					, didx3d + GRID*dSx + dSxy, nidx2d + GRID, 1.0f);
-				setNearestIndex(level + 1, nearestIdx_z[level + 1], nearestWeight_z[level + 1], IndexHis_z[level + 1]
-					, didx3d + GRID*dSx + dSxy + dSx, nidx2d + GRID, 1.0f);
-				setNearestIndex(level + 1, nearestIdx_z[level + 1], nearestWeight_z[level + 1], IndexHis_z[level + 1]
-					, didx3d + GRID*dSxy + GRID*dSx + dSx, nidx2d + GRID*dSx + GRID, 1.0f);
-				setNearestIndex(level + 1, nearestIdx_z[level + 1], nearestWeight_z[level + 1], IndexHis_z[level + 1]
-					, didx3d + GRID*dSxy + GRID*dSx + dSxy, nidx2d + GRID*dSx + GRID, 1.0f);
-				setNearestIndex(level + 1, nearestIdx_z[level + 1], nearestWeight_z[level + 1], IndexHis_z[level + 1]
-					, didx3d + GRID*dSxy + GRID*dSx + dSxy + dSx, nidx2d + GRID*dSx + GRID, 1.0f);
-				//nearestIdx_z[level + 1][didx3d + dSx] = nearestIdx_z[level + 1][didx3d];
-				//nearestIdx_z[level + 1][didx3d + dSxy] = nearestIdx_z[level + 1][didx3d];
-				//nearestIdx_z[level + 1][didx3d + dSxy + dSx] = nearestIdx_z[level + 1][didx3d];
-				//nearestIdx_z[level + 1][didx3d + GRID*dSx + dSx] = nearestIdx_z[level + 1][didx3d + GRID*dSx];
-				//nearestIdx_z[level + 1][didx3d + GRID*dSx + dSxy] = nearestIdx_z[level + 1][didx3d + GRID*dSx];
-				//nearestIdx_z[level + 1][didx3d + GRID*dSx + dSxy + dSx] = nearestIdx_z[level + 1][didx3d + GRID*dSx];
-				//nearestIdx_z[level + 1][didx3d + GRID*dSxy + dSx] = nearestIdx_z[level + 1][didx3d + GRID*dSxy];
-				//nearestIdx_z[level + 1][didx3d + GRID*dSxy + dSxy] = nearestIdx_z[level + 1][didx3d + GRID*dSxy];
-				//nearestIdx_z[level + 1][didx3d + GRID*dSxy + dSxy + dSx] = nearestIdx_z[level + 1][didx3d + GRID*dSxy];
-				//nearestIdx_z[level + 1][didx3d + GRID*dSxy + GRID*dSx + dSx] = nearestIdx_z[level + 1][didx3d + GRID*dSxy + GRID*dSx];
-				//nearestIdx_z[level + 1][didx3d + GRID*dSxy + GRID*dSx + dSxy] = nearestIdx_z[level + 1][didx3d + GRID*dSxy + GRID*dSx];
-				//nearestIdx_z[level + 1][didx3d + GRID*dSxy + GRID*dSx + dSxy + dSx] = nearestIdx_z[level + 1][didx3d + GRID*dSxy + GRID*dSx];
-
 				didx3d += 1;
 				setNearestIndex(level + 1, nearestIdx_z[level + 1], nearestWeight_z[level + 1], IndexHis_z[level + 1]
 					, didx3d, rnidx2d, 1.0f);												//[di][dj][dk+1]			[rcoordx][rcoordy]
@@ -3835,60 +3659,405 @@ void DoPAR::upsampleVolume(int level) {
 					, didx3d + GRID*dSx, rnidx2d + GRID, 1.0f);								//[di][dj+GRID][dk+1]		[rcoordx][rcoordy+GRID]
 				setNearestIndex(level + 1, nearestIdx_z[level + 1], nearestWeight_z[level + 1], IndexHis_z[level + 1]
 					, didx3d + GRID*dSxy + GRID*dSx, rnidx2d + GRID*dSx + GRID, 1.0f);		//[di+GRID][dj+GRID][dk+1]	[rcoordx+GRID][rcoordy+GRID]
-			
-				//for nosparsed grid
-				setNearestIndex(level + 1, nearestIdx_z[level + 1], nearestWeight_z[level + 1], IndexHis_z[level + 1]
-					, didx3d + dSxy, nidx2d, 1.0f);
-				setNearestIndex(level + 1, nearestIdx_z[level + 1], nearestWeight_z[level + 1], IndexHis_z[level + 1]
-					, didx3d + dSx, nidx2d, 1.0f);
-				setNearestIndex(level + 1, nearestIdx_z[level + 1], nearestWeight_z[level + 1], IndexHis_z[level + 1]
-					, didx3d + dSxy + dSx, nidx2d, 1.0f);
-				setNearestIndex(level + 1, nearestIdx_z[level + 1], nearestWeight_z[level + 1], IndexHis_z[level + 1]
-					, didx3d + GRID*dSxy + dSx, nidx2d + GRID*dSx, 1.0f);
-				setNearestIndex(level + 1, nearestIdx_z[level + 1], nearestWeight_z[level + 1], IndexHis_z[level + 1]
-					, didx3d + GRID*dSxy + dSxy, nidx2d + GRID*dSx, 1.0f);
-				setNearestIndex(level + 1, nearestIdx_z[level + 1], nearestWeight_z[level + 1], IndexHis_z[level + 1]
-					, didx3d + GRID*dSxy + dSxy + dSx, nidx2d + GRID*dSx, 1.0f);
-				setNearestIndex(level + 1, nearestIdx_z[level + 1], nearestWeight_z[level + 1], IndexHis_z[level + 1]
-					, didx3d + GRID*dSx + dSx, nidx2d + GRID, 1.0f);
-				setNearestIndex(level + 1, nearestIdx_z[level + 1], nearestWeight_z[level + 1], IndexHis_z[level + 1]
-					, didx3d + GRID*dSx + dSxy, nidx2d + GRID, 1.0f);
-				setNearestIndex(level + 1, nearestIdx_z[level + 1], nearestWeight_z[level + 1], IndexHis_z[level + 1]
-					, didx3d + GRID*dSx + dSxy + dSx, nidx2d + GRID, 1.0f);
-				setNearestIndex(level + 1, nearestIdx_z[level + 1], nearestWeight_z[level + 1], IndexHis_z[level + 1]
-					, didx3d + GRID*dSxy + GRID*dSx + dSx, nidx2d + GRID*dSx + GRID, 1.0f);
-				setNearestIndex(level + 1, nearestIdx_z[level + 1], nearestWeight_z[level + 1], IndexHis_z[level + 1]
-					, didx3d + GRID*dSxy + GRID*dSx + dSxy, nidx2d + GRID*dSx + GRID, 1.0f);
-				setNearestIndex(level + 1, nearestIdx_z[level + 1], nearestWeight_z[level + 1], IndexHis_z[level + 1]
-					, didx3d + GRID*dSxy + GRID*dSx + dSxy + dSx, nidx2d + GRID*dSx + GRID, 1.0f);
-				//nearestIdx_z[level + 1][didx3d + dSx] = nearestIdx_z[level + 1][didx3d];
-				//nearestIdx_z[level + 1][didx3d + dSxy] = nearestIdx_z[level + 1][didx3d];
-				//nearestIdx_z[level + 1][didx3d + dSxy + dSx] = nearestIdx_z[level + 1][didx3d];
-				//nearestIdx_z[level + 1][didx3d + GRID*dSx + dSx] = nearestIdx_z[level + 1][didx3d + GRID*dSx];
-				//nearestIdx_z[level + 1][didx3d + GRID*dSx + dSxy] = nearestIdx_z[level + 1][didx3d + GRID*dSx];
-				//nearestIdx_z[level + 1][didx3d + GRID*dSx + dSxy + dSx] = nearestIdx_z[level + 1][didx3d + GRID*dSx];
-				//nearestIdx_z[level + 1][didx3d + GRID*dSxy + dSx] = nearestIdx_z[level + 1][didx3d + GRID*dSxy];
-				//nearestIdx_z[level + 1][didx3d + GRID*dSxy + dSxy] = nearestIdx_z[level + 1][didx3d + GRID*dSxy];
-				//nearestIdx_z[level + 1][didx3d + GRID*dSxy + dSxy + dSx] = nearestIdx_z[level + 1][didx3d + GRID*dSxy];
-				//nearestIdx_z[level + 1][didx3d + GRID*dSxy + GRID*dSx + dSx] = nearestIdx_z[level + 1][didx3d + GRID*dSxy + GRID*dSx];
-				//nearestIdx_z[level + 1][didx3d + GRID*dSxy + GRID*dSx + dSxy] = nearestIdx_z[level + 1][didx3d + GRID*dSxy + GRID*dSx];
-				//nearestIdx_z[level + 1][didx3d + GRID*dSxy + GRID*dSx + dSxy + dSx] = nearestIdx_z[level + 1][didx3d + GRID*dSxy + GRID*dSx];
 			}
 		}
 	}//Z
-	
-	//for (size_idx i = 0; i < nearestIdx_x[level + 1].size(); i++) {
-	//	if (nearestIdx_x[level + 1][i] > dSxy) cout << endl << "nearestIdx_x " << i << "= " << nearestIdx_x[level + 1][i];
-	//}
-	//for (size_idx i = 0; i < nearestIdx_y[level + 1].size(); i++) {
-	//	if (nearestIdx_y[level + 1][i] > dSxy) cout << endl << "nearestIdx_y " << i << "= " << nearestIdx_y[level + 1][i];
-	//}
-	//for (size_idx i = 0; i < nearestIdx_z[level + 1].size(); i++) {
-	//	if (nearestIdx_z[level + 1][i] > dSxy) cout << endl << "nearestIdx_z " << i << "= " << nearestIdx_z[level + 1][i];
-	//}
 
 	cout << endl << "upsampled from " << level << " to " << level + 1;
 }
+
+//void DoPAR::upsampleVolume_nosparsed(int level) {
+//	// update nearestIdx for next level (&IndexHis)
+//	const size_idx TEXSIZE_ = TEXSIZE[level];
+//	const size_idx blockSize_ = blockSize[level];
+//	const size_idx Sx = TEXSIZE_;
+//	const size_idx Sy = TEXSIZE_;
+//	const size_idx Sz = TEXSIZE_;
+//	const size_idx Sxy = Sx * Sy;
+//	const size_idx Sxz = Sx * Sz;
+//	const size_idx Syz = Sy * Sz;
+//	const size_idx Size = Sxy * Sz;
+//	const size_idx dSx = 2 * Sx;
+//	const size_idx dSy = 2 * Sy;
+//	const size_idx dSz = 2 * Sz;
+//	const size_idx dSxy = dSx * dSx;
+//
+//	size_idx idx3d, didx3d, iSxy, jSx, sumidx_di, sumidx_dj;
+//	size_idx nidx2d, rnidx2d;
+//	size_idx coordx, coordy;
+//	size_idx rcoordx, rcoordy;
+//
+//	//X
+//	for (size_idx i = 0; i < Sx; ++i) {
+//		iSxy = i*Sxy;
+//		sumidx_di = 2 * i * dSxy;									//(2 * i)*(2 * Sx)*(2 * Sx)
+//		for (size_idx j = 0; j < Sy; j += GRID) {					//sparse grid
+//			jSx = j*Sx;
+//			sumidx_dj = 2 * j * dSx;								//(2 * j)*(2 * Sx)
+//			for (size_idx k = 0; k < Sz; k += GRID) {				//sparse grid
+//				idx3d = iSxy + jSx + k;
+//				nidx2d = nearestIdx_x[level][idx3d];
+//				//rnidx2d = KCoherence_x[level][nidx2d][1 + static_cast<unsigned int>(rand() % (COHERENCENUM - 1))];
+//				rnidx2d = KCoherence_x[level][nidx2d][static_cast<unsigned int>(rand() % (COHERENCENUM))];
+//				coordx = nidx2d / Sx;	coordy = nidx2d % Sx;
+//				rcoordx = rnidx2d / Sx;	rcoordy = rnidx2d % Sx;
+//
+//				coordx *= 2;	coordy *= 2;
+//				rcoordx *= 2;	rcoordy *= 2;
+//				nidx2d = coordx*dSx + coordy;					//new doubled nidx2d & rnidx2d
+//				rnidx2d = rcoordx*dSx + rcoordy;
+//				didx3d = sumidx_di + sumidx_dj + 2 * k;			//doubled didx3d
+//
+//				setNearestIndex(level + 1, nearestIdx_x[level + 1], nearestWeight_x[level + 1], IndexHis_x[level + 1]
+//					, didx3d, nidx2d, 1.0f);													//[di][dj][dk]				[coordx][coordy]
+//				setNearestIndex(level + 1, nearestIdx_x[level + 1], nearestWeight_x[level + 1], IndexHis_x[level + 1]
+//					, didx3d + GRID*dSx, nidx2d + GRID*dSx, 1.0f);								//[di][dj+GRID][dk]			[coordx+GRID][coordy]
+//				setNearestIndex(level + 1, nearestIdx_x[level + 1], nearestWeight_x[level + 1], IndexHis_x[level + 1]
+//					, didx3d + GRID, nidx2d + GRID, 1.0f);										//[di][dj][dk+GRID]			[coordx][coordy+GRID]
+//				setNearestIndex(level + 1, nearestIdx_x[level + 1], nearestWeight_x[level + 1], IndexHis_x[level + 1]
+//					, didx3d + GRID*dSx + GRID, nidx2d + GRID*dSx + GRID, 1.0f);				//[di][dj+GRID][dk+GRID]	[coordx+GRID][coordy+GRID]
+//
+//																								//for nosparsed grid
+//				setNearestIndex(level + 1, nearestIdx_x[level + 1], nearestWeight_x[level + 1], IndexHis_x[level + 1]
+//					, didx3d + 1, nidx2d, 1.0f);
+//				setNearestIndex(level + 1, nearestIdx_x[level + 1], nearestWeight_x[level + 1], IndexHis_x[level + 1]
+//					, didx3d + dSx, nidx2d, 1.0f);
+//				setNearestIndex(level + 1, nearestIdx_x[level + 1], nearestWeight_x[level + 1], IndexHis_x[level + 1]
+//					, didx3d + dSx + 1, nidx2d, 1.0f);
+//				setNearestIndex(level + 1, nearestIdx_x[level + 1], nearestWeight_x[level + 1], IndexHis_x[level + 1]
+//					, didx3d + GRID + 1, nidx2d + GRID, 1.0f);
+//				setNearestIndex(level + 1, nearestIdx_x[level + 1], nearestWeight_x[level + 1], IndexHis_x[level + 1]
+//					, didx3d + GRID + dSx, nidx2d + GRID, 1.0f);
+//				setNearestIndex(level + 1, nearestIdx_x[level + 1], nearestWeight_x[level + 1], IndexHis_x[level + 1]
+//					, didx3d + GRID + dSx + 1, nidx2d + GRID, 1.0f);
+//				setNearestIndex(level + 1, nearestIdx_x[level + 1], nearestWeight_x[level + 1], IndexHis_x[level + 1]
+//					, didx3d + GRID*dSx + 1, nidx2d + GRID*dSx, 1.0f);
+//				setNearestIndex(level + 1, nearestIdx_x[level + 1], nearestWeight_x[level + 1], IndexHis_x[level + 1]
+//					, didx3d + GRID*dSx + dSx, nidx2d + GRID*dSx, 1.0f);
+//				setNearestIndex(level + 1, nearestIdx_x[level + 1], nearestWeight_x[level + 1], IndexHis_x[level + 1]
+//					, didx3d + GRID*dSx + dSx + 1, nidx2d + GRID*dSx, 1.0f);
+//				setNearestIndex(level + 1, nearestIdx_x[level + 1], nearestWeight_x[level + 1], IndexHis_x[level + 1]
+//					, didx3d + GRID*dSx + GRID + 1, nidx2d + GRID*dSx + GRID, 1.0f);
+//				setNearestIndex(level + 1, nearestIdx_x[level + 1], nearestWeight_x[level + 1], IndexHis_x[level + 1]
+//					, didx3d + GRID*dSx + GRID + dSx, nidx2d + GRID*dSx + GRID, 1.0f);
+//				setNearestIndex(level + 1, nearestIdx_x[level + 1], nearestWeight_x[level + 1], IndexHis_x[level + 1]
+//					, didx3d + GRID*dSx + GRID + dSx + 1, nidx2d + GRID*dSx + GRID, 1.0f);
+//				//nearestIdx_x[level + 1][didx3d + 1] = nearestIdx_x[level + 1][didx3d];
+//				//nearestIdx_x[level + 1][didx3d + dSx] = nearestIdx_x[level + 1][didx3d];
+//				//nearestIdx_x[level + 1][didx3d + dSx + 1] = nearestIdx_x[level + 1][didx3d];
+//				//nearestIdx_x[level + 1][didx3d + GRID + 1] = nearestIdx_x[level + 1][didx3d + GRID];
+//				//nearestIdx_x[level + 1][didx3d + GRID + dSx] = nearestIdx_x[level + 1][didx3d + GRID];
+//				//nearestIdx_x[level + 1][didx3d + GRID + dSx + 1] = nearestIdx_x[level + 1][didx3d + GRID];
+//				//nearestIdx_x[level + 1][didx3d + GRID*dSx + 1] = nearestIdx_x[level + 1][didx3d + GRID*dSx];
+//				//nearestIdx_x[level + 1][didx3d + GRID*dSx + dSx] = nearestIdx_x[level + 1][didx3d + GRID*dSx];
+//				//nearestIdx_x[level + 1][didx3d + GRID*dSx + dSx + 1] = nearestIdx_x[level + 1][didx3d + GRID*dSx];
+//				//nearestIdx_x[level + 1][didx3d + GRID*dSx + GRID + 1] = nearestIdx_x[level + 1][didx3d + GRID*dSx + GRID];
+//				//nearestIdx_x[level + 1][didx3d + GRID*dSx + GRID + dSx] = nearestIdx_x[level + 1][didx3d + GRID*dSx + GRID];
+//				//nearestIdx_x[level + 1][didx3d + GRID*dSx + GRID + dSx + 1] = nearestIdx_x[level + 1][didx3d + GRID*dSx + GRID];
+//
+//				didx3d += dSxy;
+//				setNearestIndex(level + 1, nearestIdx_x[level + 1], nearestWeight_x[level + 1], IndexHis_x[level + 1]
+//					, didx3d, rnidx2d, 1.0f);												//[di+1][dj][dk]			[rcoordx][rcoordy]
+//				setNearestIndex(level + 1, nearestIdx_x[level + 1], nearestWeight_x[level + 1], IndexHis_x[level + 1]
+//					, didx3d + GRID*dSx, rnidx2d + GRID*dSx, 1.0f);							//[di+1][dj+GRID][dk]		[rcoordx+GRID][rcoordy]
+//				setNearestIndex(level + 1, nearestIdx_x[level + 1], nearestWeight_x[level + 1], IndexHis_x[level + 1]
+//					, didx3d + GRID, rnidx2d + GRID, 1.0f);									//[di+1][dj][dk+GRID]		[rcoordx][rcoordy+GRID]
+//				setNearestIndex(level + 1, nearestIdx_x[level + 1], nearestWeight_x[level + 1], IndexHis_x[level + 1]
+//					, didx3d + GRID*dSx + GRID, rnidx2d + GRID*dSx + GRID, 1.0f);			//[di+1][dj+GRID][dk+GRID]	[rcoordx+GRID][rcoordy+GRID]
+//
+//																							//for nosparsed grid
+//				setNearestIndex(level + 1, nearestIdx_x[level + 1], nearestWeight_x[level + 1], IndexHis_x[level + 1]
+//					, didx3d + 1, nidx2d, 1.0f);
+//				setNearestIndex(level + 1, nearestIdx_x[level + 1], nearestWeight_x[level + 1], IndexHis_x[level + 1]
+//					, didx3d + dSx, nidx2d, 1.0f);
+//				setNearestIndex(level + 1, nearestIdx_x[level + 1], nearestWeight_x[level + 1], IndexHis_x[level + 1]
+//					, didx3d + dSx + 1, nidx2d, 1.0f);
+//				setNearestIndex(level + 1, nearestIdx_x[level + 1], nearestWeight_x[level + 1], IndexHis_x[level + 1]
+//					, didx3d + GRID + 1, nidx2d + GRID, 1.0f);
+//				setNearestIndex(level + 1, nearestIdx_x[level + 1], nearestWeight_x[level + 1], IndexHis_x[level + 1]
+//					, didx3d + GRID + dSx, nidx2d + GRID, 1.0f);
+//				setNearestIndex(level + 1, nearestIdx_x[level + 1], nearestWeight_x[level + 1], IndexHis_x[level + 1]
+//					, didx3d + GRID + dSx + 1, nidx2d + GRID, 1.0f);
+//				setNearestIndex(level + 1, nearestIdx_x[level + 1], nearestWeight_x[level + 1], IndexHis_x[level + 1]
+//					, didx3d + GRID*dSx + 1, nidx2d + GRID*dSx, 1.0f);
+//				setNearestIndex(level + 1, nearestIdx_x[level + 1], nearestWeight_x[level + 1], IndexHis_x[level + 1]
+//					, didx3d + GRID*dSx + dSx, nidx2d + GRID*dSx, 1.0f);
+//				setNearestIndex(level + 1, nearestIdx_x[level + 1], nearestWeight_x[level + 1], IndexHis_x[level + 1]
+//					, didx3d + GRID*dSx + dSx + 1, nidx2d + GRID*dSx, 1.0f);
+//				setNearestIndex(level + 1, nearestIdx_x[level + 1], nearestWeight_x[level + 1], IndexHis_x[level + 1]
+//					, didx3d + GRID*dSx + GRID + 1, nidx2d + GRID*dSx + GRID, 1.0f);
+//				setNearestIndex(level + 1, nearestIdx_x[level + 1], nearestWeight_x[level + 1], IndexHis_x[level + 1]
+//					, didx3d + GRID*dSx + GRID + dSx, nidx2d + GRID*dSx + GRID, 1.0f);
+//				setNearestIndex(level + 1, nearestIdx_x[level + 1], nearestWeight_x[level + 1], IndexHis_x[level + 1]
+//					, didx3d + GRID*dSx + GRID + dSx + 1, nidx2d + GRID*dSx + GRID, 1.0f);
+//				//nearestIdx_x[level + 1][didx3d + 1] = nearestIdx_x[level + 1][didx3d];
+//				//nearestIdx_x[level + 1][didx3d + dSx] = nearestIdx_x[level + 1][didx3d];
+//				//nearestIdx_x[level + 1][didx3d + dSx + 1] = nearestIdx_x[level + 1][didx3d];
+//				//nearestIdx_x[level + 1][didx3d + GRID + 1] = nearestIdx_x[level + 1][didx3d + GRID];
+//				//nearestIdx_x[level + 1][didx3d + GRID + dSx] = nearestIdx_x[level + 1][didx3d + GRID];
+//				//nearestIdx_x[level + 1][didx3d + GRID + dSx + 1] = nearestIdx_x[level + 1][didx3d + GRID];
+//				//nearestIdx_x[level + 1][didx3d + GRID*dSx + 1] = nearestIdx_x[level + 1][didx3d + GRID*dSx];
+//				//nearestIdx_x[level + 1][didx3d + GRID*dSx + dSx] = nearestIdx_x[level + 1][didx3d + GRID*dSx];
+//				//nearestIdx_x[level + 1][didx3d + GRID*dSx + dSx + 1] = nearestIdx_x[level + 1][didx3d + GRID*dSx];
+//				//nearestIdx_x[level + 1][didx3d + GRID*dSx + GRID + 1] = nearestIdx_x[level + 1][didx3d + GRID*dSx + GRID];
+//				//nearestIdx_x[level + 1][didx3d + GRID*dSx + GRID + dSx] = nearestIdx_x[level + 1][didx3d + GRID*dSx + GRID];
+//				//nearestIdx_x[level + 1][didx3d + GRID*dSx + GRID + dSx + 1] = nearestIdx_x[level + 1][didx3d + GRID*dSx + GRID];
+//			}
+//		}
+//	}//X
+//
+//	 //Y
+//	for (size_idx j = 0; j < Sy; ++j) {
+//		jSx = j*Sx;
+//		sumidx_dj = 2 * j * dSx;
+//		for (size_idx i = 0; i < Sx; i += GRID) {					//sparse grid	
+//			iSxy = i*Sxy;
+//			sumidx_di = 2 * i * dSxy;
+//			for (size_idx k = 0; k < Sz; k += GRID) {				//sparse grid
+//				idx3d = iSxy + jSx + k;
+//				nidx2d = nearestIdx_y[level][idx3d];
+//				//rnidx2d = KCoherence_y[level][nidx2d][1 + static_cast<unsigned int>(rand() % (COHERENCENUM - 1))];
+//				rnidx2d = KCoherence_y[level][nidx2d][static_cast<unsigned int>(rand() % (COHERENCENUM))];
+//				coordx = nidx2d / Sx;	coordy = nidx2d % Sx;
+//				rcoordx = rnidx2d / Sx;	rcoordy = rnidx2d % Sx;
+//
+//				coordx *= 2;	coordy *= 2;
+//				rcoordx *= 2;	rcoordy *= 2;
+//				nidx2d = coordx*dSx + coordy;					//new doubled nidx2d & rnidx2d
+//				rnidx2d = rcoordx*dSx + rcoordy;
+//				didx3d = sumidx_di + sumidx_dj + 2 * k;			//doubled didx3d
+//
+//				setNearestIndex(level + 1, nearestIdx_y[level + 1], nearestWeight_y[level + 1], IndexHis_y[level + 1]
+//					, didx3d, nidx2d, 1.0f);													//[di][dj][dk]				[coordx][coordy]
+//				setNearestIndex(level + 1, nearestIdx_y[level + 1], nearestWeight_y[level + 1], IndexHis_y[level + 1]
+//					, didx3d + GRID*dSxy, nidx2d + GRID*dSx, 1.0f);							//[di+GRID][dj][dk]			[coordx+GRID][coordy]
+//				setNearestIndex(level + 1, nearestIdx_y[level + 1], nearestWeight_y[level + 1], IndexHis_y[level + 1]
+//					, didx3d + GRID, nidx2d + GRID, 1.0f);									//[di][dj][dk+GRID]			[coordx][coordy+GRID]
+//				setNearestIndex(level + 1, nearestIdx_y[level + 1], nearestWeight_y[level + 1], IndexHis_y[level + 1]
+//					, didx3d + GRID*dSxy + GRID, nidx2d + GRID*dSx + GRID, 1.0f);			//[di+GRID][dj][dk+GRID]	[coordx+GRID][coordy+GRID]
+//
+//																							//for nosparsed grid
+//				setNearestIndex(level + 1, nearestIdx_y[level + 1], nearestWeight_y[level + 1], IndexHis_y[level + 1]
+//					, didx3d + 1, nidx2d, 1.0f);
+//				setNearestIndex(level + 1, nearestIdx_y[level + 1], nearestWeight_y[level + 1], IndexHis_y[level + 1]
+//					, didx3d + dSxy, nidx2d, 1.0f);
+//				setNearestIndex(level + 1, nearestIdx_y[level + 1], nearestWeight_y[level + 1], IndexHis_y[level + 1]
+//					, didx3d + dSxy + 1, nidx2d, 1.0f);
+//				setNearestIndex(level + 1, nearestIdx_y[level + 1], nearestWeight_y[level + 1], IndexHis_y[level + 1]
+//					, didx3d + GRID*dSxy + 1, nidx2d + GRID*dSx, 1.0f);
+//				setNearestIndex(level + 1, nearestIdx_y[level + 1], nearestWeight_y[level + 1], IndexHis_y[level + 1]
+//					, didx3d + GRID*dSxy + dSxy, nidx2d + GRID*dSx, 1.0f);
+//				setNearestIndex(level + 1, nearestIdx_y[level + 1], nearestWeight_y[level + 1], IndexHis_y[level + 1]
+//					, didx3d + GRID*dSxy + dSxy + 1, nidx2d + GRID*dSx, 1.0f);
+//				setNearestIndex(level + 1, nearestIdx_y[level + 1], nearestWeight_y[level + 1], IndexHis_y[level + 1]
+//					, didx3d + GRID + 1, nidx2d + GRID, 1.0f);
+//				setNearestIndex(level + 1, nearestIdx_y[level + 1], nearestWeight_y[level + 1], IndexHis_y[level + 1]
+//					, didx3d + GRID + dSxy, nidx2d + GRID, 1.0f);
+//				setNearestIndex(level + 1, nearestIdx_y[level + 1], nearestWeight_y[level + 1], IndexHis_y[level + 1]
+//					, didx3d + GRID + dSxy + 1, nidx2d + GRID, 1.0f);
+//				setNearestIndex(level + 1, nearestIdx_y[level + 1], nearestWeight_y[level + 1], IndexHis_y[level + 1]
+//					, didx3d + GRID*dSxy + GRID + 1, nidx2d + GRID*dSx + GRID, 1.0f);
+//				setNearestIndex(level + 1, nearestIdx_y[level + 1], nearestWeight_y[level + 1], IndexHis_y[level + 1]
+//					, didx3d + GRID*dSxy + GRID + dSxy, nidx2d + GRID*dSx + GRID, 1.0f);
+//				setNearestIndex(level + 1, nearestIdx_y[level + 1], nearestWeight_y[level + 1], IndexHis_y[level + 1]
+//					, didx3d + GRID*dSxy + GRID + dSxy + 1, nidx2d + GRID*dSx + GRID, 1.0f);
+//				//nearestIdx_y[level + 1][didx3d + 1] = nearestIdx_y[level + 1][didx3d];
+//				//nearestIdx_y[level + 1][didx3d + dSxy] = nearestIdx_y[level + 1][didx3d];
+//				//nearestIdx_y[level + 1][didx3d + dSxy + 1] = nearestIdx_y[level + 1][didx3d];
+//				//nearestIdx_y[level + 1][didx3d + GRID + 1] = nearestIdx_y[level + 1][didx3d + GRID];
+//				//nearestIdx_y[level + 1][didx3d + GRID + dSxy] = nearestIdx_y[level + 1][didx3d + GRID];
+//				//nearestIdx_y[level + 1][didx3d + GRID + dSxy + 1] = nearestIdx_y[level + 1][didx3d + GRID];
+//				//nearestIdx_y[level + 1][didx3d + GRID*dSxy + 1] = nearestIdx_y[level + 1][didx3d + GRID*dSxy];
+//				//nearestIdx_y[level + 1][didx3d + GRID*dSxy + dSxy] = nearestIdx_y[level + 1][didx3d + GRID*dSxy];
+//				//nearestIdx_y[level + 1][didx3d + GRID*dSxy + dSxy + 1] = nearestIdx_y[level + 1][didx3d + GRID*dSxy];
+//				//nearestIdx_y[level + 1][didx3d + GRID*dSxy + GRID + 1] = nearestIdx_y[level + 1][didx3d + GRID*dSxy + GRID];
+//				//nearestIdx_y[level + 1][didx3d + GRID*dSxy + GRID + dSxy] = nearestIdx_y[level + 1][didx3d + GRID*dSxy + GRID];
+//				//nearestIdx_y[level + 1][didx3d + GRID*dSxy + GRID + dSxy + 1] = nearestIdx_y[level + 1][didx3d + GRID*dSxy + GRID];
+//
+//				didx3d += dSx;
+//				setNearestIndex(level + 1, nearestIdx_y[level + 1], nearestWeight_y[level + 1], IndexHis_y[level + 1]
+//					, didx3d, rnidx2d, 1.0f);												//[di][dj+1][dk]			[rcoordx][rcoordy]
+//				setNearestIndex(level + 1, nearestIdx_y[level + 1], nearestWeight_y[level + 1], IndexHis_y[level + 1]
+//					, didx3d + GRID*dSxy, rnidx2d + GRID*dSx, 1.0f);							//[di+GRID][dj+1][dk]		[rcoordx+GRID][rcoordy]
+//				setNearestIndex(level + 1, nearestIdx_y[level + 1], nearestWeight_y[level + 1], IndexHis_y[level + 1]
+//					, didx3d + GRID, rnidx2d + GRID, 1.0f);									//[di][dj+1][dk+GRID]		[rcoordx][rcoordy+GRID]
+//				setNearestIndex(level + 1, nearestIdx_y[level + 1], nearestWeight_y[level + 1], IndexHis_y[level + 1]
+//					, didx3d + GRID*dSxy + GRID, rnidx2d + GRID*dSx + GRID, 1.0f);			//[di+GRID][dj+1][dk+GRID]	[rcoordx+GRID][rcoordy+GRID]
+//
+//																							//for nosparsed grid
+//				setNearestIndex(level + 1, nearestIdx_y[level + 1], nearestWeight_y[level + 1], IndexHis_y[level + 1]
+//					, didx3d + 1, nidx2d, 1.0f);
+//				setNearestIndex(level + 1, nearestIdx_y[level + 1], nearestWeight_y[level + 1], IndexHis_y[level + 1]
+//					, didx3d + dSxy, nidx2d, 1.0f);
+//				setNearestIndex(level + 1, nearestIdx_y[level + 1], nearestWeight_y[level + 1], IndexHis_y[level + 1]
+//					, didx3d + dSxy + 1, nidx2d, 1.0f);
+//				setNearestIndex(level + 1, nearestIdx_y[level + 1], nearestWeight_y[level + 1], IndexHis_y[level + 1]
+//					, didx3d + GRID*dSxy + 1, nidx2d + GRID*dSx, 1.0f);
+//				setNearestIndex(level + 1, nearestIdx_y[level + 1], nearestWeight_y[level + 1], IndexHis_y[level + 1]
+//					, didx3d + GRID*dSxy + dSxy, nidx2d + GRID*dSx, 1.0f);
+//				setNearestIndex(level + 1, nearestIdx_y[level + 1], nearestWeight_y[level + 1], IndexHis_y[level + 1]
+//					, didx3d + GRID*dSxy + dSxy + 1, nidx2d + GRID*dSx, 1.0f);
+//				setNearestIndex(level + 1, nearestIdx_y[level + 1], nearestWeight_y[level + 1], IndexHis_y[level + 1]
+//					, didx3d + GRID + 1, nidx2d + GRID, 1.0f);
+//				setNearestIndex(level + 1, nearestIdx_y[level + 1], nearestWeight_y[level + 1], IndexHis_y[level + 1]
+//					, didx3d + GRID + dSxy, nidx2d + GRID, 1.0f);
+//				setNearestIndex(level + 1, nearestIdx_y[level + 1], nearestWeight_y[level + 1], IndexHis_y[level + 1]
+//					, didx3d + GRID + dSxy + 1, nidx2d + GRID, 1.0f);
+//				setNearestIndex(level + 1, nearestIdx_y[level + 1], nearestWeight_y[level + 1], IndexHis_y[level + 1]
+//					, didx3d + GRID*dSxy + GRID + 1, nidx2d + GRID*dSx + GRID, 1.0f);
+//				setNearestIndex(level + 1, nearestIdx_y[level + 1], nearestWeight_y[level + 1], IndexHis_y[level + 1]
+//					, didx3d + GRID*dSxy + GRID + dSxy, nidx2d + GRID*dSx + GRID, 1.0f);
+//				setNearestIndex(level + 1, nearestIdx_y[level + 1], nearestWeight_y[level + 1], IndexHis_y[level + 1]
+//					, didx3d + GRID*dSxy + GRID + dSxy + 1, nidx2d + GRID*dSx + GRID, 1.0f);
+//				//nearestIdx_y[level + 1][didx3d + 1] = nearestIdx_y[level + 1][didx3d];
+//				//nearestIdx_y[level + 1][didx3d + dSxy] = nearestIdx_y[level + 1][didx3d];
+//				//nearestIdx_y[level + 1][didx3d + dSxy + 1] = nearestIdx_y[level + 1][didx3d];
+//				//nearestIdx_y[level + 1][didx3d + GRID + 1] = nearestIdx_y[level + 1][didx3d + GRID];
+//				//nearestIdx_y[level + 1][didx3d + GRID + dSxy] = nearestIdx_y[level + 1][didx3d + GRID];
+//				//nearestIdx_y[level + 1][didx3d + GRID + dSxy + 1] = nearestIdx_y[level + 1][didx3d + GRID];
+//				//nearestIdx_y[level + 1][didx3d + GRID*dSxy + 1] = nearestIdx_y[level + 1][didx3d + GRID*dSxy];
+//				//nearestIdx_y[level + 1][didx3d + GRID*dSxy + dSxy] = nearestIdx_y[level + 1][didx3d + GRID*dSxy];
+//				//nearestIdx_y[level + 1][didx3d + GRID*dSxy + dSxy + 1] = nearestIdx_y[level + 1][didx3d + GRID*dSxy];
+//				//nearestIdx_y[level + 1][didx3d + GRID*dSxy + GRID + 1] = nearestIdx_y[level + 1][didx3d + GRID*dSxy + GRID];
+//				//nearestIdx_y[level + 1][didx3d + GRID*dSxy + GRID + dSxy] = nearestIdx_y[level + 1][didx3d + GRID*dSxy + GRID];
+//				//nearestIdx_y[level + 1][didx3d + GRID*dSxy + GRID + dSxy + 1] = nearestIdx_y[level + 1][didx3d + GRID*dSxy + GRID];
+//			}
+//		}
+//	}//Y
+//
+//	 //Z
+//	for (size_idx k = 0; k < Sz; ++k) {
+//		for (size_idx i = 0; i < Sx; i += GRID) {					//sparse grid	
+//			iSxy = i*Sxy;
+//			sumidx_di = 2 * i * dSxy;
+//			for (size_idx j = 0; j < Sy; j += GRID) {				//sparse grid
+//				jSx = j*Sx;
+//				sumidx_dj = 2 * j * dSx;
+//
+//				idx3d = iSxy + jSx + k;
+//				nidx2d = nearestIdx_z[level][idx3d];
+//				//rnidx2d = KCoherence_z[level][nidx2d][1 + static_cast<unsigned int>(rand() % (COHERENCENUM - 1))];
+//				rnidx2d = KCoherence_z[level][nidx2d][static_cast<unsigned int>(rand() % (COHERENCENUM))];
+//				coordx = nidx2d / Sx;	coordy = nidx2d % Sx;
+//				rcoordx = rnidx2d / Sx;	rcoordy = rnidx2d % Sx;
+//
+//				coordx *= 2;	coordy *= 2;
+//				rcoordx *= 2;	rcoordy *= 2;
+//				nidx2d = coordx*dSx + coordy;					//new doubled nidx2d & rnidx2d
+//				rnidx2d = rcoordx*dSx + rcoordy;
+//				didx3d = sumidx_di + sumidx_dj + 2 * k;			//doubled didx3d
+//
+//				setNearestIndex(level + 1, nearestIdx_z[level + 1], nearestWeight_z[level + 1], IndexHis_z[level + 1]
+//					, didx3d, nidx2d, 1.0f);												//[di][dj][dk]				[coordx][coordy]
+//				setNearestIndex(level + 1, nearestIdx_z[level + 1], nearestWeight_z[level + 1], IndexHis_z[level + 1]
+//					, didx3d + GRID*dSxy, nidx2d + GRID*dSx, 1.0f);							//[di+GRID][dj][dk]			[coordx+GRID][coordy]
+//				setNearestIndex(level + 1, nearestIdx_z[level + 1], nearestWeight_z[level + 1], IndexHis_z[level + 1]
+//					, didx3d + GRID*dSx, nidx2d + GRID, 1.0f);								//[di][dj+GRID][dk]			[coordx][coordy+GRID]
+//				setNearestIndex(level + 1, nearestIdx_z[level + 1], nearestWeight_z[level + 1], IndexHis_z[level + 1]
+//					, didx3d + GRID*dSxy + GRID*dSx, nidx2d + GRID*dSx + GRID, 1.0f);		//[di+GRID][dj+GRID][dk]	[coordx+GRID][coordy+GRID]
+//
+//																							//for nosparsed grid
+//				setNearestIndex(level + 1, nearestIdx_z[level + 1], nearestWeight_z[level + 1], IndexHis_z[level + 1]
+//					, didx3d + dSxy, nidx2d, 1.0f);
+//				setNearestIndex(level + 1, nearestIdx_z[level + 1], nearestWeight_z[level + 1], IndexHis_z[level + 1]
+//					, didx3d + dSx, nidx2d, 1.0f);
+//				setNearestIndex(level + 1, nearestIdx_z[level + 1], nearestWeight_z[level + 1], IndexHis_z[level + 1]
+//					, didx3d + dSxy + dSx, nidx2d, 1.0f);
+//				setNearestIndex(level + 1, nearestIdx_z[level + 1], nearestWeight_z[level + 1], IndexHis_z[level + 1]
+//					, didx3d + GRID*dSxy + dSx, nidx2d + GRID*dSx, 1.0f);
+//				setNearestIndex(level + 1, nearestIdx_z[level + 1], nearestWeight_z[level + 1], IndexHis_z[level + 1]
+//					, didx3d + GRID*dSxy + dSxy, nidx2d + GRID*dSx, 1.0f);
+//				setNearestIndex(level + 1, nearestIdx_z[level + 1], nearestWeight_z[level + 1], IndexHis_z[level + 1]
+//					, didx3d + GRID*dSxy + dSxy + dSx, nidx2d + GRID*dSx, 1.0f);
+//				setNearestIndex(level + 1, nearestIdx_z[level + 1], nearestWeight_z[level + 1], IndexHis_z[level + 1]
+//					, didx3d + GRID*dSx + dSx, nidx2d + GRID, 1.0f);
+//				setNearestIndex(level + 1, nearestIdx_z[level + 1], nearestWeight_z[level + 1], IndexHis_z[level + 1]
+//					, didx3d + GRID*dSx + dSxy, nidx2d + GRID, 1.0f);
+//				setNearestIndex(level + 1, nearestIdx_z[level + 1], nearestWeight_z[level + 1], IndexHis_z[level + 1]
+//					, didx3d + GRID*dSx + dSxy + dSx, nidx2d + GRID, 1.0f);
+//				setNearestIndex(level + 1, nearestIdx_z[level + 1], nearestWeight_z[level + 1], IndexHis_z[level + 1]
+//					, didx3d + GRID*dSxy + GRID*dSx + dSx, nidx2d + GRID*dSx + GRID, 1.0f);
+//				setNearestIndex(level + 1, nearestIdx_z[level + 1], nearestWeight_z[level + 1], IndexHis_z[level + 1]
+//					, didx3d + GRID*dSxy + GRID*dSx + dSxy, nidx2d + GRID*dSx + GRID, 1.0f);
+//				setNearestIndex(level + 1, nearestIdx_z[level + 1], nearestWeight_z[level + 1], IndexHis_z[level + 1]
+//					, didx3d + GRID*dSxy + GRID*dSx + dSxy + dSx, nidx2d + GRID*dSx + GRID, 1.0f);
+//				//nearestIdx_z[level + 1][didx3d + dSx] = nearestIdx_z[level + 1][didx3d];
+//				//nearestIdx_z[level + 1][didx3d + dSxy] = nearestIdx_z[level + 1][didx3d];
+//				//nearestIdx_z[level + 1][didx3d + dSxy + dSx] = nearestIdx_z[level + 1][didx3d];
+//				//nearestIdx_z[level + 1][didx3d + GRID*dSx + dSx] = nearestIdx_z[level + 1][didx3d + GRID*dSx];
+//				//nearestIdx_z[level + 1][didx3d + GRID*dSx + dSxy] = nearestIdx_z[level + 1][didx3d + GRID*dSx];
+//				//nearestIdx_z[level + 1][didx3d + GRID*dSx + dSxy + dSx] = nearestIdx_z[level + 1][didx3d + GRID*dSx];
+//				//nearestIdx_z[level + 1][didx3d + GRID*dSxy + dSx] = nearestIdx_z[level + 1][didx3d + GRID*dSxy];
+//				//nearestIdx_z[level + 1][didx3d + GRID*dSxy + dSxy] = nearestIdx_z[level + 1][didx3d + GRID*dSxy];
+//				//nearestIdx_z[level + 1][didx3d + GRID*dSxy + dSxy + dSx] = nearestIdx_z[level + 1][didx3d + GRID*dSxy];
+//				//nearestIdx_z[level + 1][didx3d + GRID*dSxy + GRID*dSx + dSx] = nearestIdx_z[level + 1][didx3d + GRID*dSxy + GRID*dSx];
+//				//nearestIdx_z[level + 1][didx3d + GRID*dSxy + GRID*dSx + dSxy] = nearestIdx_z[level + 1][didx3d + GRID*dSxy + GRID*dSx];
+//				//nearestIdx_z[level + 1][didx3d + GRID*dSxy + GRID*dSx + dSxy + dSx] = nearestIdx_z[level + 1][didx3d + GRID*dSxy + GRID*dSx];
+//
+//				didx3d += 1;
+//				setNearestIndex(level + 1, nearestIdx_z[level + 1], nearestWeight_z[level + 1], IndexHis_z[level + 1]
+//					, didx3d, rnidx2d, 1.0f);												//[di][dj][dk+1]			[rcoordx][rcoordy]
+//				setNearestIndex(level + 1, nearestIdx_z[level + 1], nearestWeight_z[level + 1], IndexHis_z[level + 1]
+//					, didx3d + GRID*dSxy, rnidx2d + GRID*dSx, 1.0f);						//[di+GRID][dj][dk+1]		[rcoordx+GRID][rcoordy]
+//				setNearestIndex(level + 1, nearestIdx_z[level + 1], nearestWeight_z[level + 1], IndexHis_z[level + 1]
+//					, didx3d + GRID*dSx, rnidx2d + GRID, 1.0f);								//[di][dj+GRID][dk+1]		[rcoordx][rcoordy+GRID]
+//				setNearestIndex(level + 1, nearestIdx_z[level + 1], nearestWeight_z[level + 1], IndexHis_z[level + 1]
+//					, didx3d + GRID*dSxy + GRID*dSx, rnidx2d + GRID*dSx + GRID, 1.0f);		//[di+GRID][dj+GRID][dk+1]	[rcoordx+GRID][rcoordy+GRID]
+//
+//																							//for nosparsed grid
+//				setNearestIndex(level + 1, nearestIdx_z[level + 1], nearestWeight_z[level + 1], IndexHis_z[level + 1]
+//					, didx3d + dSxy, nidx2d, 1.0f);
+//				setNearestIndex(level + 1, nearestIdx_z[level + 1], nearestWeight_z[level + 1], IndexHis_z[level + 1]
+//					, didx3d + dSx, nidx2d, 1.0f);
+//				setNearestIndex(level + 1, nearestIdx_z[level + 1], nearestWeight_z[level + 1], IndexHis_z[level + 1]
+//					, didx3d + dSxy + dSx, nidx2d, 1.0f);
+//				setNearestIndex(level + 1, nearestIdx_z[level + 1], nearestWeight_z[level + 1], IndexHis_z[level + 1]
+//					, didx3d + GRID*dSxy + dSx, nidx2d + GRID*dSx, 1.0f);
+//				setNearestIndex(level + 1, nearestIdx_z[level + 1], nearestWeight_z[level + 1], IndexHis_z[level + 1]
+//					, didx3d + GRID*dSxy + dSxy, nidx2d + GRID*dSx, 1.0f);
+//				setNearestIndex(level + 1, nearestIdx_z[level + 1], nearestWeight_z[level + 1], IndexHis_z[level + 1]
+//					, didx3d + GRID*dSxy + dSxy + dSx, nidx2d + GRID*dSx, 1.0f);
+//				setNearestIndex(level + 1, nearestIdx_z[level + 1], nearestWeight_z[level + 1], IndexHis_z[level + 1]
+//					, didx3d + GRID*dSx + dSx, nidx2d + GRID, 1.0f);
+//				setNearestIndex(level + 1, nearestIdx_z[level + 1], nearestWeight_z[level + 1], IndexHis_z[level + 1]
+//					, didx3d + GRID*dSx + dSxy, nidx2d + GRID, 1.0f);
+//				setNearestIndex(level + 1, nearestIdx_z[level + 1], nearestWeight_z[level + 1], IndexHis_z[level + 1]
+//					, didx3d + GRID*dSx + dSxy + dSx, nidx2d + GRID, 1.0f);
+//				setNearestIndex(level + 1, nearestIdx_z[level + 1], nearestWeight_z[level + 1], IndexHis_z[level + 1]
+//					, didx3d + GRID*dSxy + GRID*dSx + dSx, nidx2d + GRID*dSx + GRID, 1.0f);
+//				setNearestIndex(level + 1, nearestIdx_z[level + 1], nearestWeight_z[level + 1], IndexHis_z[level + 1]
+//					, didx3d + GRID*dSxy + GRID*dSx + dSxy, nidx2d + GRID*dSx + GRID, 1.0f);
+//				setNearestIndex(level + 1, nearestIdx_z[level + 1], nearestWeight_z[level + 1], IndexHis_z[level + 1]
+//					, didx3d + GRID*dSxy + GRID*dSx + dSxy + dSx, nidx2d + GRID*dSx + GRID, 1.0f);
+//				//nearestIdx_z[level + 1][didx3d + dSx] = nearestIdx_z[level + 1][didx3d];
+//				//nearestIdx_z[level + 1][didx3d + dSxy] = nearestIdx_z[level + 1][didx3d];
+//				//nearestIdx_z[level + 1][didx3d + dSxy + dSx] = nearestIdx_z[level + 1][didx3d];
+//				//nearestIdx_z[level + 1][didx3d + GRID*dSx + dSx] = nearestIdx_z[level + 1][didx3d + GRID*dSx];
+//				//nearestIdx_z[level + 1][didx3d + GRID*dSx + dSxy] = nearestIdx_z[level + 1][didx3d + GRID*dSx];
+//				//nearestIdx_z[level + 1][didx3d + GRID*dSx + dSxy + dSx] = nearestIdx_z[level + 1][didx3d + GRID*dSx];
+//				//nearestIdx_z[level + 1][didx3d + GRID*dSxy + dSx] = nearestIdx_z[level + 1][didx3d + GRID*dSxy];
+//				//nearestIdx_z[level + 1][didx3d + GRID*dSxy + dSxy] = nearestIdx_z[level + 1][didx3d + GRID*dSxy];
+//				//nearestIdx_z[level + 1][didx3d + GRID*dSxy + dSxy + dSx] = nearestIdx_z[level + 1][didx3d + GRID*dSxy];
+//				//nearestIdx_z[level + 1][didx3d + GRID*dSxy + GRID*dSx + dSx] = nearestIdx_z[level + 1][didx3d + GRID*dSxy + GRID*dSx];
+//				//nearestIdx_z[level + 1][didx3d + GRID*dSxy + GRID*dSx + dSxy] = nearestIdx_z[level + 1][didx3d + GRID*dSxy + GRID*dSx];
+//				//nearestIdx_z[level + 1][didx3d + GRID*dSxy + GRID*dSx + dSxy + dSx] = nearestIdx_z[level + 1][didx3d + GRID*dSxy + GRID*dSx];
+//			}
+//		}
+//	}//Z
+//
+//	 //for (size_idx i = 0; i < nearestIdx_x[level + 1].size(); i++) {
+//	 //	if (nearestIdx_x[level + 1][i] > dSxy) cout << endl << "nearestIdx_x " << i << "= " << nearestIdx_x[level + 1][i];
+//	 //}
+//	 //for (size_idx i = 0; i < nearestIdx_y[level + 1].size(); i++) {
+//	 //	if (nearestIdx_y[level + 1][i] > dSxy) cout << endl << "nearestIdx_y " << i << "= " << nearestIdx_y[level + 1][i];
+//	 //}
+//	 //for (size_idx i = 0; i < nearestIdx_z[level + 1].size(); i++) {
+//	 //	if (nearestIdx_z[level + 1][i] > dSxy) cout << endl << "nearestIdx_z " << i << "= " << nearestIdx_z[level + 1][i];
+//	 //}
+//
+//	cout << endl << "upsampled from " << level << " to " << level + 1;
+//}
+
 
 // checking parallelization without synchronizing his. result is very small amount error.
 void DoPAR::checkHisError(int level) {
