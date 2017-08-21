@@ -171,6 +171,7 @@ void DoPAR::ReadRunPar(string CurExeFile)
 
 	string tempoutputfilename;
 	string tempoutputformat;
+	string parametername;
 
 	string Path;
 	vector<string> ResLines;
@@ -264,7 +265,8 @@ void DoPAR::ReadRunPar(string CurExeFile)
 		tempoutputformat = ".raw";
 		tempoutputfilename = ParV[0].substr(0, ParV[0].rfind('.') == string::npos ? ParV[0].length() : ParV[0].rfind('.'));
 	}
-	outputfilename = tempoutputfilename + tempoutputformat;
+	parametername = "i" + to_string((int)factorIndex) + "p" + to_string((int)factorP) + "c" + to_string((int)factorC);
+	outputfilename = tempoutputfilename + "_" + parametername + tempoutputformat;
 }
 
 bool DoPAR::ReadTxtFiles(const string PFName, vector<string>& ResLines)
@@ -510,48 +512,37 @@ void DoPAR::DoANNOptimization() {
 			shuffle(m_permutation.begin(), m_permutation.end(), mersennetwistergenerator);
 			if (loop % (MAXITERATION[curlevel] / 2) == 0)
 				cout << endl << "iteration: " << loop;						
-			if (curlevel == 0 && loop == 0) searchVolume(curlevel);			//!!the first run on level0 should be started by search	
+			//if (curlevel == 0 && loop == 0) searchVolume(curlevel);			//!!the first run on level0 should be started by search	
+			if (curlevel == 0 && loop == 0) searchVolume_nosparsed(curlevel);			//!!the first run on level0 should be started by search	
 
 			t1 = GetTickCount();
-			optimizeVolume(curlevel);
+			//optimizeVolume(curlevel);
+			optimizeVolume_nosparsed(curlevel);
 			t2 = GetTickCount();
 			if (loop % (MAXITERATION[curlevel] / 2) == 0)
 				cout << endl << "optmize: " << (t2 - t1) / 1000.0 << " s";
 	
 			if (curlevel == MULTIRES - 1 && loop == MAXITERATION[curlevel] - 1) break;	//last search step is not needed.
-			if (searchVolume(curlevel)){
+			//if (searchVolume(curlevel)) {
+			if (searchVolume_nosparsed(curlevel)){
 				cout << endl << "converged, skip to next level.";
 				break;
 			}
 			t3 = GetTickCount();
 			if (loop % (MAXITERATION[curlevel] / 2) == 0)
 				cout << endl << "search: " << (t3 - t2) / 1000.0 << " s";
-
-			//size_idx TEXSIZE_ = TEXSIZE[curlevel];
-			//size_idx blockSize_ = blockSize[curlevel];
-			//float tmpavg_x = avgIndexHis[curlevel]+1;
-			//for (int x = blockSize_ / 4; x < TEXSIZE_ / 2 - blockSize_ / 4 + 1; x++) {
-			//	cout << endl;
-			//	for (int y = blockSize_ / 4; y < TEXSIZE_ / 2 - blockSize_ / 4 + 1; y++) {
-			//		cout << (int)(IndexHis_x[curlevel][y + (TEXSIZE_ / 2) * x] - tmpavg_x) << " ";
-			//	}
-			//}
-			//cout << endl; _getch();
 		}	
 		if (curlevel == MULTIRES - 1 || TEXSIZE[curlevel] >= 256) {// ouput model & histogram
 			outputmodel(curlevel);
-			//writeHistogram(curlevel);
+			writeHistogram(curlevel);
 		}
 		//if (/*TEXSIZE[curlevel] < 256 && */TEXSIZE[curlevel] >= 128)	writeHistogram(curlevel);		
-
-		//checkHisError(curlevel);	//very little error
 
 		if (curlevel < MULTIRES - 1) {// level up
 			allocateVectors(curlevel+1);
 			upsampleVolume(curlevel);			
 			cleardata(curlevel);
 			FIRSTRUN = true;
-			//_getch();
 		}
 	}
 
@@ -593,7 +584,6 @@ void DoPAR::init() {
 		omp_set_num_threads(maxthread);
 	}//else use omp_get_num_procs()
 	
-
 	// load TI
 	if (!loadExemplar()) return;
 
@@ -613,7 +603,9 @@ void DoPAR::init() {
 		//pdfdevS[i] = floor(avgIndexHis[i] * 1.0/3.0/4.0);	//search weight use linear is enough
 
 		factorIndex *= 1.0f;
-		avgIndexHis[i] = floor((1.0f * TEXSIZE[i] * (TEXSIZE[i] / 2) * (TEXSIZE[i] / 2)) / ((TEXSIZE[i] / 2 - blockSize[i] / 2 + 1)*(TEXSIZE[i] / 2 - blockSize[i] / 2 + 1)));
+		//avgIndexHis[i] = floor((1.0f * TEXSIZE[i] * (TEXSIZE[i] / 2) * (TEXSIZE[i] / 2)) / ((TEXSIZE[i] / 2 - blockSize[i] / 2 + 1)*(TEXSIZE[i] / 2 - blockSize[i] / 2 + 1)));
+		avgIndexHis[i] = floor((1.0f * TEXSIZE[i] * TEXSIZE[i] * TEXSIZE[i]) / ((TEXSIZE[i] / 2 - blockSize[i] / 2 + 1)*(TEXSIZE[i] / 2 - blockSize[i] / 2 + 1)));
+		//change avgIndexHis if no sparsed grid 
 		avgIndexHis[i] -= 1;
 		avgPosHis[i] = floor((TEXSIZE[i] * TEXSIZE[i] * TEXSIZE[i]) / ((TEXSIZE[i] - 2)*(TEXSIZE[i] - 2)) / 3.0);
 		avgPosHis[i] -= 1;
@@ -729,7 +721,7 @@ bool DoPAR::loadExemplar() {
 	if (tempSize == 1024) {
 		MULTIRES = 6;
 		blockSize = { 8, 8, 8, 8, 8, 6 };
-		MAXITERATION = { 40, 20, 10, 6, 6, 5 };
+		MAXITERATION = { 20, 15, 15, 10, 8, 6 };
 	}
 	if (tempSize >= 512) { 
 		if (tempSize % 32 != 0) { 
@@ -743,8 +735,8 @@ bool DoPAR::loadExemplar() {
 			cout << endl << "TIs are croped to "<< cropedsize <<" to fit multi-grid";
 		}
 		MULTIRES = 5;
-		blockSize = {8, 8, 8, 6, 6};
-		MAXITERATION = { 40, 20, 10, 6, 5 };
+		blockSize = {8, 8, 8, 8, 6};
+		MAXITERATION = { 20, 15, 10, 8, 6 };
 	}
 	else if (tempSize >= 256) {
 		if (tempSize % 16 != 0) { 
@@ -759,7 +751,7 @@ bool DoPAR::loadExemplar() {
 		}
 		MULTIRES = 4;
 		blockSize = { 8, 8, 8, 6 };
-		MAXITERATION = { 40, 20, 10, 5 };
+		MAXITERATION = { 20, 15, 10, 6 };
 	}
 	else if (tempSize >= 128) {
 		if (tempSize % 8 != 0) { 
@@ -774,13 +766,10 @@ bool DoPAR::loadExemplar() {
 		}
 		MULTIRES = 3;
 		blockSize = { 8, 8, 6 };
-		MAXITERATION = { 40, 20, 10};
+		MAXITERATION = { 30, 20, 10};
 	}
 	TEXSIZE.resize(MULTIRES);
-	//factorIndex.resize(MULTIRES); //factorPos.resize(MULTIRES);
-	//deltaIndexHis.resize(MULTIRES); deltaPosHis.resize(MULTIRES);
 	avgIndexHis.resize(MULTIRES); avgPosHis.resize(MULTIRES);
-	//pdfdevS.resize(MULTIRES); 
 	pdfdevO.resize(MULTIRES);
 	ColorHis_exemplar.resize(MULTIRES);
 	ColorHis_synthesis.resize(MULTIRES);
@@ -853,7 +842,6 @@ void DoPAR::gaussImage(int level, vector<vector<size_color>>& exemplar){
 		}
 	}
 }
-
 
 // ============== distance map ===============
 void DoPAR::binaryChar(vector<short>& DMap, vector<char>& Binarised, short threshold = 110) {
@@ -1234,7 +1222,6 @@ void DoPAR::transformDM(vector<size_color>& exemplar1, vector<size_color>& exemp
 	}
 }
 
-
 // Init Random Volume
 bool DoPAR::loadVolume() {
 	cout << endl << "Use Random initial.";
@@ -1270,7 +1257,6 @@ void DoPAR::outputmodel(int level) {
 	cout << endl << "output done.";
 }
 
-
 // =========== K-coherence search =============
 void DoPAR::computeKCoherence(){
 	cout << endl << "K="<< COHERENCENUM <<" compute K-coherence...";
@@ -1279,13 +1265,6 @@ void DoPAR::computeKCoherence(){
 	KCoherence_x.resize(MULTIRES);
 	KCoherence_y.resize(MULTIRES);
 	KCoherence_z.resize(MULTIRES);
-	////==========multiple nearest index, position control=========
-	//ANNidxArray ann_index_x = new size_idx[COHERENCENUM];
-	//ANNidxArray ann_index_y = new size_idx[COHERENCENUM];
-	//ANNidxArray ann_index_z = new size_idx[COHERENCENUM];
-	//ANNdistArray ann_dist_x = new size_dist[COHERENCENUM];
-	//ANNdistArray ann_dist_y = new size_dist[COHERENCENUM];
-	//ANNdistArray ann_dist_z = new size_dist[COHERENCENUM];
 
 	for (int level = 0; level < MULTIRES; ++level) {
 		size_idx TEXSIZE_ = TEXSIZE[level];
@@ -1310,10 +1289,6 @@ void DoPAR::computeKCoherence(){
 		p_source_x = annAllocPts(numData, dim);			//rows='area' numData, cols=dimension (Neighbour size)
 		p_source_y = annAllocPts(numData, dim);
 		p_source_z = annAllocPts(numData, dim);
-		//ANNpoint queryPt_x, queryPt_y, queryPt_z;
-		//queryPt_x = annAllocPt(dim);
-		//queryPt_y = annAllocPt(dim);
-		//queryPt_z = annAllocPt(dim);
 
 		size_idx row = 0;
 		for (size_idx i = 0; i < width; ++i) {
@@ -1337,40 +1312,6 @@ void DoPAR::computeKCoherence(){
 		kdTree_x = new ANNkd_tree(p_source_x, numData, dim);		//build ANNkd_tree
 		kdTree_y = new ANNkd_tree(p_source_y, numData, dim);
 		kdTree_z = new ANNkd_tree(p_source_z, numData, dim);
-
-	////! annkSearch write on shared data, so cannot use parallel for here
-	//	for (size_idx i = 0; i < width; ++i) {
-	//		for (size_idx j = 0; j < height; ++j) {
-	//			size_idx num = 0;
-	//			size_idx TIindex = TEXSIZE_ * i + j;
-	//			for (size_idx m = 0; m < blockSize_; ++m) {
-	//				for (size_idx n = 0; n < blockSize_; ++n) {
-	//					size_idx index = TIindex + TEXSIZE_ * m + n;	//[i+m][j+n]
-	//					queryPt_x[num] = m_exemplar_x[level][index];
-	//					queryPt_y[num] = m_exemplar_y[level][index];
-	//					queryPt_z[num] = m_exemplar_z[level][index];
-	//					num++;
-	//				}
-	//			}
-	//
-	//			kdTree_x->annkSearch(queryPt_x, COHERENCENUM, ann_index_x, ann_dist_x, 0);
-	//			kdTree_y->annkSearch(queryPt_y, COHERENCENUM, ann_index_y, ann_dist_y, 0);
-	//			kdTree_z->annkSearch(queryPt_z, COHERENCENUM, ann_index_z, ann_dist_z, 0);
-	//
-	//			//Set K-Coherence
-	//			size_idx bias_TIindex = TIindex + bias*TEXSIZE_ + bias;									//
-	//			KCoherence_x[level][bias_TIindex].resize(COHERENCENUM);
-	//			KCoherence_y[level][bias_TIindex].resize(COHERENCENUM);
-	//			KCoherence_z[level][bias_TIindex].resize(COHERENCENUM);
-	//			for (int k = 0; k < COHERENCENUM; ++k) {
-	//				KCoherence_x[level][bias_TIindex][k] = convertIndexANN(level, ann_index_x[k]);		//direction=0
-	//				KCoherence_y[level][bias_TIindex][k] = convertIndexANN(level, ann_index_y[k]);		//direction=1
-	//				KCoherence_z[level][bias_TIindex][k] = convertIndexANN(level, ann_index_z[k]);		//direction=2
-	//			}
-	//			//if (bias_TIindex != KCoherence_x[level][bias_TIindex][0]) { cout << endl << bias_TIindex <<" != KCoherence_x[level][bias_TIindex][0]"; _getch(); }
-	//			// K-coherence: C1(idx) = Kcoherence[0] = Origin
-	//		}
-	//	}
 
 #pragma omp parallel for schedule(static)
 		for (size_idx idx = 0; idx < maxSize2d; idx++) {
@@ -1421,15 +1362,11 @@ void DoPAR::computeKCoherence(){
 		annClose();
 		delete kdTree_x;				delete kdTree_y;				delete kdTree_z;
 		annDeallocPts(p_source_x);		annDeallocPts(p_source_y);		annDeallocPts(p_source_z);
-		//annDeallocPt(queryPt_x);		annDeallocPt(queryPt_y);		annDeallocPt(queryPt_z);
 	}
-	//delete[] ann_index_x;		delete[] ann_index_y;		delete[] ann_index_z;
-	//delete[] ann_dist_x;		delete[] ann_dist_y;		delete[] ann_dist_z;
-	
+
 	long time_end = clock();
 	cout << endl << "done. clocks = " << (time_end - time_start) / CLOCKS_PER_SEC << " s";
 }
-
 
 // ================ phase 1: search ===========================
 bool DoPAR::searchVolume(int level) {
@@ -1449,9 +1386,9 @@ bool DoPAR::searchVolume(int level) {
 	const size_idx start = static_cast<size_idx>(blockSize_ / 2);			//4	//4	//4	//3			//-cstart<=x<=cend
 	const size_idx end = static_cast<size_idx>((blockSize_-1) / 2);			//3	//3	//3	//2
 	size_idx cstart(start), cend(end);
-	if (level > 0 && end>2) {
-		cstart -= 1;														//4	//3	//3	//3
-		cend -= 1;															//3	//2	//2	//2
+	if (level > 0 && end>1) {//reduce the candidates of KCoherence. reduce computation. But the template size is not reduced in getFullDistance()
+		cstart -= 1;														//4	//3	//3	//2
+		cend -= 1;															//3	//2	//2	//1
 	}
 
 	bool isUnchanged = true;	
@@ -1900,9 +1837,9 @@ bool DoPAR::searchVolume_nosparsed(int level) {
 	const size_idx start = static_cast<size_idx>(blockSize_ / 2);			//4	//4	//4	//3			//-cstart<=x<=cend
 	const size_idx end = static_cast<size_idx>((blockSize_ - 1) / 2);		//3	//3	//3	//2
 	size_idx cstart(start), cend(end);
-	if (level > 0 && end>2) {
-		cstart -= 1;														//4	//3	//3	//3
-		cend -= 1;															//3	//2	//2	//2
+	if (level > 0 && end>1) {//reduce the candidates of KCoherence. reduce computation. But the template size is not reduced in getFullDistance()
+		cstart -= 1;														//4	//3	//3	//2
+		cend -= 1;															//3	//2	//2	//1
 	}
 
 	bool isUnchanged = true;
@@ -1951,7 +1888,6 @@ bool DoPAR::searchVolume_nosparsed(int level) {
 					temp3didx = sumidx_posx + trimIndex(level, j + v)*Sx;				//[posx][posy][k]
 					eposx = (Origin_z[level][temp3didx] / Sx) - u;
 					eposy = (Origin_z[level][temp3didx] % Sx) - v;
-
 					if (!(eposx >= start && eposx < Sx - end && eposy >= start && eposy < Sy - end))
 						continue;
 
@@ -2023,8 +1959,9 @@ bool DoPAR::searchVolume_nosparsed(int level) {
 				}
 			}
 			else {
-				if (!countedYN) cout << "bad..(best match on boundary)";
-				else cout << "infinity...";
+				//if (!countedYN) cout << "bad..(best match on boundary)";
+				//else cout << "infinity...";
+				if (countedYN) cout << "infinity...";
 				bestTIIdx = getRandomNearestIndex(level, IndexHis_z[level]);
 				nearestWeight_z[level][idx] = 1.0f / 100;
 				size_idx formerNearestIdx = nearestIdx_z[level][idx];
@@ -2087,7 +2024,6 @@ bool DoPAR::searchVolume_nosparsed(int level) {
 					temp3didx = sumidx_posx + trimIndex(level, k + v);			//[posx][j][posy]
 					eposx = (Origin_y[level][temp3didx] / Sx) - u;
 					eposy = (Origin_y[level][temp3didx] % Sy) - v;
-
 					if (!(eposx >= start && eposx < Sx - end && eposy >= start && eposy < Sy - end))
 						continue;
 
@@ -2156,8 +2092,9 @@ bool DoPAR::searchVolume_nosparsed(int level) {
 				}
 			}
 			else {
-				if (!countedYN) cout << "bad..(best match on boundary)";
-				else cout << "infinity...";
+				//if (!countedYN) cout << "bad..(best match on boundary)";
+				//else cout << "infinity...";
+				if (countedYN) cout << "infinity...";
 				bestTIIdx = getRandomNearestIndex(level, IndexHis_y[level]);
 				size_idx formerNearestIdx = nearestIdx_y[level][idx];
 				nearestWeight_y[level][idx] = 1.0f / 100;
@@ -2220,7 +2157,6 @@ bool DoPAR::searchVolume_nosparsed(int level) {
 					temp3didx = sumidx_posx + trimIndex(level, k + v);			//[i][posx][posy]
 					eposx = (Origin_x[level][temp3didx] / Sx) - u;
 					eposy = (Origin_x[level][temp3didx] % Sx) - v;
-
 					if (!(eposx >= start && eposx < Sx - end && eposy >= start && eposy < Sy - end))
 						continue;
 
@@ -2291,8 +2227,9 @@ bool DoPAR::searchVolume_nosparsed(int level) {
 				}
 			}
 			else {
-				if (!countedYN) cout << "bad..(best match on boundary)";
-				else cout << "infinity...";
+				//if (!countedYN) cout << "bad..(best match on boundary)";
+				//else cout << "infinity...";
+				if (countedYN) cout << "infinity...";
 				bestTIIdx = getRandomNearestIndex(level, IndexHis_x[level]);
 				size_idx formerNearestIdx = nearestIdx_x[level][idx];
 				nearestWeight_x[level][idx] = 1.0f / 100;
@@ -3120,7 +3057,7 @@ void DoPAR::optimizeVolume_nosparsed(int level) {
 
 				tempnearestidx = nearestIdx_y[level][tempidx];										//nearestidx from search step, weight=eudis^-0.6				
 				tempnearestweight = nearestWeight_y[level][tempidx];
-
+				
 				tempnearestidx += deltax * Sx + deltay;
 				tempcolor = m_exemplar_y[level][tempnearestidx];
 
@@ -3573,6 +3510,8 @@ void DoPAR::upsampleVolume(int level) {
 	const size_idx Syz = Sy * Sz;
 	const size_idx Size = Sxy * Sz;
 	const size_idx dSx = 2 * Sx;
+	const size_idx dSy = 2 * Sy;
+	const size_idx dSz = 2 * Sz;
 	const size_idx dSxy = dSx * dSx;
 
 	size_idx idx3d, didx3d, iSxy, jSx, sumidx_di, sumidx_dj;
@@ -3609,6 +3548,44 @@ void DoPAR::upsampleVolume(int level) {
 					, didx3d + GRID, nidx2d + GRID, 1.0f);										//[di][dj][dk+GRID]			[coordx][coordy+GRID]
 				setNearestIndex(level + 1, nearestIdx_x[level + 1], nearestWeight_x[level + 1], IndexHis_x[level + 1]
 					, didx3d + GRID*dSx + GRID, nidx2d + GRID*dSx + GRID, 1.0f);				//[di][dj+GRID][dk+GRID]	[coordx+GRID][coordy+GRID]
+				
+				//for nosparsed grid
+				setNearestIndex(level + 1, nearestIdx_x[level + 1], nearestWeight_x[level + 1], IndexHis_x[level + 1]
+					, didx3d + 1, nidx2d, 1.0f);
+				setNearestIndex(level + 1, nearestIdx_x[level + 1], nearestWeight_x[level + 1], IndexHis_x[level + 1]
+					, didx3d + dSx, nidx2d, 1.0f);
+				setNearestIndex(level + 1, nearestIdx_x[level + 1], nearestWeight_x[level + 1], IndexHis_x[level + 1]
+					, didx3d + dSx + 1, nidx2d, 1.0f);
+				setNearestIndex(level + 1, nearestIdx_x[level + 1], nearestWeight_x[level + 1], IndexHis_x[level + 1]
+					, didx3d + GRID + 1, nidx2d + GRID, 1.0f);										
+				setNearestIndex(level + 1, nearestIdx_x[level + 1], nearestWeight_x[level + 1], IndexHis_x[level + 1]
+					, didx3d + GRID + dSx, nidx2d + GRID, 1.0f);										
+				setNearestIndex(level + 1, nearestIdx_x[level + 1], nearestWeight_x[level + 1], IndexHis_x[level + 1]
+					, didx3d + GRID + dSx + 1, nidx2d + GRID, 1.0f);								
+				setNearestIndex(level + 1, nearestIdx_x[level + 1], nearestWeight_x[level + 1], IndexHis_x[level + 1]
+					, didx3d + GRID*dSx + 1, nidx2d + GRID*dSx, 1.0f);						
+				setNearestIndex(level + 1, nearestIdx_x[level + 1], nearestWeight_x[level + 1], IndexHis_x[level + 1]
+					, didx3d + GRID*dSx + dSx, nidx2d + GRID*dSx, 1.0f);					
+				setNearestIndex(level + 1, nearestIdx_x[level + 1], nearestWeight_x[level + 1], IndexHis_x[level + 1]
+					, didx3d + GRID*dSx + dSx + 1, nidx2d + GRID*dSx, 1.0f);					
+				setNearestIndex(level + 1, nearestIdx_x[level + 1], nearestWeight_x[level + 1], IndexHis_x[level + 1]
+					, didx3d + GRID*dSx + GRID + 1, nidx2d + GRID*dSx + GRID, 1.0f);
+				setNearestIndex(level + 1, nearestIdx_x[level + 1], nearestWeight_x[level + 1], IndexHis_x[level + 1]
+					, didx3d + GRID*dSx + GRID + dSx, nidx2d + GRID*dSx + GRID, 1.0f);
+				setNearestIndex(level + 1, nearestIdx_x[level + 1], nearestWeight_x[level + 1], IndexHis_x[level + 1]
+					, didx3d + GRID*dSx + GRID + dSx + 1, nidx2d + GRID*dSx + GRID, 1.0f);
+				//nearestIdx_x[level + 1][didx3d + 1] = nearestIdx_x[level + 1][didx3d];
+				//nearestIdx_x[level + 1][didx3d + dSx] = nearestIdx_x[level + 1][didx3d];
+				//nearestIdx_x[level + 1][didx3d + dSx + 1] = nearestIdx_x[level + 1][didx3d];
+				//nearestIdx_x[level + 1][didx3d + GRID + 1] = nearestIdx_x[level + 1][didx3d + GRID];
+				//nearestIdx_x[level + 1][didx3d + GRID + dSx] = nearestIdx_x[level + 1][didx3d + GRID];
+				//nearestIdx_x[level + 1][didx3d + GRID + dSx + 1] = nearestIdx_x[level + 1][didx3d + GRID];
+				//nearestIdx_x[level + 1][didx3d + GRID*dSx + 1] = nearestIdx_x[level + 1][didx3d + GRID*dSx];
+				//nearestIdx_x[level + 1][didx3d + GRID*dSx + dSx] = nearestIdx_x[level + 1][didx3d + GRID*dSx];
+				//nearestIdx_x[level + 1][didx3d + GRID*dSx + dSx + 1] = nearestIdx_x[level + 1][didx3d + GRID*dSx];
+				//nearestIdx_x[level + 1][didx3d + GRID*dSx + GRID + 1] = nearestIdx_x[level + 1][didx3d + GRID*dSx + GRID];
+				//nearestIdx_x[level + 1][didx3d + GRID*dSx + GRID + dSx] = nearestIdx_x[level + 1][didx3d + GRID*dSx + GRID];
+				//nearestIdx_x[level + 1][didx3d + GRID*dSx + GRID + dSx + 1] = nearestIdx_x[level + 1][didx3d + GRID*dSx + GRID];
 
 				didx3d += dSxy;
 				setNearestIndex(level + 1, nearestIdx_x[level + 1], nearestWeight_x[level + 1], IndexHis_x[level + 1]
@@ -3619,6 +3596,44 @@ void DoPAR::upsampleVolume(int level) {
 					, didx3d + GRID, rnidx2d + GRID, 1.0f);									//[di+1][dj][dk+GRID]		[rcoordx][rcoordy+GRID]
 				setNearestIndex(level + 1, nearestIdx_x[level + 1], nearestWeight_x[level + 1], IndexHis_x[level + 1]
 					, didx3d + GRID*dSx + GRID, rnidx2d + GRID*dSx + GRID, 1.0f);			//[di+1][dj+GRID][dk+GRID]	[rcoordx+GRID][rcoordy+GRID]
+			
+				//for nosparsed grid
+				setNearestIndex(level + 1, nearestIdx_x[level + 1], nearestWeight_x[level + 1], IndexHis_x[level + 1]
+					, didx3d + 1, nidx2d, 1.0f);
+				setNearestIndex(level + 1, nearestIdx_x[level + 1], nearestWeight_x[level + 1], IndexHis_x[level + 1]
+					, didx3d + dSx, nidx2d, 1.0f);
+				setNearestIndex(level + 1, nearestIdx_x[level + 1], nearestWeight_x[level + 1], IndexHis_x[level + 1]
+					, didx3d + dSx + 1, nidx2d, 1.0f);
+				setNearestIndex(level + 1, nearestIdx_x[level + 1], nearestWeight_x[level + 1], IndexHis_x[level + 1]
+					, didx3d + GRID + 1, nidx2d + GRID, 1.0f);
+				setNearestIndex(level + 1, nearestIdx_x[level + 1], nearestWeight_x[level + 1], IndexHis_x[level + 1]
+					, didx3d + GRID + dSx, nidx2d + GRID, 1.0f);
+				setNearestIndex(level + 1, nearestIdx_x[level + 1], nearestWeight_x[level + 1], IndexHis_x[level + 1]
+					, didx3d + GRID + dSx + 1, nidx2d + GRID, 1.0f);
+				setNearestIndex(level + 1, nearestIdx_x[level + 1], nearestWeight_x[level + 1], IndexHis_x[level + 1]
+					, didx3d + GRID*dSx + 1, nidx2d + GRID*dSx, 1.0f);
+				setNearestIndex(level + 1, nearestIdx_x[level + 1], nearestWeight_x[level + 1], IndexHis_x[level + 1]
+					, didx3d + GRID*dSx + dSx, nidx2d + GRID*dSx, 1.0f);
+				setNearestIndex(level + 1, nearestIdx_x[level + 1], nearestWeight_x[level + 1], IndexHis_x[level + 1]
+					, didx3d + GRID*dSx + dSx + 1, nidx2d + GRID*dSx, 1.0f);
+				setNearestIndex(level + 1, nearestIdx_x[level + 1], nearestWeight_x[level + 1], IndexHis_x[level + 1]
+					, didx3d + GRID*dSx + GRID + 1, nidx2d + GRID*dSx + GRID, 1.0f);
+				setNearestIndex(level + 1, nearestIdx_x[level + 1], nearestWeight_x[level + 1], IndexHis_x[level + 1]
+					, didx3d + GRID*dSx + GRID + dSx, nidx2d + GRID*dSx + GRID, 1.0f);
+				setNearestIndex(level + 1, nearestIdx_x[level + 1], nearestWeight_x[level + 1], IndexHis_x[level + 1]
+					, didx3d + GRID*dSx + GRID + dSx + 1, nidx2d + GRID*dSx + GRID, 1.0f);
+				//nearestIdx_x[level + 1][didx3d + 1] = nearestIdx_x[level + 1][didx3d];
+				//nearestIdx_x[level + 1][didx3d + dSx] = nearestIdx_x[level + 1][didx3d];
+				//nearestIdx_x[level + 1][didx3d + dSx + 1] = nearestIdx_x[level + 1][didx3d];
+				//nearestIdx_x[level + 1][didx3d + GRID + 1] = nearestIdx_x[level + 1][didx3d + GRID];
+				//nearestIdx_x[level + 1][didx3d + GRID + dSx] = nearestIdx_x[level + 1][didx3d + GRID];
+				//nearestIdx_x[level + 1][didx3d + GRID + dSx + 1] = nearestIdx_x[level + 1][didx3d + GRID];
+				//nearestIdx_x[level + 1][didx3d + GRID*dSx + 1] = nearestIdx_x[level + 1][didx3d + GRID*dSx];
+				//nearestIdx_x[level + 1][didx3d + GRID*dSx + dSx] = nearestIdx_x[level + 1][didx3d + GRID*dSx];
+				//nearestIdx_x[level + 1][didx3d + GRID*dSx + dSx + 1] = nearestIdx_x[level + 1][didx3d + GRID*dSx];
+				//nearestIdx_x[level + 1][didx3d + GRID*dSx + GRID + 1] = nearestIdx_x[level + 1][didx3d + GRID*dSx + GRID];
+				//nearestIdx_x[level + 1][didx3d + GRID*dSx + GRID + dSx] = nearestIdx_x[level + 1][didx3d + GRID*dSx + GRID];
+				//nearestIdx_x[level + 1][didx3d + GRID*dSx + GRID + dSx + 1] = nearestIdx_x[level + 1][didx3d + GRID*dSx + GRID];
 			}
 		}
 	}//X
@@ -3653,6 +3668,44 @@ void DoPAR::upsampleVolume(int level) {
 				setNearestIndex(level + 1, nearestIdx_y[level + 1], nearestWeight_y[level + 1], IndexHis_y[level + 1]
 					, didx3d + GRID*dSxy + GRID, nidx2d + GRID*dSx + GRID, 1.0f);			//[di+GRID][dj][dk+GRID]	[coordx+GRID][coordy+GRID]
 
+				//for nosparsed grid
+				setNearestIndex(level + 1, nearestIdx_y[level + 1], nearestWeight_y[level + 1], IndexHis_y[level + 1]
+					, didx3d + 1, nidx2d, 1.0f);
+				setNearestIndex(level + 1, nearestIdx_y[level + 1], nearestWeight_y[level + 1], IndexHis_y[level + 1]
+					, didx3d + dSxy, nidx2d, 1.0f);
+				setNearestIndex(level + 1, nearestIdx_y[level + 1], nearestWeight_y[level + 1], IndexHis_y[level + 1]
+					, didx3d + dSxy + 1, nidx2d, 1.0f);
+				setNearestIndex(level + 1, nearestIdx_y[level + 1], nearestWeight_y[level + 1], IndexHis_y[level + 1]
+					, didx3d + GRID*dSxy + 1, nidx2d + GRID*dSx, 1.0f);
+				setNearestIndex(level + 1, nearestIdx_y[level + 1], nearestWeight_y[level + 1], IndexHis_y[level + 1]
+					, didx3d + GRID*dSxy + dSxy, nidx2d + GRID*dSx, 1.0f);
+				setNearestIndex(level + 1, nearestIdx_y[level + 1], nearestWeight_y[level + 1], IndexHis_y[level + 1]
+					, didx3d + GRID*dSxy + dSxy + 1, nidx2d + GRID*dSx, 1.0f);
+				setNearestIndex(level + 1, nearestIdx_y[level + 1], nearestWeight_y[level + 1], IndexHis_y[level + 1]
+					, didx3d + GRID + 1, nidx2d + GRID, 1.0f);
+				setNearestIndex(level + 1, nearestIdx_y[level + 1], nearestWeight_y[level + 1], IndexHis_y[level + 1]
+					, didx3d + GRID + dSxy, nidx2d + GRID, 1.0f);
+				setNearestIndex(level + 1, nearestIdx_y[level + 1], nearestWeight_y[level + 1], IndexHis_y[level + 1]
+					, didx3d + GRID + dSxy + 1, nidx2d + GRID, 1.0f);
+				setNearestIndex(level + 1, nearestIdx_y[level + 1], nearestWeight_y[level + 1], IndexHis_y[level + 1]
+					, didx3d + GRID*dSxy + GRID + 1, nidx2d + GRID*dSx + GRID, 1.0f);
+				setNearestIndex(level + 1, nearestIdx_y[level + 1], nearestWeight_y[level + 1], IndexHis_y[level + 1]
+					, didx3d + GRID*dSxy + GRID + dSxy, nidx2d + GRID*dSx + GRID, 1.0f);
+				setNearestIndex(level + 1, nearestIdx_y[level + 1], nearestWeight_y[level + 1], IndexHis_y[level + 1]
+					, didx3d + GRID*dSxy + GRID + dSxy + 1, nidx2d + GRID*dSx + GRID, 1.0f);
+				//nearestIdx_y[level + 1][didx3d + 1] = nearestIdx_y[level + 1][didx3d];
+				//nearestIdx_y[level + 1][didx3d + dSxy] = nearestIdx_y[level + 1][didx3d];
+				//nearestIdx_y[level + 1][didx3d + dSxy + 1] = nearestIdx_y[level + 1][didx3d];
+				//nearestIdx_y[level + 1][didx3d + GRID + 1] = nearestIdx_y[level + 1][didx3d + GRID];
+				//nearestIdx_y[level + 1][didx3d + GRID + dSxy] = nearestIdx_y[level + 1][didx3d + GRID];
+				//nearestIdx_y[level + 1][didx3d + GRID + dSxy + 1] = nearestIdx_y[level + 1][didx3d + GRID];
+				//nearestIdx_y[level + 1][didx3d + GRID*dSxy + 1] = nearestIdx_y[level + 1][didx3d + GRID*dSxy];
+				//nearestIdx_y[level + 1][didx3d + GRID*dSxy + dSxy] = nearestIdx_y[level + 1][didx3d + GRID*dSxy];
+				//nearestIdx_y[level + 1][didx3d + GRID*dSxy + dSxy + 1] = nearestIdx_y[level + 1][didx3d + GRID*dSxy];
+				//nearestIdx_y[level + 1][didx3d + GRID*dSxy + GRID + 1] = nearestIdx_y[level + 1][didx3d + GRID*dSxy + GRID];
+				//nearestIdx_y[level + 1][didx3d + GRID*dSxy + GRID + dSxy] = nearestIdx_y[level + 1][didx3d + GRID*dSxy + GRID];
+				//nearestIdx_y[level + 1][didx3d + GRID*dSxy + GRID + dSxy + 1] = nearestIdx_y[level + 1][didx3d + GRID*dSxy + GRID];
+
 				didx3d += dSx;
 				setNearestIndex(level + 1, nearestIdx_y[level + 1], nearestWeight_y[level + 1], IndexHis_y[level + 1]
 					, didx3d, rnidx2d, 1.0f);												//[di][dj+1][dk]			[rcoordx][rcoordy]
@@ -3662,6 +3715,44 @@ void DoPAR::upsampleVolume(int level) {
 					, didx3d + GRID, rnidx2d + GRID, 1.0f);									//[di][dj+1][dk+GRID]		[rcoordx][rcoordy+GRID]
 				setNearestIndex(level + 1, nearestIdx_y[level + 1], nearestWeight_y[level + 1], IndexHis_y[level + 1]
 					, didx3d + GRID*dSxy + GRID, rnidx2d + GRID*dSx + GRID, 1.0f);			//[di+GRID][dj+1][dk+GRID]	[rcoordx+GRID][rcoordy+GRID]
+			
+				//for nosparsed grid
+				setNearestIndex(level + 1, nearestIdx_y[level + 1], nearestWeight_y[level + 1], IndexHis_y[level + 1]
+					, didx3d + 1, nidx2d, 1.0f);
+				setNearestIndex(level + 1, nearestIdx_y[level + 1], nearestWeight_y[level + 1], IndexHis_y[level + 1]
+					, didx3d + dSxy, nidx2d, 1.0f);
+				setNearestIndex(level + 1, nearestIdx_y[level + 1], nearestWeight_y[level + 1], IndexHis_y[level + 1]
+					, didx3d + dSxy + 1, nidx2d, 1.0f);
+				setNearestIndex(level + 1, nearestIdx_y[level + 1], nearestWeight_y[level + 1], IndexHis_y[level + 1]
+					, didx3d + GRID*dSxy + 1, nidx2d + GRID*dSx, 1.0f);
+				setNearestIndex(level + 1, nearestIdx_y[level + 1], nearestWeight_y[level + 1], IndexHis_y[level + 1]
+					, didx3d + GRID*dSxy + dSxy, nidx2d + GRID*dSx, 1.0f);
+				setNearestIndex(level + 1, nearestIdx_y[level + 1], nearestWeight_y[level + 1], IndexHis_y[level + 1]
+					, didx3d + GRID*dSxy + dSxy + 1, nidx2d + GRID*dSx, 1.0f);
+				setNearestIndex(level + 1, nearestIdx_y[level + 1], nearestWeight_y[level + 1], IndexHis_y[level + 1]
+					, didx3d + GRID + 1, nidx2d + GRID, 1.0f);
+				setNearestIndex(level + 1, nearestIdx_y[level + 1], nearestWeight_y[level + 1], IndexHis_y[level + 1]
+					, didx3d + GRID + dSxy, nidx2d + GRID, 1.0f);
+				setNearestIndex(level + 1, nearestIdx_y[level + 1], nearestWeight_y[level + 1], IndexHis_y[level + 1]
+					, didx3d + GRID + dSxy + 1, nidx2d + GRID, 1.0f);
+				setNearestIndex(level + 1, nearestIdx_y[level + 1], nearestWeight_y[level + 1], IndexHis_y[level + 1]
+					, didx3d + GRID*dSxy + GRID + 1, nidx2d + GRID*dSx + GRID, 1.0f);
+				setNearestIndex(level + 1, nearestIdx_y[level + 1], nearestWeight_y[level + 1], IndexHis_y[level + 1]
+					, didx3d + GRID*dSxy + GRID + dSxy, nidx2d + GRID*dSx + GRID, 1.0f);
+				setNearestIndex(level + 1, nearestIdx_y[level + 1], nearestWeight_y[level + 1], IndexHis_y[level + 1]
+					, didx3d + GRID*dSxy + GRID + dSxy + 1, nidx2d + GRID*dSx + GRID, 1.0f);
+				//nearestIdx_y[level + 1][didx3d + 1] = nearestIdx_y[level + 1][didx3d];
+				//nearestIdx_y[level + 1][didx3d + dSxy] = nearestIdx_y[level + 1][didx3d];
+				//nearestIdx_y[level + 1][didx3d + dSxy + 1] = nearestIdx_y[level + 1][didx3d];
+				//nearestIdx_y[level + 1][didx3d + GRID + 1] = nearestIdx_y[level + 1][didx3d + GRID];
+				//nearestIdx_y[level + 1][didx3d + GRID + dSxy] = nearestIdx_y[level + 1][didx3d + GRID];
+				//nearestIdx_y[level + 1][didx3d + GRID + dSxy + 1] = nearestIdx_y[level + 1][didx3d + GRID];
+				//nearestIdx_y[level + 1][didx3d + GRID*dSxy + 1] = nearestIdx_y[level + 1][didx3d + GRID*dSxy];
+				//nearestIdx_y[level + 1][didx3d + GRID*dSxy + dSxy] = nearestIdx_y[level + 1][didx3d + GRID*dSxy];
+				//nearestIdx_y[level + 1][didx3d + GRID*dSxy + dSxy + 1] = nearestIdx_y[level + 1][didx3d + GRID*dSxy];
+				//nearestIdx_y[level + 1][didx3d + GRID*dSxy + GRID + 1] = nearestIdx_y[level + 1][didx3d + GRID*dSxy + GRID];
+				//nearestIdx_y[level + 1][didx3d + GRID*dSxy + GRID + dSxy] = nearestIdx_y[level + 1][didx3d + GRID*dSxy + GRID];
+				//nearestIdx_y[level + 1][didx3d + GRID*dSxy + GRID + dSxy + 1] = nearestIdx_y[level + 1][didx3d + GRID*dSxy + GRID];
 			}
 		}
 	}//Y
@@ -3696,6 +3787,44 @@ void DoPAR::upsampleVolume(int level) {
 					, didx3d + GRID*dSx, nidx2d + GRID, 1.0f);								//[di][dj+GRID][dk]			[coordx][coordy+GRID]
 				setNearestIndex(level + 1, nearestIdx_z[level + 1], nearestWeight_z[level + 1], IndexHis_z[level + 1]
 					, didx3d + GRID*dSxy + GRID*dSx, nidx2d + GRID*dSx + GRID, 1.0f);		//[di+GRID][dj+GRID][dk]	[coordx+GRID][coordy+GRID]
+				
+				//for nosparsed grid
+				setNearestIndex(level + 1, nearestIdx_z[level + 1], nearestWeight_z[level + 1], IndexHis_z[level + 1]
+					, didx3d + dSxy, nidx2d, 1.0f);
+				setNearestIndex(level + 1, nearestIdx_z[level + 1], nearestWeight_z[level + 1], IndexHis_z[level + 1]
+					, didx3d + dSx, nidx2d, 1.0f);
+				setNearestIndex(level + 1, nearestIdx_z[level + 1], nearestWeight_z[level + 1], IndexHis_z[level + 1]
+					, didx3d + dSxy + dSx, nidx2d, 1.0f);
+				setNearestIndex(level + 1, nearestIdx_z[level + 1], nearestWeight_z[level + 1], IndexHis_z[level + 1]
+					, didx3d + GRID*dSxy + dSx, nidx2d + GRID*dSx, 1.0f);
+				setNearestIndex(level + 1, nearestIdx_z[level + 1], nearestWeight_z[level + 1], IndexHis_z[level + 1]
+					, didx3d + GRID*dSxy + dSxy, nidx2d + GRID*dSx, 1.0f);
+				setNearestIndex(level + 1, nearestIdx_z[level + 1], nearestWeight_z[level + 1], IndexHis_z[level + 1]
+					, didx3d + GRID*dSxy + dSxy + dSx, nidx2d + GRID*dSx, 1.0f);
+				setNearestIndex(level + 1, nearestIdx_z[level + 1], nearestWeight_z[level + 1], IndexHis_z[level + 1]
+					, didx3d + GRID*dSx + dSx, nidx2d + GRID, 1.0f);
+				setNearestIndex(level + 1, nearestIdx_z[level + 1], nearestWeight_z[level + 1], IndexHis_z[level + 1]
+					, didx3d + GRID*dSx + dSxy, nidx2d + GRID, 1.0f);
+				setNearestIndex(level + 1, nearestIdx_z[level + 1], nearestWeight_z[level + 1], IndexHis_z[level + 1]
+					, didx3d + GRID*dSx + dSxy + dSx, nidx2d + GRID, 1.0f);
+				setNearestIndex(level + 1, nearestIdx_z[level + 1], nearestWeight_z[level + 1], IndexHis_z[level + 1]
+					, didx3d + GRID*dSxy + GRID*dSx + dSx, nidx2d + GRID*dSx + GRID, 1.0f);
+				setNearestIndex(level + 1, nearestIdx_z[level + 1], nearestWeight_z[level + 1], IndexHis_z[level + 1]
+					, didx3d + GRID*dSxy + GRID*dSx + dSxy, nidx2d + GRID*dSx + GRID, 1.0f);
+				setNearestIndex(level + 1, nearestIdx_z[level + 1], nearestWeight_z[level + 1], IndexHis_z[level + 1]
+					, didx3d + GRID*dSxy + GRID*dSx + dSxy + dSx, nidx2d + GRID*dSx + GRID, 1.0f);
+				//nearestIdx_z[level + 1][didx3d + dSx] = nearestIdx_z[level + 1][didx3d];
+				//nearestIdx_z[level + 1][didx3d + dSxy] = nearestIdx_z[level + 1][didx3d];
+				//nearestIdx_z[level + 1][didx3d + dSxy + dSx] = nearestIdx_z[level + 1][didx3d];
+				//nearestIdx_z[level + 1][didx3d + GRID*dSx + dSx] = nearestIdx_z[level + 1][didx3d + GRID*dSx];
+				//nearestIdx_z[level + 1][didx3d + GRID*dSx + dSxy] = nearestIdx_z[level + 1][didx3d + GRID*dSx];
+				//nearestIdx_z[level + 1][didx3d + GRID*dSx + dSxy + dSx] = nearestIdx_z[level + 1][didx3d + GRID*dSx];
+				//nearestIdx_z[level + 1][didx3d + GRID*dSxy + dSx] = nearestIdx_z[level + 1][didx3d + GRID*dSxy];
+				//nearestIdx_z[level + 1][didx3d + GRID*dSxy + dSxy] = nearestIdx_z[level + 1][didx3d + GRID*dSxy];
+				//nearestIdx_z[level + 1][didx3d + GRID*dSxy + dSxy + dSx] = nearestIdx_z[level + 1][didx3d + GRID*dSxy];
+				//nearestIdx_z[level + 1][didx3d + GRID*dSxy + GRID*dSx + dSx] = nearestIdx_z[level + 1][didx3d + GRID*dSxy + GRID*dSx];
+				//nearestIdx_z[level + 1][didx3d + GRID*dSxy + GRID*dSx + dSxy] = nearestIdx_z[level + 1][didx3d + GRID*dSxy + GRID*dSx];
+				//nearestIdx_z[level + 1][didx3d + GRID*dSxy + GRID*dSx + dSxy + dSx] = nearestIdx_z[level + 1][didx3d + GRID*dSxy + GRID*dSx];
 
 				didx3d += 1;
 				setNearestIndex(level + 1, nearestIdx_z[level + 1], nearestWeight_z[level + 1], IndexHis_z[level + 1]
@@ -3706,10 +3835,58 @@ void DoPAR::upsampleVolume(int level) {
 					, didx3d + GRID*dSx, rnidx2d + GRID, 1.0f);								//[di][dj+GRID][dk+1]		[rcoordx][rcoordy+GRID]
 				setNearestIndex(level + 1, nearestIdx_z[level + 1], nearestWeight_z[level + 1], IndexHis_z[level + 1]
 					, didx3d + GRID*dSxy + GRID*dSx, rnidx2d + GRID*dSx + GRID, 1.0f);		//[di+GRID][dj+GRID][dk+1]	[rcoordx+GRID][rcoordy+GRID]
+			
+				//for nosparsed grid
+				setNearestIndex(level + 1, nearestIdx_z[level + 1], nearestWeight_z[level + 1], IndexHis_z[level + 1]
+					, didx3d + dSxy, nidx2d, 1.0f);
+				setNearestIndex(level + 1, nearestIdx_z[level + 1], nearestWeight_z[level + 1], IndexHis_z[level + 1]
+					, didx3d + dSx, nidx2d, 1.0f);
+				setNearestIndex(level + 1, nearestIdx_z[level + 1], nearestWeight_z[level + 1], IndexHis_z[level + 1]
+					, didx3d + dSxy + dSx, nidx2d, 1.0f);
+				setNearestIndex(level + 1, nearestIdx_z[level + 1], nearestWeight_z[level + 1], IndexHis_z[level + 1]
+					, didx3d + GRID*dSxy + dSx, nidx2d + GRID*dSx, 1.0f);
+				setNearestIndex(level + 1, nearestIdx_z[level + 1], nearestWeight_z[level + 1], IndexHis_z[level + 1]
+					, didx3d + GRID*dSxy + dSxy, nidx2d + GRID*dSx, 1.0f);
+				setNearestIndex(level + 1, nearestIdx_z[level + 1], nearestWeight_z[level + 1], IndexHis_z[level + 1]
+					, didx3d + GRID*dSxy + dSxy + dSx, nidx2d + GRID*dSx, 1.0f);
+				setNearestIndex(level + 1, nearestIdx_z[level + 1], nearestWeight_z[level + 1], IndexHis_z[level + 1]
+					, didx3d + GRID*dSx + dSx, nidx2d + GRID, 1.0f);
+				setNearestIndex(level + 1, nearestIdx_z[level + 1], nearestWeight_z[level + 1], IndexHis_z[level + 1]
+					, didx3d + GRID*dSx + dSxy, nidx2d + GRID, 1.0f);
+				setNearestIndex(level + 1, nearestIdx_z[level + 1], nearestWeight_z[level + 1], IndexHis_z[level + 1]
+					, didx3d + GRID*dSx + dSxy + dSx, nidx2d + GRID, 1.0f);
+				setNearestIndex(level + 1, nearestIdx_z[level + 1], nearestWeight_z[level + 1], IndexHis_z[level + 1]
+					, didx3d + GRID*dSxy + GRID*dSx + dSx, nidx2d + GRID*dSx + GRID, 1.0f);
+				setNearestIndex(level + 1, nearestIdx_z[level + 1], nearestWeight_z[level + 1], IndexHis_z[level + 1]
+					, didx3d + GRID*dSxy + GRID*dSx + dSxy, nidx2d + GRID*dSx + GRID, 1.0f);
+				setNearestIndex(level + 1, nearestIdx_z[level + 1], nearestWeight_z[level + 1], IndexHis_z[level + 1]
+					, didx3d + GRID*dSxy + GRID*dSx + dSxy + dSx, nidx2d + GRID*dSx + GRID, 1.0f);
+				//nearestIdx_z[level + 1][didx3d + dSx] = nearestIdx_z[level + 1][didx3d];
+				//nearestIdx_z[level + 1][didx3d + dSxy] = nearestIdx_z[level + 1][didx3d];
+				//nearestIdx_z[level + 1][didx3d + dSxy + dSx] = nearestIdx_z[level + 1][didx3d];
+				//nearestIdx_z[level + 1][didx3d + GRID*dSx + dSx] = nearestIdx_z[level + 1][didx3d + GRID*dSx];
+				//nearestIdx_z[level + 1][didx3d + GRID*dSx + dSxy] = nearestIdx_z[level + 1][didx3d + GRID*dSx];
+				//nearestIdx_z[level + 1][didx3d + GRID*dSx + dSxy + dSx] = nearestIdx_z[level + 1][didx3d + GRID*dSx];
+				//nearestIdx_z[level + 1][didx3d + GRID*dSxy + dSx] = nearestIdx_z[level + 1][didx3d + GRID*dSxy];
+				//nearestIdx_z[level + 1][didx3d + GRID*dSxy + dSxy] = nearestIdx_z[level + 1][didx3d + GRID*dSxy];
+				//nearestIdx_z[level + 1][didx3d + GRID*dSxy + dSxy + dSx] = nearestIdx_z[level + 1][didx3d + GRID*dSxy];
+				//nearestIdx_z[level + 1][didx3d + GRID*dSxy + GRID*dSx + dSx] = nearestIdx_z[level + 1][didx3d + GRID*dSxy + GRID*dSx];
+				//nearestIdx_z[level + 1][didx3d + GRID*dSxy + GRID*dSx + dSxy] = nearestIdx_z[level + 1][didx3d + GRID*dSxy + GRID*dSx];
+				//nearestIdx_z[level + 1][didx3d + GRID*dSxy + GRID*dSx + dSxy + dSx] = nearestIdx_z[level + 1][didx3d + GRID*dSxy + GRID*dSx];
 			}
 		}
 	}//Z
 	
+	//for (size_idx i = 0; i < nearestIdx_x[level + 1].size(); i++) {
+	//	if (nearestIdx_x[level + 1][i] > dSxy) cout << endl << "nearestIdx_x " << i << "= " << nearestIdx_x[level + 1][i];
+	//}
+	//for (size_idx i = 0; i < nearestIdx_y[level + 1].size(); i++) {
+	//	if (nearestIdx_y[level + 1][i] > dSxy) cout << endl << "nearestIdx_y " << i << "= " << nearestIdx_y[level + 1][i];
+	//}
+	//for (size_idx i = 0; i < nearestIdx_z[level + 1].size(); i++) {
+	//	if (nearestIdx_z[level + 1][i] > dSxy) cout << endl << "nearestIdx_z " << i << "= " << nearestIdx_z[level + 1][i];
+	//}
+
 	cout << endl << "upsampled from " << level << " to " << level + 1;
 }
 

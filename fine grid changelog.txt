@@ -1,9 +1,21 @@
-Kc = 11->7
+Kc = 11->9
+
+loadExemplar():
+lower iteration time
+
+ReadRunPar():
+add parameter name
+
+init():
+change avgIndexHis
+factor should also be lower
 
 search_volume(): 
 no skip sparse grid
- 
 
 optimize_volume():
 remove sparse grid shift
 firstrun will not use colorHis
+
+upsampleVolume():
+add no sparsed grid nearestidx upsample -- need to add 3*4 points in each loop!
