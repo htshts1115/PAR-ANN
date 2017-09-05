@@ -1,11 +1,11 @@
 //----------------------------------------------------------------------
 // File:			ANN.h
 // Programmer:		Sunil Arya and David Mount
+// Last modified:	05/03/05 (Release 1.1)
 // Description:		Basic include file for approximate nearest
 //					neighbor searching.
-// Last modified:	01/27/10 (Version 1.1.2)
 //----------------------------------------------------------------------
-// Copyright (c) 1997-2010 University of Maryland and Sunil Arya and
+// Copyright (c) 1997-2005 University of Maryland and Sunil Arya and
 // David Mount.  All Rights Reserved.
 // 
 // This software and related documentation is part of the Approximate
@@ -28,8 +28,6 @@
 //		Cleaned up C++ structure for modern compilers
 //	Revision 1.1  05/03/05
 //		Added fixed-radius k-NN searching
-//	Revision 1.1.2  01/27/10
-//		Fixed minor compilation bugs for new versions of gcc
 //----------------------------------------------------------------------
 
 //----------------------------------------------------------------------
@@ -110,18 +108,21 @@
 // points.
 //----------------------------------------------------------------------
 #ifdef ANN_NO_LIMITS_H					// limits.h unavailable
-  #include <cvalues>					// replacement for limits.h
-  const double ANN_DBL_MAX = MAXDOUBLE;	// insert maximum double
+//#include <cvalues>					// replacement for limits.h
+//const double ANN_DBL_MAX = MAXDOUBLE;	// insert maximum double
+#include <cvalues>					// replacement for limits.h
+const double ANN_FLT_MAX = MAXFLOAT;	// insert maximum double
 #else
-  #include <climits>
-  #include <cfloat>
-  const double ANN_DBL_MAX = DBL_MAX;
+#include <climits>
+#include <cfloat>
+//const double ANN_DBL_MAX = DBL_MAX;
+const float ANN_FLT_MAX = FLT_MAX;
 #endif
 
-#define ANNversion 		"1.1.2"			// ANN version and information
+#define ANNversion 		"1.1.1"			// ANN version and information
 #define ANNversionCmt	""
 #define ANNcopyright	"David M. Mount and Sunil Arya"
-#define ANNlatestRev	"Jan 27, 2010"
+#define ANNlatestRev	"Aug 4, 2006"
 
 //----------------------------------------------------------------------
 //	ANNbool
@@ -155,8 +156,11 @@ enum ANNbool {ANNfalse = 0, ANNtrue = 1}; // ANN boolean type (non ANSI C++)
 //		not occur in distance calculation.
 //----------------------------------------------------------------------
 
-typedef double	ANNcoord;				// coordinate data type
-typedef double	ANNdist;				// distance data type
+//typedef double	ANNcoord;				// coordinate data type
+//typedef double	ANNdist;				// distance data type
+//=============hts changed to float======================
+typedef float	ANNcoord;				// coordinate data type
+typedef float	ANNdist;				// distance data type
 
 //----------------------------------------------------------------------
 //	ANNidx
@@ -172,6 +176,7 @@ typedef double	ANNdist;				// distance data type
 //		It should be distinguishable from any valid array index.
 //----------------------------------------------------------------------
 
+//typedef int		ANNidx;					// point index
 //=============hts changed to long======================
 typedef long		ANNidx;				// point index
 const ANNidx	ANN_NULL_IDX = -1;		// a NULL point index
@@ -197,7 +202,9 @@ const ANNidx	ANN_NULL_IDX = -1;		// a NULL point index
 //		short	SHRT_MAX		0x7fff
 //----------------------------------------------------------------------
 
-const ANNdist	ANN_DIST_INF = ANN_DBL_MAX;
+//=============hts changed to float======================
+//const ANNdist	ANN_DIST_INF = ANN_DBL_MAX;
+const ANNdist	ANN_DIST_INF = ANN_FLT_MAX;
 
 //----------------------------------------------------------------------
 //	Significant digits for tree dumps:
@@ -217,11 +224,15 @@ const ANNdist	ANN_DIST_INF = ANN_DBL_MAX;
 //		short	 doesn't matter 5
 //----------------------------------------------------------------------
 
-#ifdef DBL_DIG							// number of sig. bits in ANNcoord
-	const int	 ANNcoordPrec	= DBL_DIG;
+//=============hts changed to float======================
+#ifdef FLT_DIG							// number of sig. bits in ANNcoord
+const int	 ANNcoordPrec = FLT_DIG;
+//const int	 ANNcoordPrec	= DBL_DIG;
 #else
-	const int	 ANNcoordPrec	= 15;	// default precision
+//const int	 ANNcoordPrec	= 15;	// default precision
+const int	 ANNcoordPrec = 6;
 #endif
+
 
 //----------------------------------------------------------------------
 // Self match?

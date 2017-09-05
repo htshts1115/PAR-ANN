@@ -1,0 +1,186 @@
+template <class T>
+void ImageProcessing<T>::Minkowski_MichielsenRaedt(
+	double a, _XyzStrType Sxyz, vector<T>& OData, bool PeriodicBYN, _MinkowskiVal& Res)
+{
+	// <1> a: Resolution of image OData, such as 14.5E-6m; 
+	// <2> OData is defined on [0, Sxyz.x*Sxyz.y*Sxyz.z-1], i.e. [0,Lx*Ly*Lz-1] in the following
+	//     OData > 0: Object voxels
+	// <3> PeriodicBYN=false: free-boundary condition or periodic boundary condition
+
+	//££££££££££££££££££££££?Comments made on March 19, 2010 below ££££££££££££££££££££££?
+	//we suggest use this function with PeriodicBYN = false 
+	//The outside of an image is assumed to be background (i.e. PeriodicBYN = false) or periodic boundary condition
+	//The Euler number calcualted with PeriodicBYN = false is equal to the value computed by our Euler computing algorihtm
+	//££££££££££££££££££££££?Comments made on March 19, 2010 above ££££££££££££££££££££££?
+
+	//Some applications, notably those where the patterns are the result of computer simulation, make
+	//use of periodic boundary conditions. There is no need to adapt the programs given in Appendix A
+	//to deal with this situation. One can embed the original image into a larger one, formed by
+	//surrounding the original image by one extra layer of pixels, the value of which is determined by
+	//making use of the periodic boundary conditions.
+
+	int Lx, Ly, Lz, NLx, NLy, NLz;
+
+	Lx = Sxyz.x; Ly = Sxyz.y; Lz = Sxyz.z;
+
+	if (Lx <= 1 || Ly <= 1 || Lz <= 1) {
+		cout << "The dimension of image should be at least 2x2x2" << endl;
+		cout << "Preey any key to quit....." << endl;
+		cout << endl << Lx << " " << Ly << " " << Lz;
+		exit(0);
+	}
+
+	NLx = Sxyz.x + 2; NLy = Sxyz.y + 2; NLz = Sxyz.z + 2;
+
+	long NSx, NSxy;
+	NSx = Lx + 2; NSxy = NLx*NLy;
+
+	vector<__int8> TmpA(NSxy*NLz, 0);
+
+	int jx, jy, jz;
+	int BdyObjNum(0);
+
+	if (PeriodicBYN) {
+
+		int oldi, oldj, oldk;
+		long Sxy = Lx*Ly;
+
+		for (jz = -1; jz <= Lz; ++jz) {
+			oldk = ((jz + Lz) % Lz)*Sxy;
+			for (jy = -1; jy <= Ly; ++jy) {
+				oldj = ((jy + Ly) % Ly)*Lx;
+				for (jx = -1; jx <= Lx; jx += Lx + 1) {
+					oldi = (jx + Lx) % Lx;
+					TmpA[(jx + 1) + (jy + 1)*NLx + (jz + 1)*NSxy] = OData[oldi + oldj + oldk];
+				}
+			}
+		}
+
+		for (jz = -1; jz <= Lz; ++jz) {
+			oldk = ((jz + Lz) % Lz)*Sxy;
+			for (jy = -1; jy <= Ly; jy += Ly + 1) {
+				oldj = ((jy + Ly) % Ly)*Lx;
+				for (jx = -1; jx <= Lx; ++jx) {
+					oldi = (jx + Lx) % Lx;
+					TmpA[(jx + 1) + (jy + 1)*NLx + (jz + 1)*NSxy] = OData[oldi + oldj + oldk];
+				}
+			}
+		}
+
+		for (jz = -1; jz <= Lz; jz += Lz + 1) {
+			oldk = ((jz + Lz) % Lz)*Sxy;
+			for (jy = -1; jy <= Ly; ++jy) {
+				oldj = ((jy + Ly) % Ly)*Lx;
+				for (jx = -1; jx <= Lx; ++jx) {
+					oldi = (jx + Lx) % Lx;
+					TmpA[(jx + 1) + (jy + 1)*NLx + (jz + 1)*NSxy] = OData[oldi + oldj + oldk];
+				}
+			}
+		}
+
+		for (jz = 0; jz < Lz; ++jz) {
+			oldk = jz*Sxy;
+			for (jy = 0; jy < Ly; ++jy) {
+				oldj = jy*Lx;
+				for (jx = 0; jx < Lx; jx += Lx - 1) {
+					if (OData[jx + oldj + oldk] > 0) BdyObjNum++;
+				}
+			}
+		}
+
+		for (jz = 0; jz < Lz; ++jz) {
+			oldk = jz*Sxy;
+			for (jy = 0; jy < Ly; jy += Ly - 1) {
+				oldj = jy*Lx;
+				for (jx = 0; jx < Lx; ++jx) {
+					if (OData[jx + oldj + oldk] > 0) BdyObjNum++;
+				}
+			}
+		}
+
+		for (jz = 0; jz < Lz; jz += Lz - 1) {
+			oldk = jz*Sxy;
+			for (jy = 0; jy < Ly; ++jy) {
+				oldj = jy*Lx;
+				for (jx = 0; jx < Lx; ++jx) {
+					if (OData[jx + oldj + oldk] > 0) BdyObjNum++;
+				}
+			}
+		}
+
+		/*
+		for(jz=-1; jz <= Lz; ++jz) { oldk =((jz+Sxyz.z) % Lz)*Sxy;
+		for(jy=-1; jy <= Ly; ++jy) { oldj =((jy+Sxyz.y) % Ly)*Lx;
+		for(jx=-1; jx <= Lx; ++jx) { oldi =(jx+Lx) % Lx;
+		TmpA[(jx+1)+(jy+1)*NLx+(jz+1)*NSxy]=OData[oldi+oldj+oldk];
+		}}}
+
+		Lx=NLx; Ly=NLy; Lz=NLz;
+		NLx=Lx+2; NLy=Lx+2; NLz=Lz+2;
+		NSx=Lx+2; NSxy=NLx*NLy;
+
+		OData=TmpA; TmpA.clear(); TmpA.resize(NSxy*NLz,0);*/
+	}
+
+	long Sur(0), Cur(0), Eul(0), nc(0), nf(0), ne(0), nv(0);
+
+	long idx(-1);
+	for (jz = 0; jz < Lz; ++jz) {
+		for (jy = 0; jy < Ly; ++jy) {
+			for (jx = 0; jx < Lx; ++jx) {
+
+				if (OData[++idx] <= 0) continue;   //non-active voxel
+
+				long nfaces(0), nedges(0), nvert(0);
+				long jz0, jy0, jx0, i, j, k;
+				jz0 = jz + 1; jy0 = jy + 1; jx0 = jx + 1;
+
+				for (i = -1; i<2; i += 2) {
+					long jxi, jyi, jzi, kc1, kc2, kc3;
+					jxi = jx0 + i; jyi = jy0 + i; jzi = jz0 + i;
+					kc1 = 1 - TmpA[jxi + jy0*NSx + jz0*NSxy];
+					kc2 = 1 - TmpA[jx0 + jyi*NSx + jz0*NSxy];
+					kc3 = 1 - TmpA[jx0 + jy0*NSx + jzi*NSxy];
+					nfaces = nfaces + kc1 + kc2 + kc3;
+					for (j = -1; j<2; j += 2) {
+						long jyj, jzj, k4, k7, kc7, kc1kc4kc5;
+						jyj = jy0 + j; jzj = jz0 + j;
+						k4 = jyj*NSx + jz0*NSxy; k7 = jy0*NSx + jzj*NSxy;
+						kc7 = 1 - TmpA[jx0 + k7];
+						kc1kc4kc5 = kc1*(1 - TmpA[jxi + k4])*(1 - TmpA[jx0 + k4]);
+						nedges = nedges + kc1kc4kc5
+							+ kc2*(1 - TmpA[jx0 + jyi*NSx + jzj*NSxy])*kc7
+							+ kc1*(1 - TmpA[jxi + k7])*kc7;
+						if (kc1kc4kc5 != 0) {
+							for (k = -1; k<2; k += 2) {
+								long jzk, k9, k10;
+								jzk = jz0 + k;
+								k9 = jy0*NSx + jzk*NSxy;
+								k10 = jyj*NSx + jzk*NSxy;
+								nvert = nvert + (1 - TmpA[jxi + k9])*(1 - TmpA[jxi + k10])
+									*(1 - TmpA[jx0 + k10])*(1 - TmpA[jx0 + k9]);
+							} //for(k=-1; k<2; k+=2)
+						} //if()
+					} //for(j=-1; j<2; j+=2)
+				} //for(i=-1; i<2; i+=2)  
+
+				TmpA[jx0 + jy0*NSx + jz0*NSxy] = 1;
+
+				nc++;
+				//%%Sur += -6+2*nfaces;             //Surface area
+				//%%Cur += 3-2*nfaces+nedges; //2B, B is the breadth
+				//%%Eul += -1+nfaces-nedges+nvert; //Euler number      
+				nf += nfaces; ne += nedges; nv += nvert;
+			}
+		}
+	}
+
+	Sur = -6 * nc + 2 * nf + BdyObjNum;    //%%
+	Cur = 3 * nc - 2 * nf + ne;  //%%
+	Eul = -nc + nf - ne + nv;  //%%
+
+	Res.Vol = nc*a*a*a;          //The volume of object
+	Res.Area = Sur*a*a;       //Area of object surface
+	Res.CurH = Cur*3.141592*a; //The integral mean curvature H=PIx2B
+	Res.Euler = Eul;           //Euler number  
+}

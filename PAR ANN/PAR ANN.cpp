@@ -5,13 +5,12 @@
 #include "DoPAR.h"
 
 int main(int argc, const char* argv[])
-{
-	
+{	
+
 	string CurWorkExeFile = argv[0];
 
 	DoPAR DoItNow;
-	DoItNow.GetStarted(CurWorkExeFile);
-
+	DoItNow.GetStarted(CurWorkExeFile);	
 
 	cout << endl << "Finally: Press any key to quit...";
 
@@ -19,6 +18,99 @@ int main(int argc, const char* argv[])
 
 	return 0;
 }
+//t = omp_get_wtime();
+//cout << endl << omp_get_num_procs();
+//vector<int> a(1000, 1);
+//vector<int> b(1000, 2);
+//vector<int> c(1000);
+//#pragma omp parallel for
+//for (int i = 0; i < 1000; i++) {
+//	int& add = b[i];
+//#pragma omp atomic
+//	//		b[i]+=a[i];	//wrong
+//	//		add += a[i];//wrong
+//	add += 1;	//right
+//
+//	c[i] = a[i] + b[i];
+//}
+//cout << endl << c[0] << " " << c[1] << " " << c[2]; _getch();
+//vector<int> a(40, 0);
+//vector<int> b(10000, 1);
+//#pragma omp parallel for schedule(static)
+//#pragma omp parallel for schedule(dynamic)	//too slow in our case
+//#pragma omp for nowait schedule(static)		//used in search step, 3 direction search no wait, but last one needs waiting otherwise will return isUnchanged
+//for (int i = 0; i < a.size(); i++) {
+//	for (int j = 0; j < b.size(); j++) {
+//		if (i % 8 == 1) break;			//inside loop can use break
+//		a[i] += b[j];
+//	}
+//	printf("%d = %d, from thread %d\n", i, a[i], omp_get_thread_num());		//i,j are private
+//}
+//_getch();
+
+//vector<float> t1 = { 100.0f, 255.0f, 256.0f, 511.0f };
+//vector<uchar> t2 = { 100, 125, 200, 255};
+//cout << endl << (int)t2[0] << "," << (int)t2[1] << "," << (int)t2[2] << "," << (int)t2[3];
+//transform(t1.begin(), t1.end(), t2.begin(),
+//	std::bind2nd(std::multiplies<float>(), 0.5));
+//cout << endl << (int)t2[0] << "," << (int)t2[1] << "," << (int)t2[2] << "," << (int)t2[3]; _getch();
+
+//cout << endl << rand(); cin.get(); //without initial seed, rand() will give the same results!
+
+//Toroidal
+//cout << endl << (-1 & 127) << " " << (258 & 127) << " " << (20 & 127);	//!!needs to be 127,255... otherwise wrong
+////cout << endl << trimIndex(2, -1) << " " << trimIndex(2, 258) << " " << trimIndex(2, 20);	//same
+//cin.get();
+
+//cout << endl <<"opencv optimization enabled? " <<useOptimized(); _getch();	//true
+//cout << endl << 124999999 * (1.0f / (500 * 500));	//=500 should be 499!
+//_getch();
+
+
+//auto result = std::minmax_element(foo.begin(), foo.end());
+//// print result:
+//std::cout << "min is " << *result.first;
+//std::cout << ", at position " << (result.first - foo.begin()) << '\n';
+//std::cout << "max is " << *result.second;
+//std::cout << ", at position " << (result.second - foo.begin()) << '\n';
+
+
+////--------------check address
+
+//vector<int> list = { 0,1,2,3,4,5,6,7,8,9 };
+//int* testnei = &list[4];
+//int testint = testnei[3];
+//int testint2 = list[7];
+//cout << endl << "test1=" << testint << " test2=" << testint2;
+//_getch();
+
+////---------------check memory usage-----------
+
+//cout << endl << "double=" << sizeof(double) << " float=" << sizeof(float) << " short=" << sizeof(short) << " int=" << sizeof(int) << " long=" << sizeof(long); _getch();
+//double 8, float 4, short 2, int 4, long 4;
+
+//for (std::vector<char>::size_type sz = 1;; sz *= 2)
+//{
+//	std::cerr << "attempting sz = " << sz << '\n';
+//	std::vector<char> v(sz);
+//}	//crash at 18GB
+//_getch();
+
+//int main(int argc, char* argv[])
+//{
+//	double *x = new double[536870912];
+//
+//	cout << "memory allocated" << endl;
+//
+//	for (long int i = 0; i < 536870912; i++)
+//	{
+//		cout << i << endl;
+//		x[i] = 0;
+//	}
+//
+//	delete[] x;
+//	return 0;
+//}
 
 ////--------------ANN sample------------------
 
@@ -28,7 +120,7 @@ int main(int argc, const char* argv[])
 ////#include <fstream>						// file I/O
 ////#include "ANN/ANN.h"					// ANN declarations
 ////
-////using namespace std;					// make std:: accessible
+////using namespace std;					// make  accessible
 ////
 //////----------------------------------------------------------------------
 ////// ann_sample
@@ -92,8 +184,8 @@ int main(int argc, const char* argv[])
 ////
 ////	queryPt = annAllocPt(dim);					// allocate query point
 ////	dataPts = annAllocPts(maxPts, dim);			// allocate data points
-////	nnIdx = new ANNidx[k];						// allocate near neigh indices
-////	dists = new ANNdist[k];						// allocate near neighbor dists
+////	nnIdx = new size_idx[k];						// allocate near neigh indices
+////	dists = new size_dist[k];						// allocate near neighbor dists
 ////
 ////	nPts = 0;									// read data points
 ////

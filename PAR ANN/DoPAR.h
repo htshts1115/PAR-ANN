@@ -2,22 +2,14 @@
 
 #include "stdafx.h"
 
-typedef struct{
-	int x, y, z;
-} _ThreeCorr;
+typedef struct { long x, y, z; } _XyzStrType;		//BarDMap()
 
-typedef struct{
-	int x, y;
-} _TwoCorr;
-
-typedef struct{ long idx; double weight; } _Filter;
-
-typedef struct{ long x, y, z; } _XyzStrType;
-
-//typedef class Graph<int, int, int> GraphType;
+typedef float size_color;
+typedef long size_idx;
+typedef float size_dist;
+typedef long size_hiscount;
 
 const unsigned long iSTEPLENGTH = 524288L;
-
 static void iCGetDirFileName(string OStr, string& Dir, string & FName)
 {
 	FName = "";		Dir = "";
@@ -40,242 +32,205 @@ private:
 	bool ReadTxtFiles(const string PFName, vector<string>& ResLines);
 	bool GetNextRowParameters(short Cno, vector<string>& ValidParStr, vector<string>& ParV);
 	long FileLength(const string& FName);
-	//bool Read(const string FPathName, vector<uchar>& Data);
 	bool Write(const string FPathName, vector<uchar> Data);
 	bool iFileExistYN(const string& PFileName);		
 	void ReadRunPar(string CurExeFile); //Read running parameters
 	//=============================================================
 	string FNameXY, FNameXZ, FNameYZ;
-	string workpath, outputpath, outputfilename;
+	string workpath, outputpath, outputfilename, parameterstring;
 	vector<string> FNameAddition;  //file path names of the training images
-	//vector<uchar> Model;
-	double PorosityX, PorosityY, PorosityZ, PorosityM; //Original porosities from 3 training images
-
-	//void ReadPBMImage(string FName, char DirID, double UpPro); //Read each training image
-	////DirID: '1' - XY plane, '2' - XZ plane, '3' - YZ plane
-	////       otherwise a single image for three direction 
-	////UpPro: upper porosity, 0.5 for default. 
+	//double PorosityX, PorosityY, PorosityZ, PorosityM; //Original porosities from 3 training images
 	
-	
-
-	//vector<uchar> XY2DImg, XZ2DImg, YZ2DImg; // 1 - pore, 0 - grain
-	////@@@@@@@10/05/2016@@@@@@@   multiple TI  
-	//vector<vector<uchar>> TIs;
-	//int XYSx, XYSy, XZSx, XZSz, YZSy, YZSz;
-	//int PARx, PARy, PARz; //Resultant model
-	//int TIx, TIy; 
-	//long PARxy;
-	//bool Identical3DYN;  //wether or not three training images are identical
-	
-
-	std::random_device randomseed;
-	std::mt19937 mersennetwistergenerator;
-	std::uniform_real_distribution<double> probabilitydistribution;
+	random_device randomseed;
+	mt19937 mersennetwistergenerator;
+	uniform_real_distribution<double> probabilitydistribution;
 
 	void showMat(const cv::String& winname, const cv::Mat& mat);
-	///========================== 190217 Kopf. optimization based =====================
+	///========================== optimization based =====================
 
-	string modelFilename3D;							//load 3D model as initial
-	vector<uchar> load3Dmodel(const char* filename);
-	bool loadVolume();
-	// synthesized volume
-	std::vector<std::vector<double > > m_volume;	// [M] size: NUM_CHANNEL * TEXSIZE^3
-	void InitRandomVolume(int level);
-	void upsampleVolume(int level);
-	void outputmodel(int level);
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////
-	static const int MULTIRES = 3;			// # of multi-resolution (0 -> MULTIRES - 1 :: coarsest -> finest)
-	static const int N[MULTIRES];
-	static int TEXSIZE[MULTIRES];			// size of input exemplar
-	static int D_NEIGHBOR[MULTIRES];		// dimension of neighborhood (:= 3 * (2 * N + 1)^2)
-	static int NEIGHBORSIZE[MULTIRES];		// size: (2 * N + 1) * (2 * N + 1)
-	static int NUM_CHANNEL;						// # of channels (RGB, feature dist., RTF)
+	int MULTIRES;										// # of multi-resolution (0 -> MULTIRES - 1 :: coarsest -> finest)
+	vector<int> blockSize;								// template size
+	vector<size_idx> TEXSIZE;							// size of input exemplar
+	vector<int> MAXITERATION;							// max iteration time	
+	
+	int COHERENCENUM = 9;								// K-coherence (9) 11
+	bool useRandomSeed;									// Use random seed or fixed (0) for test (false)
+	
+	const size_idx GRID = 2;							// sparse grid
+	const size_dist min_dist = 0.1f;
+	const bool DISTANCEMAP_ON = true;					// convert to distance map model
+	const bool ColorHis_ON = true;			
+	
+	const bool GenerateDMTI = false;					// generate DM transformed TI
 
-	static const bool INDEXHIS_ON = true;				// Index Histogram in search step
+	size_dist factorIndex;
+	//vector<size_dist> factorIndex;						// linear weighting factor
+	//vector<size_dist> factorPos;
+	//vector<size_dist> deltaIndexHis;					// update IndexHis value per operation
+	//vector<size_dist> deltaPosHis;					// update PosHis value per operation
+	vector<size_dist> avgIndexHis;						// default average value of IndexHis
+	vector<size_dist> avgPosHis;						// default average value of PosHis
+	//vector<size_dist> pdfdevS;						// gaussian distribution factor for search step
+	vector<size_dist> pdfdevO;							// gaussian distribution factor for optimize step
+	vector<size_dist> pdfdevColor;						// gaussian distribution factor for colorHis
+	size_dist factorC;
+	size_dist factorP;
 
-	static const bool DISTANCEMAP_ON = true;			// convert to distance map model
-
-	static const bool PROPORTIONTHRESHOLD_ON = true;	// ProportionThreshold() same or better effect than DISCRETETHRESHOLD_ON
-
-	//not used anymore, tested to have worse quality
-	static const bool DISCRETETHRESHOLD_ON = false;		// dynamic thresholding in optimize step. 
-	static const bool COLORHIS_ON = false;				// Colour Histogram in optimize step
-	static const bool POSITIONHIS_ON = false;			// Position Histogram	in optimize step
-	static const bool DISCRETE_ON = false;				// discrete solver in optimize step
-	static const bool GAUSSIANFALLOFF_ON = false;		// gaussian fall off weight in optimize step
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+	inline size_idx trimIndex(int level, size_idx index, bool isToroidal = true) {
+		//if (isToroidal) {
+			if (index < 0) index += TEXSIZE[level];
+			return index % TEXSIZE[level];
+		//}
+		//else {//mirror
+		//	while (true) {
+		//		if (index < 0) index = -index;
+		//		if (TEXSIZE[level] <= index) {
+		//			index = 2 * (TEXSIZE[level] - 1) - index;
+		//			continue;
+		//		}
+		//		break;
+		//	}
+		//	return index;
+		//}
+	}
+	inline size_idx convertIndexANN(int level, size_idx index){
+		//convert ANNSearch m_volume_nearest_x_index to TI index
+		size_idx i, j, height, bias;
+		height = TEXSIZE[level] - blockSize[level] + 1;
+		bias = static_cast<size_idx>(blockSize[level] / 2);
+		i = index / height + bias;
+		j = index % height + bias;
+		return (i*TEXSIZE[level] + j);
+	}
+	inline size_idx sparseIdx(int level, size_idx index) {
+		//convert idx to sparsed grid --> width/2!
+		size_idx i, j, height, sheight;
+		height = TEXSIZE[level];
+		sheight = height / GRID;
+		i = (index / height) / GRID;
+		j = (index % height) / GRID;
+		return (i*sheight + j);
+	}
+	static const size_dist inv_sqrt_2pi;
+	inline size_dist gaussian_pdf(size_dist x, size_dist dev){		
+		if (x == 0.0f) return 1.0f;
+		return exp(-0.5f * (x * x / dev / dev));
+		//return max(FLT_MIN, exp(-0.5f * (x * x / dev / dev)));
+	}
+	//const size_dist	gwdev = 1.0f / 6.0f;
+	//inline size_dist normal_cdf(size_dist x, size_dist stddev, size_dist mean = 0.0f){
+	//	if (x == 0.0f) return 1.0f;
+	//	size_dist tx = (x - mean) / (stddev * sqrt(2.0f));
+	//	size_dist y = 1.0f / (1.0f + 0.3275911f * tx);
+	//	size_dist erf = 1.0f - (((((
+	//		+1.061405429f  * y
+	//		- 1.453152027f) * y
+	//		+ 1.421413741f) * y
+	//		- 0.284496736f) * y
+	//		+ 0.254829592f) * y)
+	//		* exp(-tx * tx);
+	//	size_dist cdf = (1.0f - 0.5f * (1.0f + erf)) * 2.0f;	// =/0.5f
+	//	if (cdf < FLT_MIN) cdf = FLT_MIN;
+	//	return cdf;
+	//}
+
 
 	void DoANNOptimization();
+	
 	void init();
-	void initthreshold();
 
-	inline ANNidx trimIndex(int level, ANNidx index, bool isToroidal = FALSE) {
-		if (isToroidal) {
-			while (index < 0) index += TEXSIZE[level];
-			return index % TEXSIZE[level];
-		}
-		else {//mirror
-			while (true) {
-				if (index < 0) index = -index;
-				if (TEXSIZE[level] <= index) {
-					index = 2 * (TEXSIZE[level] - 1) - index;
-					continue;
-				}
-				break;
-			}
-			return index;
-		}
-	}
-	inline ANNidx convertIndexANN(int level, ANNidx index){
-		//convert ANNSearch m_volume_nearest_x_index to m_volume index
-		int x, y, size;
-		size = TEXSIZE[level] - 2 * N[level];
-		x = index%size;
-		y = index / size;
-		return ((y + N[level])*TEXSIZE[level] + (x + N[level]));
-	}
-	inline double gaussian_pdf(double x, double mean, double stddev)
-	{
-		static const double inv_sqrt_2pi = 0.398942280401432677939946;
-		double a = (x - mean) / stddev;
-		return inv_sqrt_2pi / stddev * std::exp(-0.5 * a * a);
-	}
-	
-	// ========== need to change to short ==================
-	std::vector<std::vector<double> >  m_exemplar_x;		
-	std::vector<std::vector<double> >  m_exemplar_y;		
-	std::vector<std::vector<double> >  m_exemplar_z;		// [M] exemplar RGB image, size: NUM_CHANNEL * TEXSIZE^2
+	void allocateVectors(int level);
 
+	// 2D Exemplar 
+	vector<vector<size_color> >  m_exemplar_x;									//[level][idx2d] = color
+	vector<vector<size_color> >  m_exemplar_y;
+	vector<vector<size_color> >  m_exemplar_z;
 	bool loadExemplar();
-	void calcNeighbor();
+	void gaussImage(int level, vector<vector<size_color>>& exemplar);
 
-	void initabsoluteneigh();
-	vector<vector<ANNidx>> absoluteneigh;
-
-	// PCA-projected neighborhood vector
-	std::vector<std::vector<double> > m_neighbor_x;				// [M] original neighborhood vector required for texture optimization
-	std::vector<std::vector<double> > m_neighbor_y;
-	std::vector<std::vector<double> > m_neighbor_z;
-	std::vector<CvMat*> mp_neighbor_pca_average_x;						// [M] average of neighborhood vector
-	std::vector<CvMat*> mp_neighbor_pca_average_y;
-	std::vector<CvMat*> mp_neighbor_pca_average_z;
-	std::vector<CvMat*> mp_neighbor_pca_projected_x;						// [M] PCA-projected neighborhood data
-	std::vector<CvMat*> mp_neighbor_pca_projected_y;
-	std::vector<CvMat*> mp_neighbor_pca_projected_z;
-	std::vector<CvMat*> mp_neighbor_pca_eigenvec_x;						// [M] eigenvectors for covariant matrix
-	std::vector<CvMat*> mp_neighbor_pca_eigenvec_y;
-	std::vector<CvMat*> mp_neighbor_pca_eigenvec_z;
-	std::vector<std::vector<double*> > m_neighbor_kdTree_ptr_x;			// [M] array of pointers to vectors required for ANNkd_tree
-	std::vector<std::vector<double*> > m_neighbor_kdTree_ptr_y;			//ANNPoint*, 3 level
-	std::vector<std::vector<double*> > m_neighbor_kdTree_ptr_z;
-	std::vector<ANNkd_tree*          > mp_neighbor_kdTree_x;	// [M] ANN kdTree
-	std::vector<ANNkd_tree*          > mp_neighbor_kdTree_y;	// ANNkd_tree, 3 level
-	std::vector<ANNkd_tree*          > mp_neighbor_kdTree_z;
-
-	// pseudocode-----------------------------------------------------------------
-	// volume[0] := initVolume(0);                                        % initialization
-	// for level = 0 to L                                                 % coarse-to-fine synthesis
-	//   repeat                                                           % several iterations for a single level
-	//     nearest_neighbor := searchVolume(level);                       % phase 1: search
-	//     volume[level] := optimizeVolume(level, nearest_neighbor);      % phase 2: optimization
-	//   until converged
-	//   volume[level + 1] = upsampleVolume(level);                       % upsampling
-	// end for
-	//----------------------------------------------------------------------------
-
-	//check convergence
-	double globalenergy_new, globalenergy_old;
-	static const short MAXITERATION;				//max iteration time
-
-	//=========== phase 1: search ===========================
-	static const double PCA_RATIO_VARIANCE;		//0.95
-	static const double ErrorBound;				//Kopf used 2.0
-	static const int ANNsearchk;			//search k nearest index
-	std::vector<std::vector<ANNidx> > m_volume_nearest_x_index;		// [M] size: TEXSIZE^3
-	std::vector<std::vector<ANNidx> > m_volume_nearest_y_index;		// [M] size: TEXSIZE^3
-	std::vector<std::vector<ANNidx> > m_volume_nearest_z_index;		// [M] size: TEXSIZE^3
-	std::vector<std::vector<double> > m_volume_nearest_x_dist;		// [M] size: TEXSIZE^3
-	std::vector<std::vector<double> > m_volume_nearest_y_dist;		// [M] size: TEXSIZE^3
-	std::vector<std::vector<double> > m_volume_nearest_z_dist;		// [M] size: TEXSIZE^3
-	void searchVolume(int level);
-
-	// ----------- index histogram -------------
-	std::vector<std::vector<double> >  m_indexhistogram_exemplar;
-	std::vector<std::vector<double> >  m_indexhistogram_synthesis;
-	void initIndexHistogram(int level);
-	void updateIndexHistogram(int level, int orientation, const ANNidx oldannidx, const ANNidx newannidx);
-	ANNidx indexhistmatching_ann_index(int level, int orientation, ANNidxArray idxarray, ANNdistArray distarry);
-	bool FIRSTRUN = true;					// dont use random initial histogram. start counting from 0 for the first run.
-
-
-	//========== phase 2: optimization ======================
-	void optimizeVolume(int level);
-	// random permutation (precomputed)
-	std::vector<std::vector<ANNidx> > m_permutation_xyz;				// [M] size: TEXSIZE^3
-	void initPermutation(int level);
-	// Gaussian fall-off function
-	static const double gaussiansigma;
-	std::vector<std::vector<double> > gaussiankernel;					// m level gaussian kernel
-	void InitGaussianKernel();
-
-	//---------- color histogram ---------------	
-	static const short NUM_HISTOGRAM_BIN;			// # of histogram bins
-	static std::vector<short> CHANNEL_MAXVALUE;	// for color histogram	
-	//double WEIGHT_HISTOGRAM;					// linear weight for histogram
-	vector<vector<vector<double> > > dimensional_histogram_exemplar;				// [level][ori][bin]	16
-	//std::vector<std::vector<std::vector<double> > > m_histogram_exemplar;			// [level][ch][bin]		16
-	vector<vector<vector<double> > > m_histogram_synthesis;							// [level][ch][bin]		16
-
-	void calcHistogram_exemplar(int level);
-	void calcHistogram_synthesis(int level);
-	void updateHistogram_synthesis(int level, const std::vector<double>& color_old, const std::vector<double>& color_new);
-	
-	//---------- position histogram ------------
-	vector<double> WEIGHT_POSITIONHISTOGRAM;
-	std::vector<std::vector<double> >  m_positionhistogram_exemplar;				//  multires * binsize(exemplar area)
-	std::vector<std::vector<double> >  m_positionhistogram_synthesis;				//  multires * binsize(exmeplar area)
-	std::vector<std::vector<ANNidx> > m_volume_position;		// volume_position record // [M] size: TEXSIZE^3
-	
-	void initPositionHistogram_exemplar(int level);
-	void initPositionHistogram_synthesis(int level);
-	void updatePositionHistogram_synthesis(int level, const ANNidx position_old, const ANNidx position_new);
-	void writeHistogram(int level, vector<double> &histogram, int rows, int cols, const string filename);
-	//discrete solver
-	int FindClosestColorIndex(int level, vector<double>& colorset, vector<double>& weightset, double referencecolor);	// return the index in colorset of the most similar color	
-	
-	//----------- Dynamic thresholding ----------
-	static short DISCRETE_HISTOGRAM_BIN;						// for thresholding, discrete values. e.g. default256
-	vector<vector<double> >  discrete_histogram_exemplar;			// [level][discretebin]	256
-	vector<vector<double> >  discrete_histogram_synthesis;			// [level][discretebin]	256
-	vector<vector<short> > existed_bin_exemplar;						//[level][<=max bin size]
-	vector<vector<double>> existed_histogram_examplar;				//[level][<=max bin size]
-	vector<vector<double>> discrete_acchis_exemplar;							//[level][bin]
-
-	void DynamicThresholding(int level);//reassign values based on TI colorhis after optimize step
-	void calcaccHistogram(vector<double> &inputhis, vector<double> &acchis);
-	//Non-linear solver
-	void PolynomialInterpolation(vector<double>& Xv, vector<double>& Yv, vector<double>& X);
-
-	void ProportionThreshold(vector<short>& Model, vector<short>& BinNum, vector<double>& Prob);
-	void ProportionThreshold(vector<double>& Model, vector<short>& BinNum, vector<double>& Prob);
-
-	//=============== distance map ===================
-	double porosityTI, porosityModel;
-	static vector<short> Solid_Upper;			//Redistribute DMap Model. Use same Solid_Upper,Pore_Lower for 3TIs and loaded model
-	static vector<short> Pore_Lower;
-	static vector<short> DistanceThreshold;		//Binarise DM, use the same threshold.
-	static short ProjectDMapGap;
-	static short ProjectDMapMaxBins;
-	static vector<double> ProjectDMapCompressRatio;//Redistribute DMap Model. Use same (projection)ratio for 3TIs and loaded model
-
+	//=============== distance map ===============
+	size_color Solid_Upper, Pore_Upper;						//Redistribute DMap. Use same Solid_Upper,Pore_Lower for 3TIs and loaded model
+	void binaryChar(vector<short>& DMap, vector<char>& Binarised, short threshold);
+	void binaryUchar(vector<short>& DMap, vector<uchar>& Binarised, short threshold);
 	vector<unsigned short> BarDMap(short tSx, short tSy, short tSz, vector<char>& OImg);
-	vector<short> GetDMap(short Sx, short Sy, short Sz, vector<char>& OImg, char DM_Type, bool DisValYN);
-	vector<char> BinariseImg(vector<short>& DMap, double TPorosity);
-	void BinariseThreshold(vector<short>& DMap, vector<char>& Binarised, short threshold);
-	void ProjectDMap(vector<short>& DMap, int level);
-	void PrepareDMapProjection(vector<short>& TI1, vector<short>& TI2, vector<short>& TI3, int level);
+	vector<short> GetDMap(short Sx, short Sy, short Sz, vector<char>& OImg, char DM_Type, bool DisValYN);		//calculate Distance Map
+	//redistribute TI based on DM, no need to resize to 0-255
+	void transformDM(vector<size_color>& exemplar1, vector<size_color>& exemplar2, vector<size_color>& exemplar3);
+
+
+	// 3D Model
+	string modelFilename3D;
+	vector<uchar> load3Dmodel(const char* filename);
+	bool loadVolume();
+	vector<vector<size_color>> m_volume;		// synthesized volume				//[level][idx3d] = color	//can be short, others can also use unsignedint_16
+	void outputmodel(int level);
+
+	void InitRandomVolume(int level);
+	
+	// random permutation (precomputed)
+	vector<size_idx>	 m_permutation;												//[idx3d] = idx3d
+	void initPermutation(int level);
+
+	// upsample
+	void upsampleVolume(int level);
 
 	//release data
 	void cleardata(int level);
+
+	// =========== K-coherence search =============
+	vector<vector<vector<size_idx>>> KCoherence_x, KCoherence_y, KCoherence_z;		//[level][idx2d][k] = TIindex2d
+	void computeKCoherence();
+
+
+	//=========== phase 1: search ================================
+	size_dist TotalDis;
+	bool searchVolume(int level);
+	bool searchVolume_nosparsed(int level);
+
+	size_dist getFullDistance(int level, vector<size_color>& exemplar, size_idx idx2d, CvMat* dataMat);
+
+	vector<vector<bool>> isUnchanged_x, isUnchanged_y, isUnchanged_z;				//[level][idx3d]=isUnchanged	bool
+	bool isUnchangedBlock(int level, int direction, size_idx i, size_idx j, size_idx k);
+
+	size_idx DoPAR::getRandomNearestIndex(int level, vector<size_hiscount>& IndexHis);	//for bad points
+
+	//========== phase 2: optimization ===========================
+	void optimizeVolume(int level);
+	void optimizeVolume_nosparsed(int level);
+
+	bool FIRSTRUN = true;
+	//void optimizeVolume_firstrun(int level);	//firstrun without colorhis
+
+	//============== index histogram ============
+	vector<vector<size_hiscount>> IndexHis_x, IndexHis_y, IndexHis_z;//sparse grid!	//[level][idx2d/4]=IndexHis		 //3TI different IndexHis
+	vector<vector<size_idx>> nearestIdx_x, nearestIdx_y, nearestIdx_z;				//[level][idx3d]=nearestIdx2d
+	vector<vector<size_dist>> nearestWeight_x, nearestWeight_y, nearestWeight_z;	//[level][idx3d]=nearestWeight	eudis^-0.6 or eudis^-1
+
+	bool setNearestIndex(int level, vector<size_idx>& nearestIdx, vector<size_dist>& nearestWeight, vector<size_hiscount>&IndexHis,
+		size_idx idx3d, size_idx newNearestIdx, size_dist dis);
+
+
+	//=========== position histogram =============
+	vector<vector<size_hiscount>> PosHis;											//[level][idx2d*3]=IndexHis		// no sparse grid
+	vector<vector<size_idx>> SelectedPos;											//[level][idx3d]=idx2d (TIsize*3)
+	vector<vector<size_idx>> Origin_x, Origin_y, Origin_z;							//[level][idx3d]=OriginTIidx2d
+
+	//void updatePosHis(int level, vector<size_hiscount>& PosHis, vector<size_idx>& selectedPos, size_idx idx3d, size_idx newPos);
+
+	void writeHistogram(int level);
+
+	void checkHisError(int level);
+
+	//============ Color Histogram ===============
+	int ColorHis_BinNum;
+	vector<vector<size_hiscount>> ColorHis_exemplar;								//[level][BinNum], BinNum is the same for all level
+	vector<vector<size_hiscount>> ColorHis_synthesis;
+
+	void initColorHis_exemplar();
+	void initColorHis_synthesis(int level);
 };
 
+//for now the total size of last level is: 4*(1+1+0.75+3+6) = 4*12 times volumesize!

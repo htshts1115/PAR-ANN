@@ -27,6 +27,7 @@
 #include <iterator>
 #include <set>
 #include <functional>	//bind1st
+#include <numeric>
 
 #include "opencv2/core/core.hpp"
 #include "opencv2/imgcodecs.hpp"
@@ -35,6 +36,8 @@
 #include "opencv2/opencv.hpp"
 
 #include <ANN/ANN.h>
+
+#include <omp.h>		//OpenMP multi-thread!
 
 using namespace std;
 using namespace cv;
