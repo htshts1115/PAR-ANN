@@ -233,4 +233,4 @@ private:
 	void initColorHis_synthesis(int level);
 };
 
-//for now the total size of last level is: 4*(1+1+0.75+3+6) = 4*12 times volumesize!
+//for now the total size of last level is: 4*(1+1+0.75+3+6) = 4*12 times volumesize! (e.g. 400^3 raw size = 61Mb, then needs > 61*48 = 2928 Mb)
