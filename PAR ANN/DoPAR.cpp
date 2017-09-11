@@ -217,10 +217,11 @@ void DoPAR::ReadRunPar(string CurExeFile)
 		else useRandomSeed = true;
 
 		if (ParV.size() > 1) factorIndex = atoi(ParV[1].c_str());
-		if (ParV.size() > 2) factorP = atoi(ParV[2].c_str());
-		if (ParV.size() > 3) factorC = atoi(ParV[3].c_str());
-		if (ParV.size() > 4) { if (atoi(ParV[4].c_str()) == 0) PrintHisYN = false; else PrintHisYN = true; }
+		if (ParV.size() > 2) factorPos = atoi(ParV[2].c_str());
+		if (ParV.size() > 3) { if (atoi(ParV[3].c_str()) == 0) HisEqYN = false; else HisEqYN = true; }
+		if (ParV.size() > 4) { if (atoi(ParV[4].c_str()) == 0) DMtransformYN = false; else DMtransformYN = true; }
 		if (ParV.size() > 5) { if (atoi(ParV[5].c_str()) == 0) GenerateDMTI = false; else GenerateDMTI = true; }
+		if (ParV.size() > 6) { if (atoi(ParV[6].c_str()) == 0) PrintHisYN = false; else PrintHisYN = true; }	
 	}
 	if (useRandomSeed) {
 		cout << endl << "use Random Seed";
@@ -264,7 +265,7 @@ void DoPAR::ReadRunPar(string CurExeFile)
 		tempoutputformat = ".raw";
 		tempoutputfilename = ParV[0].substr(0, ParV[0].rfind('.') == string::npos ? ParV[0].length() : ParV[0].rfind('.'));
 	}
-	parametername = "i" + to_string((int)factorIndex) + "p" + to_string((int)factorP) + "c" + to_string((int)factorC);
+	parametername = "i" + to_string((int)factorIndex) + "p" + to_string((int)factorPos) + "Eq" + to_string((int)HisEqYN) + "DM" + to_string((int)DMtransformYN);
 	outputfilename = tempoutputfilename + "_" + parametername + tempoutputformat;
 }
 
@@ -545,10 +546,10 @@ void DoPAR::DoANNOptimization() {
 			if (loop % (MAXITERATION[curlevel] / 2) == 0)
 				cout << endl << "search: " << (t3 - t2) / 1000.0 << " s";
 		}	
-		//if (curlevel == MULTIRES - 1 || TEXSIZE[curlevel] >= 256) {// ouput model & histogram
+		if (curlevel == MULTIRES - 1 || TEXSIZE[curlevel] >= 256) {// ouput model & histogram
 			outputmodel(curlevel);
 			if (PrintHisYN) writeHistogram(curlevel);
-		//}
+		}
 
 		if (curlevel < MULTIRES - 1) {// level up
 			//allocateVectors(curlevel+1);
@@ -613,12 +614,11 @@ void DoPAR::init() {
 
 	// init deltaHis, linear factor
 	for (int i = 0; i < MULTIRES; i++){
-		factorIndex *= 1.0f;
 		avgIndexHis[i] = floor((1.0f * TEXSIZE[i] * (TEXSIZE[i] / 2) * (TEXSIZE[i] / 2)) / ((TEXSIZE[i] / 2 - blockSize[i] / 2 + 1)*(TEXSIZE[i] / 2 - blockSize[i] / 2 + 1)));
 		avgIndexHis[i] -= 1;
 		avgPosHis[i] = floor((TEXSIZE[i] * TEXSIZE[i] * TEXSIZE[i]) / ((TEXSIZE[i] - 2)*(TEXSIZE[i] - 2)) / 3.0);
 		avgPosHis[i] -= 1;
-		pdfdevO[i] = (avgPosHis[i]+1) * 1.0/3.0/factorP;
+		pdfdevO[i] = (avgPosHis[i]+1) * 1.0/3.0/factorPos;
 		factorC = 1.0 / 3.0 / factorC;
 	}
 
@@ -737,7 +737,7 @@ bool DoPAR::loadExemplar() {
 	if (tempSize == 1024) {
 		MULTIRES = 6;
 		blockSize = { 10, 10, 8, 8, 8, 6 };
-		MAXITERATION = { 10, 10, 10, 8, 6, 5 };
+		MAXITERATION = { 30, 15, 8, 6, 6, 4 };
 	}
 	if (tempSize >= 512) { 
 		if (tempSize % 32 != 0) { 
@@ -752,7 +752,7 @@ bool DoPAR::loadExemplar() {
 		}
 		MULTIRES = 5;
 		blockSize = {10, 10, 8, 8, 6};
-		MAXITERATION = { 10, 10, 8, 6, 5 };
+		MAXITERATION = { 30, 15, 8, 6, 4 };
 	}
 	else if (tempSize >= 256) {
 		if (tempSize % 16 != 0) { 
@@ -766,7 +766,6 @@ bool DoPAR::loadExemplar() {
 			cout << endl << "TIs are croped to " << cropedsize << " to fit multi-grid";
 		}
 		MULTIRES = 4;
-		//blockSize = { 10, 4, 4, 4 };
 		blockSize = { 10, 10, 8, 8 };			// T<=12
 		MAXITERATION = { 30, 15, 8, 6 };
 	}
@@ -782,8 +781,8 @@ bool DoPAR::loadExemplar() {
 			cout << endl << "TIs are croped to " << cropedsize << " to fit multi-grid";
 		}
 		MULTIRES = 3;
-		blockSize = { 10, 8, 6 };
-		MAXITERATION = { 10, 10, 8};
+		blockSize = { 10, 8, 8 };
+		MAXITERATION = { 30, 15, 8};
 	}
 	TEXSIZE.resize(MULTIRES);
 	avgIndexHis.resize(MULTIRES); avgPosHis.resize(MULTIRES);
@@ -819,7 +818,7 @@ bool DoPAR::loadExemplar() {
 	///////--------------Processing TI----------------------------------
 
 
-	transformDM(MULTIRES - 1, m_exemplar_x[MULTIRES - 1], m_exemplar_y[MULTIRES - 1], m_exemplar_z[MULTIRES - 1]);
+	if (DMtransformYN) transformDM(MULTIRES - 1, m_exemplar_x[MULTIRES - 1], m_exemplar_y[MULTIRES - 1], m_exemplar_z[MULTIRES - 1]);
 
 	if (MULTIRES > 1) {										//! gauss filter resizing better than opencv interpolation resize(inter_area)
 		cout << endl << "use Gaussian filter to resize.";
@@ -872,14 +871,17 @@ bool DoPAR::loadExemplar() {
 	//	transformDM(l, m_exemplar_x[l], m_exemplar_y[l], m_exemplar_z[l]);		
 	//}
 
-	cout << endl << "apply histogram equalization";
-	for (int l = 0; l < MULTIRES; ++l)
-		equalizeHistogram(l, m_exemplar_x[l], m_exemplar_y[l], m_exemplar_z[l]);
+	if (HisEqYN) {
+		cout << endl << "apply histogram equalization";
+		for (int l = MULTIRES - 1; l >= 0; --l)
+			equalizeHistogram(l, m_exemplar_x[l], m_exemplar_y[l], m_exemplar_z[l]);
+	}
 
 
-	if (GenerateDMTI) {						//Generate DM TI
+	if (DMtransformYN && GenerateDMTI) {						//Generate DM TI
 		ostringstream name;
-		for (int lv = MULTIRES-1; lv >=0 ; --lv) {
+		//for (int lv = MULTIRES-1; lv >=0 ; --lv) {
+		int lv = MULTIRES - 1;
 			int TEXSIZE_ = TEXSIZE[lv];
 
 			vector<unsigned short> tmpshort;
@@ -888,18 +890,8 @@ bool DoPAR::loadExemplar() {
 			DM1 = Mat(tmpshort, true).reshape(1, DM1.rows);					// vector to mat, need the same data type!
 			name << "DM1_S" << (short)Solid_Upper[lv] << "_L"<< to_string(lv) << ".png";
 			imwrite(name.str(), DM1);	name.str("");
-
-			//Mat DM2 = Mat(TEXSIZE_, TEXSIZE_, CV_16UC1);
-			//DM2 = Mat(tempushort, true).reshape(1, DM2.rows);
-			//name << "DM2_S" << (short)Solid_Upper << ".png";
-			//imwrite(name.str(), DM2);	name.str("");
-
-			//Mat DM3 = Mat(TEXSIZE_, TEXSIZE_, CV_16UC1);
-			//DM3 = Mat(tempushort, true).reshape(1, DM3.rows);
-			//name << "DM3_S" << (short)Solid_Upper << ".png";
-			//imwrite(name.str(), DM3);	name.str("");
-		}
-		cout << endl << "output DM TI.";	_getch();
+		//}
+		cout << endl << "output DM TI.";	//_getch();
 	}
 
 
@@ -1009,6 +1001,7 @@ void DoPAR::equalizeHistogram(int level, vector<size_color>& exemplarX, vector<s
 	//double scale =  (n_bins - 1.0) / (total - hist[i]);
 	//double scale = (n_bins - 1.0) / total;
 	double scale = min(50.0, n_bins - 1.0) / total;
+	int mincount = total / min(50.0, n_bins - 1.0) / 30;
 
 	// Initialize lut
 	vector<unsigned short> lut(n_bins, 0);
@@ -1046,16 +1039,25 @@ void DoPAR::equalizeHistogram(int level, vector<size_color>& exemplarX, vector<s
 		exemplarY[k] = actuallist[exemplarY[k]];
 	for (long k = 0; k < exemplarZ.size(); ++k)
 		exemplarZ[k] = actuallist[exemplarZ[k]];
+	
+	//check last bin ? mincount
+	int lastbincountX = count(exemplarX.begin(), exemplarX.end(), actualbin);
+	int lastbincountY = count(exemplarY.begin(), exemplarY.end(), actualbin) ;
+	int lastbincountZ = count(exemplarZ.begin(), exemplarZ.end(), actualbin);
+	//cout << endl <<"lastbin="<< actualbin << " mincount=" << mincount << " lastbincountX=" << lastbincountX << " Y=" << lastbincountY << " Z=" << lastbincountZ; 
+	//_getch();
+	if (lastbincountX < mincount || lastbincountY < mincount || lastbincountZ < mincount) {
+		replace(exemplarX.begin(), exemplarX.end(), actualbin, actualbin - 1);
+		replace(exemplarY.begin(), exemplarY.end(), actualbin, actualbin - 1);
+		replace(exemplarZ.begin(), exemplarZ.end(), actualbin, actualbin - 1);
+		actualbin--;
+	}
+
+	
 	Solid_Upper[level] = pressedSolid_Upper;
 	Pore_Upper[level] = actualbin;
 	
-	
-
 	cout << endl << "level " << level << ":   max before=" << maxv<<" after="<< Pore_Upper[level] << "   actual bins=" << actualbin+1;
-
-
-
-
 }
 
 
@@ -1071,7 +1073,7 @@ void DoPAR::binaryChar(vector<short>& DMap, vector<char>& Binarised, short thres
 void DoPAR::binaryUchar(vector<short>& DMap, vector<uchar>& Binarised, short threshold) {
 	//input  vector<short> DMap		//output vector<uchar>Binarised
 	for (long i = 0; i < DMap.size(); i++) {
-		if (DMap[i] <= threshold) Binarised[i] = 0;
+		if (DMap[i] < threshold) Binarised[i] = 0;
 		else Binarised[i] = 255;
 	}
 }
@@ -1423,7 +1425,7 @@ void DoPAR::outputmodel(int level) {
 
 	// binary model
 	vector<short> tempshort(m_volume[level].begin(), m_volume[level].end());
-	binaryUchar(tempshort, tempUchar, Solid_Upper[level]);						// binary thresholded to 0&255
+	binaryUchar(tempshort, tempUchar, Solid_Upper[level]+1);						// binary thresholded to 0&255
 	tempoutputfilename = outputfilename.substr(0, outputfilename.find('.')) + "_Size" + to_string(TEXSIZE[level]) + ".RAW";
 	Write(outputpath + tempoutputfilename, tempUchar);	
 
@@ -1684,10 +1686,12 @@ bool DoPAR::searchVolume(int level) {
 
 						//IndexHis needs sparse grid
 						curhis = IndexHis_z[level][sparseIdx(level, temp2didx)];
-						tempHisDiff = max(0.0f, curhis - avgIndexHis[level]);
-						IndexHisWeight = 1.0f + factorIndex * tempHisDiff;
+						tempHisDiff = max(0.0f, curhis - avgIndexHis[level]);						
+						IndexHisWeight = 1.0f + factorIndex * tempHisDiff;					
 						curError = IndexHisWeight * curDis;		
 						countedYN = true;
+
+						if (tempHisDiff > max(avgIndexHis[level], 1.0f*TEXSIZE[level])) curError = FLT_MAX;
 
 						curbin = (int)m_exemplar_z[level][temp2didx];
 						if (curError < minError) {								//min error			
@@ -1746,7 +1750,7 @@ bool DoPAR::searchVolume(int level) {
 			}
 			else {
 				if (!countedYN) cout << "bad ";
-				else cout << "infinity.";
+				//else cout << "infinity.";
 				bestTIIdx = getRandomNearestIndex(level, IndexHis_z[level]);
 				nearestWeight_z[level][idx] = 1.0f / 100;
 				size_idx formerNearestIdx = nearestIdx_z[level][idx];
@@ -1830,6 +1834,8 @@ bool DoPAR::searchVolume(int level) {
 						curError = IndexHisWeight * curDis;
 						countedYN = true;
 
+						if (tempHisDiff > max(avgIndexHis[level], 1.0f*TEXSIZE[level])) curError = FLT_MAX;
+
 						curbin = (int)m_exemplar_y[level][temp2didx];
 						if (minError > curError) {								//min error			
 							minError = curError;
@@ -1880,7 +1886,7 @@ bool DoPAR::searchVolume(int level) {
 			}
 			else {
 				if (!countedYN) cout << "bad ";
-				else cout << "infinity.";
+				//else cout << "infinity.";
 				bestTIIdx = getRandomNearestIndex(level, IndexHis_y[level]);
 				size_idx formerNearestIdx = nearestIdx_y[level][idx];
 				nearestWeight_y[level][idx] = 1.0f / 100;
@@ -1966,6 +1972,8 @@ bool DoPAR::searchVolume(int level) {
 						curError = IndexHisWeight * curDis;
 						countedYN = true;
 
+						if (tempHisDiff > max(avgIndexHis[level], 1.0f*TEXSIZE[level])) curError = FLT_MAX;
+
 						curbin = (int)m_exemplar_x[level][temp2didx];
 						if (minError > curError) {								//min error			
 							minError = curError;
@@ -2016,7 +2024,7 @@ bool DoPAR::searchVolume(int level) {
 			}
 			else {
 				if (!countedYN) cout << "bad ";
-				else cout << "infinity ";
+				//else cout << "infinity ";
 				bestTIIdx = getRandomNearestIndex(level, IndexHis_x[level]);
 				size_idx formerNearestIdx = nearestIdx_x[level][idx];
 				nearestWeight_x[level][idx] = 1.0f / 100;
@@ -2236,7 +2244,7 @@ void DoPAR::optimizeVolume(int level) {
 
 				tempPosIdx = tempnearestidx + Sxy * 2;													//PosHis size=3TI!
 				tempHisDiff = max(0.0f, PosHis[level][tempPosIdx] - avgPosHis[level]);
-				weightp = 1.0f / (1.0f + tempHisDiff * factorP);
+				weightp = 1.0f / (1.0f + tempHisDiff * factorPos);
 
 				weightc = FLT_MAX;
 				if (ColorHis_ON && !FIRSTRUN){
@@ -2285,7 +2293,7 @@ void DoPAR::optimizeVolume(int level) {
 			
 				tempPosIdx = tempnearestidx + Sxy;													//PosHis size=3TI!
 				tempHisDiff = max(0.0f, PosHis[level][tempPosIdx] - avgPosHis[level]);
-				weightp = 1.0f / (1.0f + tempHisDiff * factorP);
+				weightp = 1.0f / (1.0f + tempHisDiff * factorPos);
 
 				weightc = FLT_MAX;
 				if (ColorHis_ON && !FIRSTRUN) {
@@ -2328,7 +2336,7 @@ void DoPAR::optimizeVolume(int level) {
 						
 				tempPosIdx = tempnearestidx;
 				tempHisDiff = max(0.0f, PosHis[level][tempPosIdx] - avgPosHis[level]);					//PosHis size=3TI
-				weightp = 1.0f / (1.0f + tempHisDiff * factorP);
+				weightp = 1.0f / (1.0f + tempHisDiff * factorPos);
 
 				weightc = FLT_MAX;
 				if (ColorHis_ON && !FIRSTRUN) {

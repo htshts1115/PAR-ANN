@@ -62,6 +62,8 @@ private:
 	const bool DISTANCEMAP_ON = true;					// convert to distance map model
 	const bool ColorHis_ON = false;			
 	
+	bool HisEqYN = true;								// apply histogram equalization
+	bool DMtransformYN = true;							// use DM transformation
 	bool GenerateDMTI = false;							// generate DM transformed TI
 	bool PrintHisYN = false;							// generate Histogram
 
@@ -70,12 +72,13 @@ private:
 	vector<size_dist> pdfdevO;							// gaussian distribution factor for optimize step
 	vector<size_dist> pdfdevColor;						// gaussian distribution factor for colorHis
 	size_dist factorIndex;
-	size_dist factorC;
-	size_dist factorP;
+	size_dist factorPos;
+	size_dist factorC = 1;
+
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-	inline size_idx trimIndex(int level, size_idx index, bool isToroidal = true) {
+	inline size_idx trimIndex(int level, size_idx index) {
 		//if (isToroidal) {
 			if (index < 0) index += TEXSIZE[level];
 			return index % TEXSIZE[level];
@@ -91,7 +94,20 @@ private:
 		//	}
 		//	return index;
 		//}
+		//if (index < 0) return -index;
+		//if (TEXSIZE[level] <= index) return 2 * (TEXSIZE[level] - 1) - index;
+		//return index;
 	}
+	inline size_idx trim(size_idx SIZE, size_idx index) {
+		//Toroidal
+		if (index < 0) index += SIZE;
+		return index % SIZE;
+
+		//if (index < 0) return -index;
+		//if (index >= SIZE) return 2 * (SIZE - 1) - index;
+		//return index;
+	}
+
 	inline size_idx convertIndexANN(int level, size_idx index){
 		//convert ANNSearch m_volume_nearest_x_index to TI index
 		size_idx i, j, height, bias;
