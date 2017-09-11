@@ -545,14 +545,13 @@ void DoPAR::DoANNOptimization() {
 			if (loop % (MAXITERATION[curlevel] / 2) == 0)
 				cout << endl << "search: " << (t3 - t2) / 1000.0 << " s";
 		}	
-		if (curlevel == MULTIRES - 1 || TEXSIZE[curlevel] >= 256) {// ouput model & histogram
+		//if (curlevel == MULTIRES - 1 || TEXSIZE[curlevel] >= 256) {// ouput model & histogram
 			outputmodel(curlevel);
 			if (PrintHisYN) writeHistogram(curlevel);
-		}
-		//if (/*TEXSIZE[curlevel] < 256 && */TEXSIZE[curlevel] >= 128)	writeHistogram(curlevel);		
+		//}
 
 		if (curlevel < MULTIRES - 1) {// level up
-			allocateVectors(curlevel+1);
+			//allocateVectors(curlevel+1);
 			upsampleVolume(curlevel);	
 			//upsampleVolume_nosparsed(curlevel);
 			cleardata(curlevel);
@@ -565,11 +564,8 @@ void DoPAR::DoANNOptimization() {
 	cleardata(MULTIRES-1);
 }
 
-void DoPAR::allocateVectors(int level) {
-	const size_idx S2d_ = TEXSIZE[level] * TEXSIZE[level];
-	const size_idx S3d_ = S2d_*TEXSIZE[level];
-
-	if (level == 0) {
+void DoPAR::allocateVectors() {
+	//if (level == 0) {
 		isUnchanged_x.resize(MULTIRES); isUnchanged_y.resize(MULTIRES);		isUnchanged_z.resize(MULTIRES);
 		nearestIdx_x.resize(MULTIRES);	nearestIdx_y.resize(MULTIRES);		nearestIdx_z.resize(MULTIRES);
 		nearestWeight_x.resize(MULTIRES); nearestWeight_y.resize(MULTIRES); nearestWeight_z.resize(MULTIRES);
@@ -577,16 +573,22 @@ void DoPAR::allocateVectors(int level) {
 		IndexHis_x.resize(MULTIRES);	IndexHis_y.resize(MULTIRES);		IndexHis_z.resize(MULTIRES);
 		PosHis.resize(MULTIRES);
 		SelectedPos.resize(MULTIRES);
+	//}
+
+	for (int level = 0; level < MULTIRES; ++level) {
+		size_idx S2d_ = TEXSIZE[level] * TEXSIZE[level];
+		size_idx S3d_ = S2d_*TEXSIZE[level];
+
+		isUnchanged_x[level].resize(S3d_, false);		isUnchanged_y[level].resize(S3d_, false);		isUnchanged_z[level].resize(S3d_, false);
+		nearestIdx_x[level].resize(S3d_, 205000);		nearestIdx_y[level].resize(S3d_, 205000);		nearestIdx_z[level].resize(S3d_, 205000);
+		nearestWeight_x[level].resize(S3d_, min_dist);	nearestWeight_y[level].resize(S3d_, min_dist);	nearestWeight_z[level].resize(S3d_, min_dist);
+		Origin_x[level].resize(S3d_, 205000);			Origin_y[level].resize(S3d_, 205000);			Origin_z[level].resize(S3d_, 205000);
+		//!PosHis size=3*TI
+		SelectedPos[level].resize(S3d_, 615000);
+		PosHis[level].resize(S2d_ * 3, 0);
+		//!sparse grid IndexHis
+		IndexHis_x[level].resize(S2d_ / 4, 0);		IndexHis_y[level].resize(S2d_ / 4, 0);		IndexHis_z[level].resize(S2d_ / 4, 0);
 	}
-	isUnchanged_x[level].resize(S3d_, false);		isUnchanged_y[level].resize(S3d_, false);		isUnchanged_z[level].resize(S3d_, false);
-	nearestIdx_x[level].resize(S3d_, 205000);		nearestIdx_y[level].resize(S3d_, 205000);		nearestIdx_z[level].resize(S3d_, 205000);
-	nearestWeight_x[level].resize(S3d_, min_dist);	nearestWeight_y[level].resize(S3d_, min_dist);	nearestWeight_z[level].resize(S3d_, min_dist);
-	Origin_x[level].resize(S3d_, 205000);			Origin_y[level].resize(S3d_, 205000);			Origin_z[level].resize(S3d_, 205000);	
-	//!PosHis size=3*TI
-	SelectedPos[level].resize(S3d_, 615000);
-	PosHis[level].resize(S2d_*3, 0);
-	//!sparse grid IndexHis
-	IndexHis_x[level].resize(S2d_ / 4, 0);		IndexHis_y[level].resize(S2d_ / 4, 0);		IndexHis_z[level].resize(S2d_ / 4, 0);
 }
 
 void DoPAR::init() {
@@ -602,8 +604,9 @@ void DoPAR::init() {
 	// load TI
 	if (!loadExemplar()) return;
 
-	// allocate memory for all global vectors (level0), init His=0
-	allocateVectors(0);
+	// allocate memory for all global vectors
+	//allocateVectors(0);
+	allocateVectors();
 
 	// load Model
 	if (!loadVolume()) return;			
@@ -663,8 +666,11 @@ void DoPAR::InitRandomVolume(int level) {
 		isUnchanged_z[level][xyz] = false;
 
 		m_volume[level][xyz] = (m_exemplar_x[level][randomidx2d[0]] + m_exemplar_y[level][randomidx2d[1]] + m_exemplar_z[level][randomidx2d[2]]) / 3.0f;
-		//ori = rand() % 3;
-		//m_volume[level][xyz] = p[ori]->operator[](randomidx2d[ori]);
+		
+		//if (m_volume[level][xyz] > 10000) {
+		//	cout << endl << "x[" << randomidx2d[0] << "]=" << m_exemplar_x[level][randomidx2d[0]] << "  y[" << randomidx2d[1] << "]=" << m_exemplar_y[level][randomidx2d[1]] << "  z[" << randomidx2d[2] << "]=" << m_exemplar_z[level][randomidx2d[2]];
+		//	_getch();
+		//}
 	}
 }
 
@@ -760,8 +766,9 @@ bool DoPAR::loadExemplar() {
 			cout << endl << "TIs are croped to " << cropedsize << " to fit multi-grid";
 		}
 		MULTIRES = 4;
-		blockSize = { 10, 10, 8, 8 };
-		MAXITERATION = { 20, 15, 8, 6 };
+		//blockSize = { 10, 4, 4, 4 };
+		blockSize = { 10, 10, 8, 8 };			// T<=12
+		MAXITERATION = { 30, 15, 8, 6 };
 	}
 	else if (tempSize >= 128) {
 		if (tempSize % 8 != 0) { 
@@ -811,6 +818,9 @@ bool DoPAR::loadExemplar() {
 	
 	///////--------------Processing TI----------------------------------
 
+
+	transformDM(MULTIRES - 1, m_exemplar_x[MULTIRES - 1], m_exemplar_y[MULTIRES - 1], m_exemplar_z[MULTIRES - 1]);
+
 	if (MULTIRES > 1) {										//! gauss filter resizing better than opencv interpolation resize(inter_area)
 		cout << endl << "use Gaussian filter to resize.";
 		for (int l = MULTIRES - 1; l > 0; --l) {
@@ -820,53 +830,51 @@ bool DoPAR::loadExemplar() {
 		}
 	}
 	
-	cout << endl << "binarise each sub-sample level";
-	for (int l =0; l < MULTIRES - 1; ++l) {
-		size_idx porocount;
-		size_color segvalue;
-		vector<size_color> tmpv;
+	//cout << endl << "binarise each sub-sample level";
+	//for (int l =0; l < MULTIRES - 1; ++l) {
+	//	size_idx porocount;
+	//	size_color segvalue;
+	//	vector<size_color> tmpv;
 
-		tmpv = m_exemplar_x[l];
-		sort(tmpv.begin(), tmpv.end());//first sort
-		porocount = floor((1-porosityYZ) * m_exemplar_x[l].size());//then calc the seg point 
-		segvalue = tmpv[porocount];
-		size_idx solidcount = 0;//finally threshold
-		for (size_idx i = 0; i < m_exemplar_x[l].size(); ++i) {
-			if (m_exemplar_x[l][i] < segvalue && solidcount < porocount) { m_exemplar_x[l][i] = 0; solidcount++; }
-			else  m_exemplar_x[l][i] = 255;
-		}
+	//	tmpv = m_exemplar_x[l];
+	//	sort(tmpv.begin(), tmpv.end());//first sort
+	//	porocount = floor((1-porosityYZ) * m_exemplar_x[l].size());//then calc the seg point 
+	//	segvalue = tmpv[porocount];
+	//	size_idx solidcount = 0;//finally threshold
+	//	for (size_idx i = 0; i < m_exemplar_x[l].size(); ++i) {
+	//		if (m_exemplar_x[l][i] < segvalue && solidcount < porocount) { m_exemplar_x[l][i] = 0; solidcount++; }
+	//		else  m_exemplar_x[l][i] = 255;
+	//	}
 
-		tmpv = m_exemplar_y[l];
-		sort(tmpv.begin(), tmpv.end());
-		porocount = floor((1-porosityZX) * m_exemplar_y[l].size());
-		segvalue = tmpv[porocount];
-		solidcount = 0;
-		for (size_idx i = 0; i < m_exemplar_y[l].size(); ++i) {
-			if (m_exemplar_y[l][i] < segvalue && solidcount < porocount) {m_exemplar_y[l][i] = 0; solidcount++;	}
-			else  m_exemplar_y[l][i] = 255;
-		}
-		
-		tmpv = m_exemplar_z[l];
-		sort(tmpv.begin(), tmpv.end());
-		porocount = floor((1-porosityXY) * m_exemplar_z[l].size());
-		segvalue = tmpv[porocount];
-		solidcount = 0;
-		for (size_idx i = 0; i < m_exemplar_z[l].size(); ++i) {
-			if (m_exemplar_z[l][i] < segvalue && solidcount < porocount) {m_exemplar_z[l][i] = 0; solidcount++;}
-			else  m_exemplar_z[l][i] = 255;
-		}
-	}
-	
-	cout << endl << "apply Distance Map transformation.";
-	for (int l = 0; l < MULTIRES; ++l) {
-		transformDM(l, m_exemplar_x[l], m_exemplar_y[l], m_exemplar_z[l]);
-	}
+	//	tmpv = m_exemplar_y[l];
+	//	sort(tmpv.begin(), tmpv.end());
+	//	porocount = floor((1-porosityZX) * m_exemplar_y[l].size());
+	//	segvalue = tmpv[porocount];
+	//	solidcount = 0;
+	//	for (size_idx i = 0; i < m_exemplar_y[l].size(); ++i) {
+	//		if (m_exemplar_y[l][i] < segvalue && solidcount < porocount) {m_exemplar_y[l][i] = 0; solidcount++;	}
+	//		else  m_exemplar_y[l][i] = 255;
+	//	}
+	//	
+	//	tmpv = m_exemplar_z[l];
+	//	sort(tmpv.begin(), tmpv.end());
+	//	porocount = floor((1-porosityXY) * m_exemplar_z[l].size());
+	//	segvalue = tmpv[porocount];
+	//	solidcount = 0;
+	//	for (size_idx i = 0; i < m_exemplar_z[l].size(); ++i) {
+	//		if (m_exemplar_z[l][i] < segvalue && solidcount < porocount) {m_exemplar_z[l][i] = 0; solidcount++;}
+	//		else  m_exemplar_z[l][i] = 255;
+	//	}
+	//}
+	//
+	//cout << endl << "apply Distance Map transformation.";
+	//for (int l = 0; l < MULTIRES; ++l) {
+	//	transformDM(l, m_exemplar_x[l], m_exemplar_y[l], m_exemplar_z[l]);		
+	//}
 
 	cout << endl << "apply histogram equalization";
-	for (int l = MULTIRES-1; l >= 0; --l)
-		equalizeHistogram(m_exemplar_x[l], m_exemplar_y[l], m_exemplar_z[l], Pore_Upper[l]);
-	
-	//press histogram, make distance minimum and equal
+	for (int l = 0; l < MULTIRES; ++l)
+		equalizeHistogram(l, m_exemplar_x[l], m_exemplar_y[l], m_exemplar_z[l]);
 
 
 	if (GenerateDMTI) {						//Generate DM TI
@@ -932,53 +940,55 @@ void DoPAR::gaussImage(int level, vector<vector<size_color>>& exemplar){
 	}
 }
 
-void DoPAR::equalizeHistogram(vector<size_color>& exemplar, unsigned short max_val)
-{
-	int total = exemplar.size();
-	unsigned short n_bins = max_val + 1;
-
-	// Compute histogram
-	vector<unsigned short> hist(n_bins, 0);
-	for (int i = 0; i < total; ++i) {
-		hist[exemplar[i]]++;
-	}
-
-	// Build LUT from cumulative histrogram
-
-	// Find first non-zero bin
-	int i = 0;
-	while (!hist[i]) ++i;
-
-	if (hist[i] == total) {
-		for (int j = 0; j < total; ++j) {
-			exemplar[j] = i;
-		}
-		return;
-	}
-
-	// Compute scale
-	double scale = (n_bins - 1.0) / (total - hist[i]);
-
-	// Initialize lut
-	vector<unsigned short> lut(n_bins, 0);
-	i++;
-
-	int sum = 0;
-	for (; i < hist.size(); ++i) {
-		sum += hist[i];
-		// the value is saturated in range [0, max_val]
-		lut[i] = max(unsigned short(0), min(unsigned short(round(sum * scale)), max_val));
-	}
-
-	// Apply equalization
-	for (int i = 0; i < total; ++i) {
-		exemplar[i] = lut[exemplar[i]];
-	}
-}
-void DoPAR::equalizeHistogram(vector<size_color>& exemplarX, vector<size_color>& exemplarY, vector<size_color>& exemplarZ, unsigned short max_val)
+//void DoPAR::equalizeHistogram(vector<size_color>& exemplar, unsigned short max_val)
+//{
+//	int total = exemplar.size();
+//	unsigned short n_bins = max_val + 1;
+//
+//	// Compute histogram
+//	vector<unsigned short> hist(n_bins, 0);
+//	for (int i = 0; i < total; ++i) {
+//		hist[exemplar[i]]++;
+//	}
+//
+//	// Build LUT from cumulative histrogram
+//
+//	// Find first non-zero bin
+//	int i = 0;
+//	while (!hist[i]) ++i;
+//
+//	if (hist[i] == total) {
+//		for (int j = 0; j < total; ++j) {
+//			exemplar[j] = i;
+//		}
+//		return;
+//	}
+//
+//	// Compute scale
+//	double scale = (n_bins - 1.0) / (total - hist[i]);
+//
+//	// Initialize lut
+//	vector<unsigned short> lut(n_bins, 0);
+//	i++;
+//
+//	int sum = 0;
+//	for (; i < hist.size(); ++i) {
+//		sum += hist[i];
+//		// the value is saturated in range [0, max_val]
+//		lut[i] = max(unsigned short(0), min(unsigned short(round(sum * scale)), max_val));
+//	}
+//
+//	// Apply equalization
+//	for (int i = 0; i < total; ++i) {
+//		exemplar[i] = lut[exemplar[i]];
+//	}
+//}
+void DoPAR::equalizeHistogram(int level, vector<size_color>& exemplarX, vector<size_color>& exemplarY, vector<size_color>& exemplarZ)
 {
 	long total = exemplarX.size() + exemplarY.size() + exemplarZ.size(); 
-	unsigned short n_bins = max_val + 1; 
+
+	unsigned short maxv = max(*max_element(exemplarX.begin(), exemplarX.end()), max( *max_element(exemplarY.begin(), exemplarY.end()), *max_element(exemplarZ.begin(), exemplarZ.end())));
+	unsigned short n_bins = maxv + 1;
 
 	// Compute histogram
 	vector<long> hist(n_bins, 0);
@@ -998,28 +1008,54 @@ void DoPAR::equalizeHistogram(vector<size_color>& exemplarX, vector<size_color>&
 	// Compute scale
 	//double scale =  (n_bins - 1.0) / (total - hist[i]);
 	//double scale = (n_bins - 1.0) / total;
-	double scale = min(256.0, n_bins - 1.0) / total;
+	double scale = min(50.0, n_bins - 1.0) / total;
 
 	// Initialize lut
 	vector<unsigned short> lut(n_bins, 0);
 	//i++;
 	long sum = 0;
+	int lastv = -1, actualbin = -1, pressedSolid_Upper=0;
+	vector<unsigned short> actuallist(n_bins, 0);
 	for (unsigned short i=0; i < hist.size(); ++i) {
 		sum += hist[i];
 		// the value is saturated in range [0, max_val]
-		lut[i] = max(unsigned short(0), min(unsigned short(round(sum * scale)), max_val));
+		lut[i] = max(unsigned short(0), min(unsigned short(round(sum * scale)), maxv));
+	
+		if (lut[i] != lastv) {
+			lastv = lut[i];	
+			actualbin++;
+		}
+		actuallist[i] = actualbin;
+		if (i == Solid_Upper[MULTIRES-1]) pressedSolid_Upper = actualbin;
 	}
-	//unsigned short previous = 0;
-	//for (int l = 0; l < lut.size(); ++l) if (lut[l] != previous) { cout  << l << " ";  previous = lut[l]; }
-	//_getch();
 
-	// Apply equalization
-	for (long k = 0; k < exemplarX.size(); ++k) 
-		exemplarX[k] = lut[exemplarX[k]];
+	//// Apply equalization without press
+	//for (long k = 0; k < exemplarX.size(); ++k) 
+	//	exemplarX[k] = lut[exemplarX[k]];
+	//for (long k = 0; k < exemplarY.size(); ++k)
+	//	exemplarY[k] = lut[exemplarY[k]];
+	//for (long k = 0; k < exemplarZ.size(); ++k)
+	//	exemplarZ[k] = lut[exemplarZ[k]];
+	//Solid_Upper[level] = lut[Solid_Upper[MULTIRES-1]];
+	//Pore_Upper[level] = min(255, n_bins - 1);
+
+	// equalization with compress
+	for (long k = 0; k < exemplarX.size(); ++k)
+		exemplarX[k] = actuallist[exemplarX[k]];
 	for (long k = 0; k < exemplarY.size(); ++k)
-		exemplarY[k] = lut[exemplarY[k]];
+		exemplarY[k] = actuallist[exemplarY[k]];
 	for (long k = 0; k < exemplarZ.size(); ++k)
-		exemplarZ[k] = lut[exemplarZ[k]];
+		exemplarZ[k] = actuallist[exemplarZ[k]];
+	Solid_Upper[level] = pressedSolid_Upper;
+	Pore_Upper[level] = actualbin;
+	
+	
+
+	cout << endl << "level " << level << ":   max before=" << maxv<<" after="<< Pore_Upper[level] << "   actual bins=" << actualbin+1;
+
+
+
+
 }
 
 
@@ -1352,10 +1388,6 @@ void DoPAR::transformDM(int level, vector<size_color>& exemplar1, vector<size_co
 	minVal = max(minVal1, max(minVal2, minVal3));
 	maxVal = min(maxVal1, min(maxVal2, maxVal3));
 
-	if (ColorHis_ON) {
-		ColorHis_BinNum = maxVal - minVal;
-		cout << endl << "Transformed TI bin size= " << ColorHis_BinNum;
-	}
 
 	// transform to exemplar			// no need to resize to 0-255!   min -> 0, +1 -> -min
 	Solid_Upper[level] = -1 - minVal;
@@ -1528,6 +1560,32 @@ void DoPAR::computeKCoherence(){
 		annClose();
 		delete kdTree_x;				delete kdTree_y;				delete kdTree_z;
 		annDeallocPts(p_source_x);		annDeallocPts(p_source_y);		annDeallocPts(p_source_z);
+
+		////fill empty KCoherence (those on boundary) simply with the neighbouring points
+		//vector<short> jset = { 0, -1, 1, 0, 0, -1, 1, -1, 1,    -2, 2, 0, 0};
+		//vector<short> iset = { 0, 0, 0, -1, 1, -1, 1, 1, -1,    0, 0, -2, 2};
+		//size_idx idx = 0;
+		//for (size_idx i = 0; i < TEXSIZE_; ++i) {
+		//	idx = TEXSIZE_ * i - 1;
+		//	for (size_idx j = 0; j < TEXSIZE_; ++j) {	
+		//		idx++;
+		//		if (KCoherence_x[level][idx].empty()) {
+		//			KCoherence_x[level][idx].resize(COHERENCENUM);
+		//			for (short count = 0; count < COHERENCENUM; ++count) 
+		//				KCoherence_x[level][idx][count] = trimIndex(level, i + iset[count])*TEXSIZE_ + trimIndex(level, j + jset[count]);
+		//		}
+		//		if (KCoherence_y[level][idx].empty()) {
+		//			KCoherence_y[level][idx].resize(COHERENCENUM);
+		//			for (short count = 0; count < COHERENCENUM; ++count)
+		//				KCoherence_y[level][idx][count] = trimIndex(level, i + iset[count])*TEXSIZE_ + trimIndex(level, j + jset[count]);
+		//		}
+		//		if (KCoherence_z[level][idx].empty()) {
+		//			KCoherence_z[level][idx].resize(COHERENCENUM);
+		//			for (short count = 0; count < COHERENCENUM; ++count)
+		//				KCoherence_z[level][idx][count] = trimIndex(level, i + iset[count])*TEXSIZE_ + trimIndex(level, j + jset[count]);
+		//		}
+		//	}
+		//}
 	}
 
 	long time_end = clock();
@@ -1549,8 +1607,8 @@ bool DoPAR::searchVolume(int level) {
 	const size_idx Sxz = Sx * Sz;
 	const size_idx Syz = Sy * Sz;
 	const size_idx Size = Sxy * Sz;
-	const size_idx start = static_cast<size_idx>(blockSize_ / 2);			//4	//4	//4	//3			//-cstart<=x<=cend
-	const size_idx end = static_cast<size_idx>((blockSize_-1) / 2);			//3	//3	//3	//2
+	const size_idx start = static_cast<size_idx>(blockSize_ / 2);			//5	//4	//4	//3			//-cstart<=x<=cend
+	const size_idx end = static_cast<size_idx>((blockSize_-1) / 2);			//4	//3	//3	//2
 	size_idx cstart(start), cend(end);
 	if (level > 0 && end>2) {//reduce the candidates of KCoherence. reduce computation. But the template size is not reduced in getFullDistance()
 		cstart -= 1;														//4	//3	//3	//3
@@ -1591,25 +1649,31 @@ bool DoPAR::searchVolume(int level) {
 			size_dist tempHisDiff;
 			bool countedYN = false;
 			size_dist minError = INFINITY, minDis = INFINITY;
-			size_idx bestTIIdx;
+			size_idx bestTIIdx(0);
 			size_idx eposx, eposy;
 			size_idx temp2didx, temp3didx, tempTIidx;
 			size_idx sumidx_posx;
 			int compareNum = 0;
-			compareIdx.clear(); compareIdx.reserve(blockSize_ * blockSize_ * COHERENCENUM);
+			compareIdx.clear(); 
+			compareIdx.reserve(blockSize_ * blockSize_ * COHERENCENUM);
 			for (size_idx u = -cstart; u <= cend; ++u) {
 				sumidx_posx = trimIndex(level, i + u)*Sxy + k;
 				for (size_idx v = -cstart; v <= cend; ++v) {
-					temp3didx = sumidx_posx + trimIndex(level, j + v)*Sx;				//[posx][posy][k]
+					temp3didx = sumidx_posx + trimIndex(level, j + v)*Sx;				//[posx][posy][k]    [i+u][j+v]
 					eposx = (Origin_z[level][temp3didx] / Sx) - u;
 					eposy = (Origin_z[level][temp3didx] % Sx) - v;
 
 					if (!(eposx >= start && eposx < Sx - end && eposy >= start && eposy < Sy - end))
 						continue;
+					//if (!(eposx >= 0 && eposx < Sx && eposy >= 0 && eposy < Sy))
+					//	continue;
 
 					tempTIidx = eposx*Sx + eposy;										//origin - (u,v)
 					for (int l = 0; l < COHERENCENUM; ++l) {							//[0,COHERENCENUM]				
 						temp2didx = KCoherence_z[level][tempTIidx][l];
+
+						//if (temp2didx<0 || temp2didx>=Sxy) { cout << " temp2didx=" << temp2didx; _getch(); }
+
 						int p = 0;
 						for (; p < compareNum; ++p) {
 							if (compareIdx[p] == temp2didx)	break;
@@ -1617,13 +1681,12 @@ bool DoPAR::searchVolume(int level) {
 						if (p < compareNum)	continue;
 
 						curDis = getFullDistance(level, m_exemplar_z[level], temp2didx, current_neighbor);
+
 						//IndexHis needs sparse grid
 						curhis = IndexHis_z[level][sparseIdx(level, temp2didx)];
 						tempHisDiff = max(0.0f, curhis - avgIndexHis[level]);
 						IndexHisWeight = 1.0f + factorIndex * tempHisDiff;
-						//IndexHisWeight = 1.0f + tempHisDiff;
 						curError = IndexHisWeight * curDis;		
-						//curError = curDis * max(IndexHisWeight, 1.0f / gaussian_pdf(tempHisDiff, pdfdevS[level]));
 						countedYN = true;
 
 						curbin = (int)m_exemplar_z[level][temp2didx];
@@ -1631,7 +1694,6 @@ bool DoPAR::searchVolume(int level) {
 							minError = curError;
 							minDis = curDis;
 							bestTIIdx = temp2didx;
-							//countz = 1;
 							besthis = curhis;
 							bestbin = curbin;
 						}
@@ -1639,24 +1701,18 @@ bool DoPAR::searchVolume(int level) {
 							if (curhis < besthis) {
 								minDis = curDis;
 								bestTIIdx = temp2didx;
-								//countz = 1;
 								besthis = curhis;
 								bestbin = curbin;
 							}
-							else if (curhis == besthis && !FIRSTRUN) {
-								if (curbin == bestbin) {// if IndexHis same and color same, compare PosHis
-									if (PosHis[level][temp2didx + 2 * Sxy] < PosHis[level][bestTIIdx + 2 * Sxy])
-										bestTIIdx = temp2didx;
-								}
+							else if (curhis == besthis && !FIRSTRUN) {						
+								if (PosHis[level][temp2didx + 2 * Sxy] < PosHis[level][bestTIIdx + 2 * Sxy])
+									bestTIIdx = temp2didx;						
 								// if IndexHis same and color not the same, compare ColorHis
 								else if (ColorHis_ON)
 									if (ColorHis_synthesis[level][curbin] - ColorHis_exemplar[level][curbin] < ColorHis_synthesis[level][bestbin] - ColorHis_exemplar[level][bestbin]) {
 									bestTIIdx = temp2didx;
 									bestbin = curbin;
-									//countz = 1;
 									}
-								//else if (ColorHis_synthesis[level][curbin] - ColorHis_exemplar[level][curbin] == ColorHis_synthesis[level][bestbin] - ColorHis_exemplar[level][bestbin])
-								//	countz++;
 							}
 						}
 						compareNum++;
@@ -1667,11 +1723,6 @@ bool DoPAR::searchVolume(int level) {
 
 
 			if (minError < INFINITY) {
-				//if (IndexHis_z[level][sparseIdx(level, bestTIIdx)] >(avgIndexHis[level] * 1.5)) {
-				//	bestTIIdx = getRandomNearestIndex(level, IndexHis_z[level]);
-				//	cout << "highIdx.";
-				//}
-
 				nearestWeight_z[level][idx] = 1.0f / minDis;
 				size_idx formerNearestIdx = nearestIdx_z[level][idx];
 				if (formerNearestIdx != bestTIIdx) {
@@ -1686,9 +1737,15 @@ bool DoPAR::searchVolume(int level) {
 					addressbestTIIdx++;							//update IndexHis sparse grid 	
 					isUnchanged = false;
 				}
+
+
+				//if (bestTIIdx<0 || bestTIIdx>=Sxy) {
+				//	printf("nearestIdx_z=%f idx=%d", m_exemplar_z[level][bestTIIdx], bestTIIdx);
+				//	_getch();
+				//}
 			}
 			else {
-				if (!countedYN) cout << "boundary.";
+				if (!countedYN) cout << "bad ";
 				else cout << "infinity.";
 				bestTIIdx = getRandomNearestIndex(level, IndexHis_z[level]);
 				nearestWeight_z[level][idx] = 1.0f / 100;
@@ -1755,6 +1812,8 @@ bool DoPAR::searchVolume(int level) {
 
 					if (!(eposx >= start && eposx < Sx - end && eposy >= start && eposy < Sy - end))
 						continue;
+					//if (!(eposx >= 0 && eposx < Sx && eposy >= 0 && eposy < Sy))
+					//	continue;
 
 					tempTIidx = eposx*Sx + eposy;
 					for (int l = 0; l < COHERENCENUM; ++l) {					//[0,COHERENCENUM]				
@@ -1768,9 +1827,7 @@ bool DoPAR::searchVolume(int level) {
 						curhis = IndexHis_y[level][sparseIdx(level, temp2didx)];
 						tempHisDiff = max(0.0f, curhis - avgIndexHis[level]);
 						IndexHisWeight = 1.0f + factorIndex * tempHisDiff;
-						//IndexHisWeight = 1.0f + tempHisDiff;			//IndexHis needs sparse grid			
 						curError = IndexHisWeight * curDis;
-						//curError = curDis * max(IndexHisWeight, 1.0f / gaussian_pdf(tempHisDiff, pdfdevS[level]));
 						countedYN = true;
 
 						curbin = (int)m_exemplar_y[level][temp2didx];
@@ -1789,10 +1846,8 @@ bool DoPAR::searchVolume(int level) {
 								bestbin = curbin;
 							}
 							else if (curhis == besthis && !FIRSTRUN) {
-								if (curbin == bestbin) {// if IndexHis same and color same, compare PosHis
-									if (PosHis[level][temp2didx + Sxy] < PosHis[level][bestTIIdx + Sxy])
-										bestTIIdx = temp2didx;
-								}
+								if (PosHis[level][temp2didx + Sxy] < PosHis[level][bestTIIdx + Sxy])
+									bestTIIdx = temp2didx;
 								// if IndexHis same and color not the same, compare ColorHis
 								else if (ColorHis_ON)
 									if (ColorHis_synthesis[level][curbin] - ColorHis_exemplar[level][curbin] < ColorHis_synthesis[level][bestbin] - ColorHis_exemplar[level][bestbin]) {
@@ -1808,11 +1863,6 @@ bool DoPAR::searchVolume(int level) {
 			}//for (int u = -start; u <= end; ++u){
 
 			if (minError < INFINITY) {//update NearestIndex, IndexHis, store EuDis
-				//if (IndexHis_y[level][sparseIdx(level, bestTIIdx)] >(avgIndexHis[level] * 1.5)) {
-				//	bestTIIdx = getRandomNearestIndex(level, IndexHis_y[level]);
-				//	cout << "highIdx.";
-				//}
-
 				size_idx formerNearestIdx = nearestIdx_y[level][idx];
 				nearestWeight_y[level][idx] = 1.0f / minDis;
 				if (formerNearestIdx != bestTIIdx) {
@@ -1829,7 +1879,7 @@ bool DoPAR::searchVolume(int level) {
 				}
 			}
 			else {
-				if (!countedYN) cout << "boundary.";
+				if (!countedYN) cout << "bad ";
 				else cout << "infinity.";
 				bestTIIdx = getRandomNearestIndex(level, IndexHis_y[level]);
 				size_idx formerNearestIdx = nearestIdx_y[level][idx];
@@ -1896,12 +1946,13 @@ bool DoPAR::searchVolume(int level) {
 
 					if (!(eposx >= start && eposx < Sx - end && eposy >= start && eposy < Sy - end))
 						continue;
+					//if (!(eposx >= 0 && eposx < Sx && eposy >= 0 && eposy < Sy))
+					//	continue;
 
 					tempTIidx = eposx*Sx + eposy;								//[x][y] idx=x*Sx+y			
 					for (int l = 0; l < COHERENCENUM; ++l) {						//[0,COHERENCENUM]				
 						temp2didx = KCoherence_x[level][tempTIidx][l];
 						int p = 0;
-						//compareNum = compareIdx.size();
 						for (; p < compareNum; ++p) {
 							if (compareIdx[p] == temp2didx)	break;
 						}
@@ -1912,9 +1963,7 @@ bool DoPAR::searchVolume(int level) {
 						curhis = IndexHis_x[level][sparseIdx(level, temp2didx)];
 						tempHisDiff = max(0.0f, curhis - avgIndexHis[level]);
 						IndexHisWeight = 1.0f + factorIndex * tempHisDiff;
-						//IndexHisWeight = 1.0f + tempHisDiff;			//IndexHis needs sparse grid			
 						curError = IndexHisWeight * curDis;
-						//curError = curDis * max(IndexHisWeight, 1.0f / gaussian_pdf(tempHisDiff, pdfdevS[level]));
 						countedYN = true;
 
 						curbin = (int)m_exemplar_x[level][temp2didx];
@@ -1933,10 +1982,8 @@ bool DoPAR::searchVolume(int level) {
 								bestbin = curbin;
 							}
 							else if (curhis == besthis && !FIRSTRUN) {
-								if (curbin == bestbin) {// if IndexHis same and color same, compare PosHis
-									if (PosHis[level][temp2didx] < PosHis[level][bestTIIdx])
-										bestTIIdx = temp2didx;
-								}
+								if (PosHis[level][temp2didx] < PosHis[level][bestTIIdx])
+									bestTIIdx = temp2didx;
 								// if IndexHis same and color not the same, compare ColorHis
 								else if (ColorHis_ON)
 									if (ColorHis_synthesis[level][curbin] - ColorHis_exemplar[level][curbin] < ColorHis_synthesis[level][bestbin] - ColorHis_exemplar[level][bestbin]) {
@@ -1951,12 +1998,7 @@ bool DoPAR::searchVolume(int level) {
 				}//for (int v = -start; v <= end; ++v){
 			}//for (int u = -start; u <= end; ++u){
 
-			if (minError < INFINITY) {//update NearestIndex, IndexHis, store EuDis
-				//if (IndexHis_x[level][sparseIdx(level, bestTIIdx)] >(avgIndexHis[level] *1.5)) {
-				//	bestTIIdx = getRandomNearestIndex(level, IndexHis_x[level]);
-				//	cout << "highIdx.";
-				//}
-					
+			if (minError < INFINITY) {//update NearestIndex, IndexHis, store EuDis					
 				size_idx formerNearestIdx = nearestIdx_x[level][idx];
 				nearestWeight_x[level][idx] = 1.0f / minDis;
 				if (formerNearestIdx != bestTIIdx) {
@@ -1973,8 +2015,8 @@ bool DoPAR::searchVolume(int level) {
 				}
 			}
 			else {
-				if (!countedYN) cout << "boundary.";
-				else cout << "infinity.";
+				if (!countedYN) cout << "bad ";
+				else cout << "infinity ";
 				bestTIIdx = getRandomNearestIndex(level, IndexHis_x[level]);
 				size_idx formerNearestIdx = nearestIdx_x[level][idx];
 				nearestWeight_x[level][idx] = 1.0f / 100;
@@ -2034,8 +2076,33 @@ size_dist DoPAR::getFullDistance(int level, vector<size_color>& exemplar, size_i
 	size_idx Sx = TEXSIZE[level];
 	size_idx tempIdx;
 	size_dist dif;
+	size_idx x = idx2d / Sx, y = idx2d % Sx;
 
-	for (size_idx i = -R; i < R; ++i) {		//[-4,3]
+	if (x< R || x > Sx - R - 1 || y< R || y> Sx - R - 1) {
+		for (size_idx i = -R; i < R; ++i) {		
+			tempIdx = trimIndex(level, x + i)*Sx;
+			for (size_idx j = -R; j < R; ++j) {
+				dif = exemplar[tempIdx + trimIndex(level, y + j)] - cvmGet(dataMat, 0, n++);
+				sum += (dif * dif);
+				
+				//if (tempIdx + trimIndex(level, y + j) > Sx*Sx || tempIdx + trimIndex(level, y + j) < 0) {
+				//	cout << " getfullDis " << tempIdx + trimIndex(level, y + j);
+				//	_getch();
+				//}
+				//if (exemplar[tempIdx + trimIndex(level, y + j)] <0 || exemplar[tempIdx + trimIndex(level, y + j)]> Pore_Upper[level]) {
+				//	printf("exemplar: %f \nx=%d i=%d y=%d j=%d", exemplar[tempIdx + trimIndex(level, y + j)], x, i, y, j);
+				//	_getch();
+				//}
+				//if (cvmGet(dataMat, 0, n) <0 || cvmGet(dataMat, 0, n)> Pore_Upper[level]) {
+				//	printf("dataMat: %f  n=%d", cvmGet(dataMat, 0, n), n);
+				//	_getch();
+				//}
+			}
+		}
+		return (sum < min_dist) ? min_dist : sum;
+	}
+	
+	for (size_idx i = -R; i < R; ++i) {		
 		tempIdx = idx2d + i*Sx;
 		for (size_idx j = -R; j < R; ++j) {
 			dif = exemplar[tempIdx + j] - cvmGet(dataMat, 0, n++);
@@ -2106,18 +2173,11 @@ void DoPAR::optimizeVolume(int level) {
 	const size_idx Size = Sxy * Sz;
 	const size_idx Sxy3 = 3 * Sxy;
 	const size_idx candSize = static_cast<size_idx>(blockSize_ / GRID) * static_cast<size_idx>(blockSize_ / GRID);	//candidate has sparse grid
-	const size_idx start = static_cast<size_idx>(blockSize_ / (2 * GRID)) + 1;		//3	//3	//3	//2
+	const size_idx start = static_cast<size_idx>(blockSize_ / (2 * GRID)) + 1;		
 	const size_idx end = start;					
-	////change to 7*7,5*5 from 8*8,6*6	
-	//size_idx e1 = static_cast<size_idx>(blockSize_ / 2) - 1;						//3	//3	//3	//2
-	//size_idx s1 = -e1;																//-3//-3//-3//-2
-	size_idx s1 = -static_cast<size_idx>(blockSize_ / 2);							//-4//-4//-4//-3
-	size_idx e1 = static_cast<size_idx>((blockSize_ - 1) / 2);					//3	//3	//3	//2
+	size_idx s1 = -static_cast<size_idx>(blockSize_ / 2);							
+	size_idx e1 = static_cast<size_idx>((blockSize_ - 1) / 2);					
 
-	//if (level > 0 && e1>2) {								//reduce average blurring
-	//	s1 += 1;																//3>=-2l>=-4 -> 2>=l>=-1 -> 4*4 -> 7*7 actrual template; odd:
-	//	e1 -= 1;																//2>=-2l>=-3 -> 1>=l>=-1 -> 3*3 -> 5*5
-	//}																			///////////1>=-2l>=-2 -> 1>=l>=0 -> 2*2 -> 3*3	
 	
 #pragma omp parallel for schedule(static)
 	for (size_idx i2 = 0; i2 < Size; ++i2) {
@@ -2166,18 +2226,21 @@ void DoPAR::optimizeVolume(int level) {
 				tempnearestidx = nearestIdx_z[level][tempidx];			
 				tempnearestweight = nearestWeight_z[level][tempidx];									//nearestidx from search step, weight=eudis^-0.6, larger means closer
 
-				tempnearestidx += deltax * Sx + deltay;
+				tempnearestidx = Sx * trimIndex(level, tempnearestidx / Sx + deltax) + trimIndex(level, tempnearestidx%Sx + deltay);
 				tempcolor = m_exemplar_z[level][tempnearestidx];
-
-				inttempcolor = (int)tempcolor;				
 				
+				//if (tempnearestidx > Sxy -1 || tempnearestidx <0) {
+				//	cout << endl << "tempnearestidx=" << tempnearestidx << " tempidx=" << tempidx;
+				//	_getch();
+				//}
+
 				tempPosIdx = tempnearestidx + Sxy * 2;													//PosHis size=3TI!
 				tempHisDiff = max(0.0f, PosHis[level][tempPosIdx] - avgPosHis[level]);
-				//weightp = gaussian_pdf(tempHisDiff, pdfdevO[level]);									//PosHis weighted
 				weightp = 1.0f / (1.0f + tempHisDiff * factorP);
 
-				if (FIRSTRUN && ColorHis_ON) weightc = FLT_MAX;
-				else {
+				weightc = FLT_MAX;
+				if (ColorHis_ON && !FIRSTRUN){
+					inttempcolor = (int)tempcolor;
 					tempColorHisDiff = max(0.0f, 1.0f*(ColorHis_synthesis[level][inttempcolor] - ColorHis_exemplar[level][inttempcolor]));
 					weightc = gaussian_pdf(tempColorHisDiff, pdfdevColor[level]);
 				}
@@ -2189,7 +2252,13 @@ void DoPAR::optimizeVolume(int level) {
 
 				weight = tempnearestweight * minweight;
 				color_acc += weight * tempcolor;			
-				weight_acc += weight;				
+				weight_acc += weight;	
+
+
+				//if (tempcolor > Pore_Upper[level] || tempcolor<0) {
+				//	cout << endl << "tempcolor=" << tempcolor << " neareastIdx=" << nearestIdx_z[level][tempidx] << " tempidx=" << tempidx;
+				//	_getch();
+				//}
 			}
 		}		
 		
@@ -2211,18 +2280,16 @@ void DoPAR::optimizeVolume(int level) {
 				tempnearestidx = nearestIdx_y[level][tempidx];										//nearestidx from search step, weight=eudis^-0.6				
 				tempnearestweight = nearestWeight_y[level][tempidx];
 
-				tempnearestidx += deltax * Sx + deltay;
+				tempnearestidx = Sx * trimIndex(level, tempnearestidx / Sx + deltax) + trimIndex(level, tempnearestidx%Sx + deltay);
 				tempcolor = m_exemplar_y[level][tempnearestidx];
 			
-				inttempcolor = (int)tempcolor;
-
 				tempPosIdx = tempnearestidx + Sxy;													//PosHis size=3TI!
 				tempHisDiff = max(0.0f, PosHis[level][tempPosIdx] - avgPosHis[level]);
-				//weightp = gaussian_pdf(tempHisDiff, pdfdevO[level]);								//PosHis weighted
 				weightp = 1.0f / (1.0f + tempHisDiff * factorP);
 
-				if (FIRSTRUN && ColorHis_ON) weightc = FLT_MAX;
-				else {
+				weightc = FLT_MAX;
+				if (ColorHis_ON && !FIRSTRUN) {
+					inttempcolor = (int)tempcolor;
 					tempColorHisDiff = max(0.0f, 1.0f*(ColorHis_synthesis[level][inttempcolor] - ColorHis_exemplar[level][inttempcolor]));
 					weightc = gaussian_pdf(tempColorHisDiff, pdfdevColor[level]);
 				}
@@ -2256,18 +2323,16 @@ void DoPAR::optimizeVolume(int level) {
 				tempnearestidx = nearestIdx_x[level][tempidx];
 				tempnearestweight = nearestWeight_x[level][tempidx];								//nearestidx from search step, weight=eudis^-0.6
 				
-				tempnearestidx += deltax * Sx + deltay;
+				tempnearestidx = Sx * trimIndex(level, tempnearestidx / Sx + deltax) + trimIndex(level, tempnearestidx%Sx + deltay);
 				tempcolor = m_exemplar_x[level][tempnearestidx];
-				
-				inttempcolor = (int)tempcolor;
-
+						
 				tempPosIdx = tempnearestidx;
 				tempHisDiff = max(0.0f, PosHis[level][tempPosIdx] - avgPosHis[level]);					//PosHis size=3TI
-				//weightp = gaussian_pdf(tempHisDiff, pdfdevO[level]);									//PosHis weighted
 				weightp = 1.0f / (1.0f + tempHisDiff * factorP);
 
-				if (FIRSTRUN && ColorHis_ON) weightc = FLT_MAX;
-				else {
+				weightc = FLT_MAX;
+				if (ColorHis_ON && !FIRSTRUN) {
+					inttempcolor = (int)tempcolor;
 					tempColorHisDiff = max(0.0f, 1.0f*(ColorHis_synthesis[level][inttempcolor] - ColorHis_exemplar[level][inttempcolor]));
 					weightc = gaussian_pdf(tempColorHisDiff, pdfdevColor[level]);
 				}
@@ -2319,6 +2384,12 @@ void DoPAR::optimizeVolume(int level) {
 			isUnchanged_z[level][idx] = false;
 		}
 		else isUnchanged_z[level][idx] = true;
+
+		//if (closestIdx_z < 0 || closestIdx_z >= Sxy) {
+		//	cout << endl << " closestIdx_z=" << closestIdx_z;
+		//	_getch();
+		//}
+
 
 		// Y
 		bestorder = 0;
@@ -2407,7 +2478,7 @@ void DoPAR::optimizeVolume(int level) {
 		addressnewPos++;
 		SelectedPos[level][idx] = newPos;													// update SelectedPos
 				
-		if (!FIRSTRUN && ColorHis_ON) {
+		if (ColorHis_ON && !FIRSTRUN) {
 			size_hiscount& addressfomerColor = ColorHis_synthesis[level][(int)m_volume[level][idx]];	// update ColorHis
 #pragma omp atomic
 			addressfomerColor--;
@@ -2448,18 +2519,6 @@ bool DoPAR::setNearestIndex(int level, vector<size_idx>& nearestIdx, vector<size
 	return false;
 }
 
-// ========= Position Histogram for optimize step ====
-
-//void DoPAR::updatePosHis(int level, vector<size_hiscount>& PosHis, vector<size_idx>& selectedPos, size_idx idx3d, size_idx newPos) {
-//	// update PosHis -- optimize step
-//	// no sparse grid!
-//	size_idx formerPos = selectedPos[idx3d];
-//	if (formerPos < 3 * TEXSIZE[level] * TEXSIZE[level] && formerPos>=0)
-//		if (PosHis[formerPos] > 0)	PosHis[formerPos]--;
-//	
-//	selectedPos[idx3d] = newPos;
-//	PosHis[newPos]++;
-//}
 
 // ========= Color Histogram for optimize step =======
 void DoPAR::initColorHis_exemplar() {

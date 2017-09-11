@@ -138,7 +138,7 @@ private:
 	
 	void init();
 
-	void allocateVectors(int level);
+	void allocateVectors();
 
 	// 2D Exemplar 
 	vector<vector<size_color> >  m_exemplar_x;									//[level][idx2d] = color
@@ -147,8 +147,8 @@ private:
 	bool loadExemplar();
 	void gaussImage(int level, vector<vector<size_color>>& exemplar);
 
-	void equalizeHistogram(vector<size_color>& exemplar, unsigned short max_val);
-	void equalizeHistogram(vector<size_color>& exemplarX, vector<size_color>& exemplarY, vector<size_color>& exemplarZ, unsigned short max_val);
+	//void equalizeHistogram(vector<size_color>& exemplar, unsigned short max_val);
+	void equalizeHistogram(int level, vector<size_color>& exemplarX, vector<size_color>& exemplarY, vector<size_color>& exemplarZ);
 
 	//=============== distance map ===============
 	vector<size_color> Solid_Upper, Pore_Upper;						//Redistribute DMap. Use same Solid_Upper,Pore_Lower for 3TIs and loaded model
