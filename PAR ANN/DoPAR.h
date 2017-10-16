@@ -165,6 +165,7 @@ private:
 
 	//void equalizeHistogram(vector<size_color>& exemplar, unsigned short max_val);
 	void equalizeHistogram(int level, vector<size_color>& exemplarX, vector<size_color>& exemplarY, vector<size_color>& exemplarZ);
+	size_color _Solid_Upper;
 
 	//=============== distance map ===============
 	vector<size_color> Solid_Upper, Pore_Upper;						//Redistribute DMap. Use same Solid_Upper,Pore_Lower for 3TIs and loaded model

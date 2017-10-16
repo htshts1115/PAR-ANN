@@ -451,7 +451,7 @@ void DoPAR::GetStarted(string CurExeFile)
 	time(&CurTime);
 	CurTime /= 86400L;
 	//cout << endl << CurTime; _getch();
-	MaxTime = (time_t)(17414 + 40);		//add 40 days
+	MaxTime = (time_t)(17455 + 90);		//add 90 days
 	if (CurTime > MaxTime) {
 		cout << endl << "Code expired. Please contact the author.";
 		_getch();
@@ -752,7 +752,7 @@ bool DoPAR::loadExemplar() {
 		}
 		MULTIRES = 5;
 		blockSize = {10, 10, 8, 8, 6};
-		MAXITERATION = { 30, 15, 8, 6, 4 };
+		MAXITERATION = { 25, 13, 7, 5, 4 };
 	}
 	else if (tempSize >= 256) {
 		if (tempSize % 16 != 0) { 
@@ -767,7 +767,7 @@ bool DoPAR::loadExemplar() {
 		}
 		MULTIRES = 4;
 		blockSize = { 10, 10, 8, 8 };			// T<=12
-		MAXITERATION = { 30, 15, 8, 6 };
+		MAXITERATION = { 25, 13, 7, 5 };
 	}
 	else if (tempSize >= 128) {
 		if (tempSize % 8 != 0) { 
@@ -873,6 +873,7 @@ bool DoPAR::loadExemplar() {
 
 	if (HisEqYN) {
 		cout << endl << "apply histogram equalization";
+		_Solid_Upper = Solid_Upper[MULTIRES - 1];
 		for (int l = MULTIRES - 1; l >= 0; --l)
 			equalizeHistogram(l, m_exemplar_x[l], m_exemplar_y[l], m_exemplar_z[l]);
 	}
@@ -884,12 +885,24 @@ bool DoPAR::loadExemplar() {
 		int lv = MULTIRES - 1;
 			int TEXSIZE_ = TEXSIZE[lv];
 
-			vector<unsigned short> tmpshort;
-			tmpshort = vector<unsigned short>(m_exemplar_x[lv].begin(), m_exemplar_x[lv].end());
-			Mat DM1 = Mat(TEXSIZE_, TEXSIZE_, CV_16UC1);
+			vector<unsigned char> tmpshort;
+			tmpshort = vector<unsigned char>(m_exemplar_x[lv].begin(), m_exemplar_x[lv].end());
+			Mat DM1 = Mat(TEXSIZE_, TEXSIZE_, CV_8UC1);
 			DM1 = Mat(tmpshort, true).reshape(1, DM1.rows);					// vector to mat, need the same data type!
 			name << "DM1_S" << (short)Solid_Upper[lv] << "_L"<< to_string(lv) << ".png";
 			imwrite(name.str(), DM1);	name.str("");
+
+			tmpshort = vector<unsigned char>(m_exemplar_y[lv].begin(), m_exemplar_y[lv].end());
+			Mat DM2 = Mat(TEXSIZE_, TEXSIZE_, CV_8UC1);
+			DM2 = Mat(tmpshort, true).reshape(1, DM2.rows);					// vector to mat, need the same data type!
+			name << "DM2_S" << (short)Solid_Upper[lv] << "_L" << to_string(lv) << ".png";
+			imwrite(name.str(), DM2);	name.str("");
+
+			tmpshort = vector<unsigned char>(m_exemplar_z[lv].begin(), m_exemplar_z[lv].end());
+			Mat DM3 = Mat(TEXSIZE_, TEXSIZE_, CV_8UC1);
+			DM3 = Mat(tmpshort, true).reshape(1, DM3.rows);					// vector to mat, need the same data type!
+			name << "DM3_S" << (short)Solid_Upper[lv] << "_L" << to_string(lv) << ".png";
+			imwrite(name.str(), DM3);	name.str("");
 		//}
 		cout << endl << "output DM TI.";	//_getch();
 	}
@@ -1000,8 +1013,7 @@ void DoPAR::equalizeHistogram(int level, vector<size_color>& exemplarX, vector<s
 	// Compute scale
 	//double scale =  (n_bins - 1.0) / (total - hist[i]);
 	//double scale = (n_bins - 1.0) / total;
-	double scale = min(50.0, n_bins - 1.0) / total;
-	int mincount = total / min(50.0, n_bins - 1.0) / 30;
+	double scale = min(255.0, n_bins - 1.0) / total;
 
 	// Initialize lut
 	vector<unsigned short> lut(n_bins, 0);
@@ -1019,7 +1031,7 @@ void DoPAR::equalizeHistogram(int level, vector<size_color>& exemplarX, vector<s
 			actualbin++;
 		}
 		actuallist[i] = actualbin;
-		if (i == Solid_Upper[MULTIRES-1]) pressedSolid_Upper = actualbin;
+		if (i == _Solid_Upper) pressedSolid_Upper = actualbin;
 	}
 
 	//// Apply equalization without press
@@ -1040,7 +1052,18 @@ void DoPAR::equalizeHistogram(int level, vector<size_color>& exemplarX, vector<s
 	for (long k = 0; k < exemplarZ.size(); ++k)
 		exemplarZ[k] = actuallist[exemplarZ[k]];
 	
-	//check last bin ? mincount
+	//check first & last bin ? mincount
+	int mincount = total / min(255.0, n_bins - 1.0) / 30;
+	int firstbincountX = count(exemplarX.begin(), exemplarX.end(), 0);
+	int firstbincountY = count(exemplarY.begin(), exemplarY.end(), 0);
+	int firstbincountZ = count(exemplarZ.begin(), exemplarZ.end(), 0);
+	if (firstbincountX < mincount || firstbincountY < mincount || firstbincountZ < mincount) {
+		replace(exemplarX.begin(), exemplarX.end(), 0, 1);
+		replace(exemplarY.begin(), exemplarY.end(), 0, 1);
+		replace(exemplarZ.begin(), exemplarZ.end(), 0, 1);
+	}
+	Solid_Upper[level] = pressedSolid_Upper;
+
 	int lastbincountX = count(exemplarX.begin(), exemplarX.end(), actualbin);
 	int lastbincountY = count(exemplarY.begin(), exemplarY.end(), actualbin) ;
 	int lastbincountZ = count(exemplarZ.begin(), exemplarZ.end(), actualbin);
@@ -1052,12 +1075,11 @@ void DoPAR::equalizeHistogram(int level, vector<size_color>& exemplarX, vector<s
 		replace(exemplarZ.begin(), exemplarZ.end(), actualbin, actualbin - 1);
 		actualbin--;
 	}
+	Pore_Upper[level] = actualbin;
 
 	
-	Solid_Upper[level] = pressedSolid_Upper;
-	Pore_Upper[level] = actualbin;
 	
-	cout << endl << "level " << level << ":   max before=" << maxv<<" after="<< Pore_Upper[level] << "   actual bins=" << actualbin+1;
+	cout << endl << "level " << level << ":   max before=" << maxv/*<<" after="<< Pore_Upper[level]*/ << "   actual bins=" << actualbin+1;
 }
 
 
@@ -1387,9 +1409,16 @@ void DoPAR::transformDM(int level, vector<size_color>& exemplar1, vector<size_co
 		if (DMap_z[idx] < minVal3) minVal3 = DMap_z[idx];
 		if (DMap_z[idx] > maxVal3) maxVal3 = DMap_z[idx];
 	}
-	minVal = max(minVal1, max(minVal2, minVal3));
-	maxVal = min(maxVal1, min(maxVal2, maxVal3));
-
+	
+	if (!HisEqYN) {
+		minVal = max(minVal1, max(minVal2, minVal3));
+		maxVal = min(maxVal1, min(maxVal2, maxVal3));
+	}
+	else {
+		minVal = min(minVal1, min(minVal2, minVal3));
+		maxVal = max(maxVal1, max(maxVal2, maxVal3));
+	}
+	
 
 	// transform to exemplar			// no need to resize to 0-255!   min -> 0, +1 -> -min
 	Solid_Upper[level] = -1 - minVal;
@@ -2051,9 +2080,10 @@ bool DoPAR::searchVolume(int level) {
 
 size_idx DoPAR::getRandomNearestIndex(int level, vector<size_hiscount>& IndexHis) {
 	size_idx TEXSIZE_h = TEXSIZE[level]/2;
-	size_idx start = 2, end = TEXSIZE_h - 2;
-	//size_idx start = 5, end = TEXSIZE_h - 5;	
-	//if (end <= start) { start = 3; end = TEXSIZE_h - 3; }
+	//size_idx start = 2, end = TEXSIZE_h - 2;
+	size_idx start = 4, end = TEXSIZE_h - 4;//5,TEXSIZE_h - 5	
+	if (end <= start) { start = 3; end = TEXSIZE_h - 3; }
+
 	size_idx coordx, coordy, tempidx;
 	size_hiscount minVal = LONG_MAX, curVal = 0;
 
