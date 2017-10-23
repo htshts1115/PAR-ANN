@@ -601,6 +601,10 @@ void DoPAR::init() {
 		omp_set_dynamic(0);     // Explicitly disable dynamic teams
 		omp_set_num_threads(maxthread);
 	}//else use omp_get_num_procs()
+
+	//omp_set_dynamic(0);     // Explicitly disable dynamic teams
+	//omp_set_num_threads(omp_get_num_procs()-1);
+
 	
 	// load TI
 	if (!loadExemplar()) return;
@@ -733,12 +737,12 @@ bool DoPAR::loadExemplar() {
 	//--------------[begin] initial global parameters -------------
 	int tempSize = matyz.cols;
 	if (tempSize < 128) { cout << endl << "TI size < 128, too small!"; _getch(); exit(0); }
-	else if (tempSize > 1024) { cout << endl << "TI size > 1024, too big!"; _getch(); exit(0); }
-	if (tempSize == 1024) {
-		MULTIRES = 6;
-		blockSize = { 10, 10, 8, 8, 8, 6 };
-		MAXITERATION = { 30, 15, 8, 6, 6, 4 };
-	}
+	else if (tempSize > 800) { cout << endl << "TI size > 800, too big!"; _getch(); exit(0); }
+	//if (tempSize == 1024) {
+	//	MULTIRES = 6;
+	//	blockSize = { 10, 10, 8, 8, 8, 6 };
+	//	MAXITERATION = { 30, 15, 8, 6, 6, 4 };
+	//}
 	if (tempSize >= 512) { 
 		if (tempSize % 32 != 0) { 
 			int cropedsize = tempSize / 32 * 32;
@@ -752,7 +756,7 @@ bool DoPAR::loadExemplar() {
 		}
 		MULTIRES = 5;
 		blockSize = {10, 10, 8, 8, 6};
-		MAXITERATION = { 25, 13, 7, 5, 4 };
+		MAXITERATION = { 30, 15, 5, 3, 3 };
 	}
 	else if (tempSize >= 256) {
 		if (tempSize % 16 != 0) { 
@@ -767,7 +771,7 @@ bool DoPAR::loadExemplar() {
 		}
 		MULTIRES = 4;
 		blockSize = { 10, 10, 8, 8 };			// T<=12
-		MAXITERATION = { 25, 13, 7, 5 };
+		MAXITERATION = { 30, 15, 5, 3 };
 	}
 	else if (tempSize >= 128) {
 		if (tempSize % 8 != 0) { 
@@ -782,7 +786,7 @@ bool DoPAR::loadExemplar() {
 		}
 		MULTIRES = 3;
 		blockSize = { 10, 8, 8 };
-		MAXITERATION = { 30, 15, 8};
+		MAXITERATION = { 30, 15, 5};
 	}
 	TEXSIZE.resize(MULTIRES);
 	avgIndexHis.resize(MULTIRES); avgPosHis.resize(MULTIRES);
@@ -884,23 +888,50 @@ bool DoPAR::loadExemplar() {
 		//for (int lv = MULTIRES-1; lv >=0 ; --lv) {
 		int lv = MULTIRES - 1;
 			int TEXSIZE_ = TEXSIZE[lv];
+			Mat DM1, DM2, DM3;
 
-			vector<unsigned char> tmpshort;
-			tmpshort = vector<unsigned char>(m_exemplar_x[lv].begin(), m_exemplar_x[lv].end());
-			Mat DM1 = Mat(TEXSIZE_, TEXSIZE_, CV_8UC1);
-			DM1 = Mat(tmpshort, true).reshape(1, DM1.rows);					// vector to mat, need the same data type!
+			if (HisEqYN) {
+				vector<unsigned char> tmpchar;
+				DM1 = Mat(TEXSIZE_, TEXSIZE_, CV_8UC1); 
+				tmpchar = vector<unsigned char>(m_exemplar_x[lv].begin(), m_exemplar_x[lv].end());
+				DM1 = Mat(tmpchar, true).reshape(1, DM1.rows);// vector to mat, need the same data type!
+			}
+			else {
+				vector<unsigned short> tmpshort;
+				DM1 = Mat(TEXSIZE_, TEXSIZE_, CV_16UC1);
+				tmpshort = vector<unsigned short>(m_exemplar_x[lv].begin(), m_exemplar_x[lv].end());
+				DM1 = Mat(tmpshort, true).reshape(1, DM1.rows);// vector to mat, need the same data type!
+			}						
 			name << "DM1_S" << (short)Solid_Upper[lv] << "_L"<< to_string(lv) << ".png";
 			imwrite(name.str(), DM1);	name.str("");
 
-			tmpshort = vector<unsigned char>(m_exemplar_y[lv].begin(), m_exemplar_y[lv].end());
-			Mat DM2 = Mat(TEXSIZE_, TEXSIZE_, CV_8UC1);
-			DM2 = Mat(tmpshort, true).reshape(1, DM2.rows);					// vector to mat, need the same data type!
+			if (HisEqYN) {
+				vector<unsigned char> tmpchar;
+				DM2 = Mat(TEXSIZE_, TEXSIZE_, CV_8UC1);
+				tmpchar = vector<unsigned char>(m_exemplar_y[lv].begin(), m_exemplar_y[lv].end());
+				DM2 = Mat(tmpchar, true).reshape(1, DM2.rows);
+			}
+			else {
+				vector<unsigned short> tmpshort;
+				DM2 = Mat(TEXSIZE_, TEXSIZE_, CV_16UC1);
+				tmpshort = vector<unsigned short>(m_exemplar_y[lv].begin(), m_exemplar_y[lv].end());
+				DM2 = Mat(tmpshort, true).reshape(1, DM2.rows);
+			}
 			name << "DM2_S" << (short)Solid_Upper[lv] << "_L" << to_string(lv) << ".png";
 			imwrite(name.str(), DM2);	name.str("");
 
-			tmpshort = vector<unsigned char>(m_exemplar_z[lv].begin(), m_exemplar_z[lv].end());
-			Mat DM3 = Mat(TEXSIZE_, TEXSIZE_, CV_8UC1);
-			DM3 = Mat(tmpshort, true).reshape(1, DM3.rows);					// vector to mat, need the same data type!
+			if (HisEqYN) {
+				vector<unsigned char> tmpchar;
+				DM3 = Mat(TEXSIZE_, TEXSIZE_, CV_8UC1);
+				tmpchar = vector<unsigned char>(m_exemplar_z[lv].begin(), m_exemplar_z[lv].end());
+				DM3 = Mat(tmpchar, true).reshape(1, DM3.rows);
+			}
+			else {
+				vector<unsigned short> tmpshort;
+				DM3 = Mat(TEXSIZE_, TEXSIZE_, CV_16UC1);
+				tmpshort = vector<unsigned short>(m_exemplar_z[lv].begin(), m_exemplar_z[lv].end());
+				DM3 = Mat(tmpshort, true).reshape(1, DM3.rows);
+			}
 			name << "DM3_S" << (short)Solid_Upper[lv] << "_L" << to_string(lv) << ".png";
 			imwrite(name.str(), DM3);	name.str("");
 		//}
@@ -1642,8 +1673,8 @@ bool DoPAR::searchVolume(int level) {
 	const size_idx end = static_cast<size_idx>((blockSize_-1) / 2);			//4	//3	//3	//2
 	size_idx cstart(start), cend(end);
 	if (level > 0 && end>2) {//reduce the candidates of KCoherence. reduce computation. But the template size is not reduced in getFullDistance()
-		cstart -= 1;														//4	//3	//3	//3
-		cend -= 1;															//3	//2	//2	//2
+		cstart -= 1;														//5	//3	//3	//3
+		cend -= 1;															//4	//2	//2	//2
 	}
 
 	bool isUnchanged = true;	
@@ -2081,8 +2112,8 @@ bool DoPAR::searchVolume(int level) {
 size_idx DoPAR::getRandomNearestIndex(int level, vector<size_hiscount>& IndexHis) {
 	size_idx TEXSIZE_h = TEXSIZE[level]/2;
 	//size_idx start = 2, end = TEXSIZE_h - 2;
-	size_idx start = 4, end = TEXSIZE_h - 4;//5,TEXSIZE_h - 5	
-	if (end <= start) { start = 3; end = TEXSIZE_h - 3; }
+	size_idx start = 3, end = TEXSIZE_h - 3;//5,TEXSIZE_h - 5	
+	//if (end <= start) { start = 3; end = TEXSIZE_h - 3; }
 
 	size_idx coordx, coordy, tempidx;
 	size_hiscount minVal = LONG_MAX, curVal = 0;
@@ -2116,25 +2147,12 @@ size_dist DoPAR::getFullDistance(int level, vector<size_color>& exemplar, size_i
 	size_dist dif;
 	size_idx x = idx2d / Sx, y = idx2d % Sx;
 
-	if (x< R || x > Sx - R - 1 || y< R || y> Sx - R - 1) {
+	if (x< R || x > Sx - R - 1 || y< R || y> Sx - R - 1) {//near boundary
 		for (size_idx i = -R; i < R; ++i) {		
 			tempIdx = trimIndex(level, x + i)*Sx;
 			for (size_idx j = -R; j < R; ++j) {
 				dif = exemplar[tempIdx + trimIndex(level, y + j)] - cvmGet(dataMat, 0, n++);
 				sum += (dif * dif);
-				
-				//if (tempIdx + trimIndex(level, y + j) > Sx*Sx || tempIdx + trimIndex(level, y + j) < 0) {
-				//	cout << " getfullDis " << tempIdx + trimIndex(level, y + j);
-				//	_getch();
-				//}
-				//if (exemplar[tempIdx + trimIndex(level, y + j)] <0 || exemplar[tempIdx + trimIndex(level, y + j)]> Pore_Upper[level]) {
-				//	printf("exemplar: %f \nx=%d i=%d y=%d j=%d", exemplar[tempIdx + trimIndex(level, y + j)], x, i, y, j);
-				//	_getch();
-				//}
-				//if (cvmGet(dataMat, 0, n) <0 || cvmGet(dataMat, 0, n)> Pore_Upper[level]) {
-				//	printf("dataMat: %f  n=%d", cvmGet(dataMat, 0, n), n);
-				//	_getch();
-				//}
 			}
 		}
 		return (sum < min_dist) ? min_dist : sum;
