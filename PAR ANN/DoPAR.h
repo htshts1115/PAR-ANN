@@ -163,6 +163,8 @@ private:
 	bool loadExemplar();
 	void gaussImage(int level, vector<vector<size_color>>& exemplar);
 
+	void testPCA();		//compare PCA TI
+
 	//void equalizeHistogram(vector<size_color>& exemplar, unsigned short max_val);
 	void equalizeHistogram(int level, vector<size_color>& exemplarX, vector<size_color>& exemplarY, vector<size_color>& exemplarZ);
 	size_color _Solid_Upper;
