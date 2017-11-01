@@ -5,8 +5,7 @@
 #include "DoPAR.h"
 
 int main(int argc, const char* argv[])
-{	
-
+{		
 	string CurWorkExeFile = argv[0];
 
 	DoPAR DoItNow;
@@ -18,6 +17,14 @@ int main(int argc, const char* argv[])
 
 	return 0;
 }
+
+//string parv = "soilcrack_PCTOSIM_histeq.raw";
+//string tempoutputformat;
+//auto idx = parv.rfind('.');
+//if (idx != std::string::npos) tempoutputformat = parv.substr(idx);
+//if (tempoutputformat == ".raw")	cout << tempoutputformat;
+//_getch();
+
 //t = omp_get_wtime();
 //cout << endl << omp_get_num_procs();
 //vector<int> a(1000, 1);

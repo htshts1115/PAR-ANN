@@ -54,7 +54,7 @@ private:
 	vector<size_idx> TEXSIZE;							// size of input exemplar
 	vector<int> MAXITERATION;							// max iteration time	
 	
-	int COHERENCENUM = 11;								// K-coherence (9) 11
+	int COHERENCENUM = 11;								// K-coherence 11
 	bool useRandomSeed;									// Use random seed or fixed (0) for test (false)
 	
 	const size_idx GRID = 2;							// sparse grid
@@ -157,6 +157,7 @@ private:
 	void allocateVectors();
 
 	// 2D Exemplar 
+	bool SIM2D_YN = false;											//2d reconstruction
 	vector<vector<size_color> >  m_exemplar_x;									//[level][idx2d] = color
 	vector<vector<size_color> >  m_exemplar_y;
 	vector<vector<size_color> >  m_exemplar_z;
