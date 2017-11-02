@@ -53,6 +53,7 @@ private:
 	vector<int> blockSize;								// template size
 	vector<size_idx> TEXSIZE;							// size of input exemplar
 	vector<int> MAXITERATION;							// max iteration time	
+	int NumRealization;
 	
 	int COHERENCENUM = 11;								// K-coherence 11
 	bool useRandomSeed;									// Use random seed or fixed (0) for test (false)
@@ -198,6 +199,7 @@ private:
 
 	//release data
 	void cleardata(int level);
+	void cleardata();
 
 	// =========== K-coherence search =============
 	vector<vector<vector<size_idx>>> KCoherence_x, KCoherence_y, KCoherence_z;		//[level][idx2d][k] = TIindex2d

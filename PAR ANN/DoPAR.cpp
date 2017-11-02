@@ -213,15 +213,15 @@ void DoPAR::ReadRunPar(string CurExeFile)
 	vector<string> ParV;
 	GetNextRowParameters(Row, ResLines, ParV);
 	if (ParV.size() > 0) {
-		if (atoi(ParV[0].c_str()) == 0) useRandomSeed = false;
-		else useRandomSeed = true;
+		/*if (atoi(ParV[0].c_str()) == 0) useRandomSeed = false;
+		else */useRandomSeed = true;
+		/*if (ParV.size() > 1)*/ factorIndex = 1.0;
+		/*if (ParV.size() > 2)*/ factorPos = 1.0;
 
-		if (ParV.size() > 1) factorIndex = atoi(ParV[1].c_str());
-		if (ParV.size() > 2) factorPos = atoi(ParV[2].c_str());
-		if (ParV.size() > 3) { if (atoi(ParV[3].c_str()) == 0) HisEqYN = false; else HisEqYN = true; }
-		if (ParV.size() > 4) { if (atoi(ParV[4].c_str()) == 0) DMtransformYN = false; else DMtransformYN = true; }
-		if (ParV.size() > 5) { if (atoi(ParV[5].c_str()) == 0) GenerateDMTI = false; else GenerateDMTI = true; }
-		if (ParV.size() > 6) { if (atoi(ParV[6].c_str()) == 0) PrintHisYN = false; else PrintHisYN = true; }	
+		if (ParV.size() > 0) { if (atoi(ParV[0].c_str()) == 0) HisEqYN = false; else HisEqYN = true; }
+		if (ParV.size() > 1) { if (atoi(ParV[1].c_str()) == 0) DMtransformYN = false; else DMtransformYN = true; }
+		if (ParV.size() > 2) { if (atoi(ParV[2].c_str()) == 0) GenerateDMTI = false; else GenerateDMTI = true; }
+		if (ParV.size() > 3) { if (atoi(ParV[3].c_str()) == 0) PrintHisYN = false; else PrintHisYN = true; }
 	}
 	if (useRandomSeed) {
 		cout << endl << "use Random Seed";
@@ -235,6 +235,11 @@ void DoPAR::ReadRunPar(string CurExeFile)
 	}
 	probabilitydistribution = uniform_real_distribution<double>(0.0, 1.0);
 
+	///////////////////////// Number of realizations
+	GetNextRowParameters(++Row, ResLines, ParV);
+	if (ParV.size() > 0) {
+		if (ParV.size() > 0) NumRealization = atoi(ParV[0].c_str());
+	}
 
 	///////////////////////// Working directory
 	workpath = ResLines[++Row];
@@ -532,52 +537,62 @@ void DoPAR::DoANNOptimization() {
 	init();
 
 	time_t StartTime;	time(&StartTime);
-	unsigned long t1, t2, t3;
-	for (int curlevel = 0; curlevel < MULTIRES; curlevel++) {
-		cout << endl << "=============level: " << curlevel << "===============";		
-		
-		initPermutation(curlevel);
-		for (int loop = 0; loop < MAXITERATION[curlevel]; loop++) {
-			shuffle(m_permutation.begin(), m_permutation.end(), mersennetwistergenerator);
-			if (loop % (MAXITERATION[curlevel] / 2) == 0)
-				cout << endl << "iteration: " << loop;						
-			if (curlevel == 0 && loop == 0) searchVolume(curlevel);			//!!the first run on level0 should be started by search	
-			//if (curlevel == 0 && loop == 0) searchVolume_nosparsed(curlevel);			//!!the first run on level0 should be started by search	
+	unsigned long t1, t2, t3;	
 
-			t1 = GetTickCount();
-			optimizeVolume(curlevel);
-			//optimizeVolume_nosparsed(curlevel);
-			t2 = GetTickCount();
-			if (loop % (MAXITERATION[curlevel] / 2) == 0)
-				cout << endl << "optmize: " << (t2 - t1) / 1000.0 << " s";
-	
-			if (curlevel == MULTIRES - 1 && loop == MAXITERATION[curlevel] - 1) break;	//last search step is not needed.
-			if (searchVolume(curlevel)) {
-			//if (searchVolume_nosparsed(curlevel)){
-				cout << endl << "converged, skip to next level.";
-				break;
-			}
-			t3 = GetTickCount();
-			if (loop % (MAXITERATION[curlevel] / 2) == 0)
-				cout << endl << "search: " << (t3 - t2) / 1000.0 << " s";
-		}	
-		if (curlevel == MULTIRES - 1 || TEXSIZE[curlevel] >= 256) {// ouput model & histogram
-			outputmodel(curlevel);
-			if (PrintHisYN) writeHistogram(curlevel);
+	for (int numsim = 0; numsim < NumRealization; ++numsim) {
+		cout << endl << "Realization :  " << numsim+1;
+		if (numsim > 0) {
+			allocateVectors();
+			InitRandomVolume(0);
 		}
 
-		if (curlevel < MULTIRES - 1) {// level up
-			//allocateVectors(curlevel+1);
-			upsampleVolume(curlevel);	
-			//upsampleVolume_nosparsed(curlevel);
-			cleardata(curlevel);
+		for (int curlevel = 0; curlevel < MULTIRES; curlevel++) {
+			cout << endl << "=============level: " << curlevel << "===============";
+
 			FIRSTRUN = true;
+			initPermutation(curlevel);
+			for (int loop = 0; loop < MAXITERATION[curlevel]; loop++) {
+				shuffle(m_permutation.begin(), m_permutation.end(), mersennetwistergenerator);
+				if (loop % (MAXITERATION[curlevel] / 2) == 0)
+					cout << endl << "iteration: " << loop;
+				if (curlevel == 0 && loop == 0) searchVolume(curlevel);			//!!the first run on level0 should be started by search	
+																				//if (curlevel == 0 && loop == 0) searchVolume_nosparsed(curlevel);			//!!the first run on level0 should be started by search	
+
+				t1 = GetTickCount();
+				optimizeVolume(curlevel);
+				//optimizeVolume_nosparsed(curlevel);
+				t2 = GetTickCount();
+				if (loop % (MAXITERATION[curlevel] / 2) == 0)
+					cout << endl << "optmize: " << (t2 - t1) / 1000.0 << " s";
+
+				if (curlevel == MULTIRES - 1 && loop == MAXITERATION[curlevel] - 1) break;	//last search step is not needed.
+				if (searchVolume(curlevel)) {
+					//if (searchVolume_nosparsed(curlevel)){
+					cout << endl << "converged, skip to next level.";
+					break;
+				}
+				t3 = GetTickCount();
+				if (loop % (MAXITERATION[curlevel] / 2) == 0)
+					cout << endl << "search: " << (t3 - t2) / 1000.0 << " s";
+			}
+			if (curlevel == MULTIRES - 1 || TEXSIZE[curlevel] >= 256) {// ouput model & histogram
+				outputmodel(curlevel);
+				if (PrintHisYN) writeHistogram(curlevel);
+			}
+
+			if (curlevel < MULTIRES - 1) {// level up
+				upsampleVolume(curlevel);
+				//upsampleVolume_nosparsed(curlevel);
+				//cleardata(curlevel);
+				FIRSTRUN = true;
+			}
 		}
 	}
 
 	time_t NewTime;		time(&NewTime);
 	cout << endl << "Total reconstruction time: " << unsigned long(NewTime - StartTime) << " s (" << unsigned long(NewTime - StartTime)/60 <<" min)";
-	cleardata(MULTIRES-1);
+	//cleardata(MULTIRES-1);
+	cleardata();
 }
 
 void DoPAR::allocateVectors() {
@@ -596,15 +611,15 @@ void DoPAR::allocateVectors() {
 		size_idx S3d_ = S2d_*TEXSIZE[level];
 		if (SIM2D_YN) S3d_ = S2d_;
 
-		isUnchanged_x[level].resize(S3d_, false);		isUnchanged_y[level].resize(S3d_, false);		isUnchanged_z[level].resize(S3d_, false);
-		nearestIdx_x[level].resize(S3d_, 205000);		nearestIdx_y[level].resize(S3d_, 205000);		nearestIdx_z[level].resize(S3d_, 205000);
-		nearestWeight_x[level].resize(S3d_, min_dist);	nearestWeight_y[level].resize(S3d_, min_dist);	nearestWeight_z[level].resize(S3d_, min_dist);
-		Origin_x[level].resize(S3d_, 205000);			Origin_y[level].resize(S3d_, 205000);			Origin_z[level].resize(S3d_, 205000);
+		isUnchanged_x[level].assign(S3d_, false);		isUnchanged_y[level].assign(S3d_, false);		isUnchanged_z[level].assign(S3d_, false);
+		nearestIdx_x[level].assign(S3d_, 205000);		nearestIdx_y[level].assign(S3d_, 205000);		nearestIdx_z[level].assign(S3d_, 205000);
+		nearestWeight_x[level].assign(S3d_, min_dist);	nearestWeight_y[level].assign(S3d_, min_dist);	nearestWeight_z[level].assign(S3d_, min_dist);
+		Origin_x[level].assign(S3d_, 205000);			Origin_y[level].assign(S3d_, 205000);			Origin_z[level].assign(S3d_, 205000);
 		//!PosHis size=3*TI
-		SelectedPos[level].resize(S3d_, 615000);
-		PosHis[level].resize(S2d_ * 3, 0);
+		SelectedPos[level].assign(S3d_, 615000);
+		PosHis[level].assign(S2d_ * 3, 0);
 		//!sparse grid IndexHis
-		IndexHis_x[level].resize(S2d_ / 4, 0);		IndexHis_y[level].resize(S2d_ / 4, 0);		IndexHis_z[level].resize(S2d_ / 4, 0);
+		IndexHis_x[level].assign(S2d_ / 4, 0);		IndexHis_y[level].assign(S2d_ / 4, 0);		IndexHis_z[level].assign(S2d_ / 4, 0);
 	}
 }
 
@@ -613,7 +628,6 @@ void DoPAR::init() {
 	cout<<endl<<"Select maximum threads for CPU parallelization, no more than "<< omp_get_num_procs()<<endl;
 	int maxthread;
 	cin >> maxthread;
-
 	//omp_set_dynamic(0);     // Explicitly disable dynamic teams
 	//omp_set_num_threads(omp_get_num_procs()-1);
 
@@ -622,7 +636,6 @@ void DoPAR::init() {
 	if (!loadExemplar()) return;
 
 	// allocate memory for all global vectors
-	//allocateVectors(0);
 	allocateVectors();
 
 	// load Model
@@ -737,6 +750,38 @@ void DoPAR::cleardata(int level) {
 		m_permutation.clear(); 
 		m_permutation.shrink_to_fit(); 
 	}
+}
+void DoPAR::cleardata() {
+	for (int level = 0; level < MULTIRES - 1; ++level) {
+		m_volume[level].clear();
+		m_exemplar_x[level].clear();	m_exemplar_y[level].clear();	m_exemplar_z[level].clear();
+		KCoherence_x[level].clear();	KCoherence_y[level].clear();	KCoherence_z[level].clear();
+		isUnchanged_x[level].clear();	isUnchanged_y[level].clear();	isUnchanged_z[level].clear();
+		nearestIdx_x[level].clear();	nearestIdx_y[level].clear();	nearestIdx_z[level].clear();
+		nearestWeight_x[level].clear(); nearestWeight_y[level].clear(); nearestWeight_z[level].clear();
+		Origin_x[level].clear();		Origin_y[level].clear();		Origin_z[level].clear();
+		IndexHis_x[level].clear();		IndexHis_y[level].clear();		IndexHis_z[level].clear();
+		PosHis[level].clear();
+		SelectedPos[level].clear();
+
+		m_volume[level].shrink_to_fit();
+		m_exemplar_x[level].shrink_to_fit();	m_exemplar_y[level].shrink_to_fit();	m_exemplar_z[level].shrink_to_fit();
+		KCoherence_x[level].shrink_to_fit();	KCoherence_y[level].shrink_to_fit();	KCoherence_z[level].shrink_to_fit();
+		isUnchanged_x[level].shrink_to_fit();
+		isUnchanged_y[level].shrink_to_fit();
+		isUnchanged_z[level].shrink_to_fit();
+		nearestIdx_x[level].shrink_to_fit();
+		nearestIdx_y[level].shrink_to_fit();
+		nearestIdx_z[level].shrink_to_fit();
+		nearestWeight_x[level].shrink_to_fit();	nearestWeight_y[level].shrink_to_fit();	nearestWeight_z[level].shrink_to_fit();
+		Origin_x[level].shrink_to_fit();		Origin_y[level].shrink_to_fit();		Origin_z[level].shrink_to_fit();
+		IndexHis_x[level].shrink_to_fit();		IndexHis_y[level].shrink_to_fit();		IndexHis_z[level].shrink_to_fit();
+		PosHis[level].shrink_to_fit();
+		SelectedPos[level].shrink_to_fit();
+	}
+
+	m_permutation.clear();
+	m_permutation.shrink_to_fit();
 }
 
 // load 2D Exemplar, initialize multi-level!
@@ -1685,10 +1730,17 @@ void DoPAR::outputmodel(int level) {
 
 	if (SIM2D_YN) {
 		tempoutputfilename = outputfilename.substr(0, outputfilename.find('.')) + "_Size" + to_string(TEXSIZE[level]) + ".png";
+		
+		int i(1);
+		string nonrepeatFPName = tempoutputfilename;
+		while (fileExists(nonrepeatFPName) == true) {
+			nonrepeatFPName = tempoutputfilename.substr(0, tempoutputfilename.find('.')) + "_" + to_string(i) + ".png";
+			i++;
+		}
 
 		Mat tempM = Mat(TEXSIZE[level], TEXSIZE[level], CV_8UC1);
 		tempM = Mat(tempUchar, true).reshape(1, tempM.rows);						
-		imwrite(tempoutputfilename, tempM);
+		imwrite(nonrepeatFPName, tempM);
 	}
 	else {
 		tempoutputfilename = outputfilename.substr(0, outputfilename.find('.')) + "_Size" + to_string(TEXSIZE[level]) + ".RAW";

@@ -1,27 +1,32 @@
 /* &&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&
-/* &&&&&&&&&       22 03 17   PAR ANN             &&&&&&
+/* &&&&&&&&&       30 10 17   PAR KC              &&&&&&
 /* &&&&&&&&&       Tianshen Huang                 &&&&&&
 /* &&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&
-/* Use Random seed or fixed seed (0:fixed seed, else:random seed)
 /*=============================================
-0
+/* (1) Apply Histogram Equalization or not (default:1)	
+/* (2) Apply DistanceMap transformation or not (default:1)	
+/* (3) Print DistanceMap TI or not (0:false, 1:true)	
+/* (4) Print Histogram or not (0:false, 1:true)	
+/*=============================================
+0, 0, 0, 0
+/*=============================================
+/* Number of realizations (default:1, dont set too many for 3D reconstruction)
+/*=============================================
+5
 /*=============================================
 /* Specify working directory (e.g. d:\test\)
 /*=============================================
-//C:\Users\Tianshen Huang\Documents\PRM\PAR\PAR ANN\x64\Release\Two-scale-B\TIs
-//C:\Users\Tianshen Huang\Documents\PRM\PAR\PAR ANN\x64\Release\Berea512\TI
-C:\Users\Tianshen Huang\Documents\PRM\PAR\PAR ANN\x64\Release\Berea_300-400\TI
-//C:\Users\Tianshen Huang\Documents\PRM\PAR\PAR ANN\x64\Release\CrossScale\TIs
-//C:\Users\Tianshen Huang\Documents\PRM\PAR\PAR ANN\x64\Release\TwoScale512
-//C:\Users\Tianshen Huang\Documents\PRM\PAR\PAR ANN\x64\Release\Anderson\TIs
+E:\Tests_results\paper\TIs
 /*=============================================
 /* Specify training images in YZ, ZX and XY-plane
+//exemplar_x --> YZ, exemplar_y --> ZX, exemplar_z --> XY
+//using imagej, YZ slice is XY, ememplar_x
+//ZX slice can be attained by: 1. reslice top + flip virtical 2. then rotate 90 degrees left
+//XY slice is done by: reslice left
 /*=============================================
-//TwoScaleB_256_YZ2.png, TwoScaleB_256_ZX2.png, TwoScaleB_256_XY2.png
-Berea_256_YZ111.png, Berea_256_ZX112.png, Berea_256_XY117.png
-//MaMiPores_256_YZ128.png, MaMiPores_256_ZX128.png, MaMiPores_256_XY128.png
-//TwoScale512.png, TwoScale512_swapXY.png, TwoScale512.png
+soilcrack.png, soilcrack.png, soilcrack.png
 /*=============================================
-/* Specify 3D model 
+/* Specify output model 
+/* if format is ".png", then output 2D reconstruction based on X TI(YZ)
 /*=============================================
-Berea_111217.raw
+soilcrack.png
