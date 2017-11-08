@@ -55,7 +55,7 @@ private:
 	vector<int> MAXITERATION;							// max iteration time	
 	int NumRealization;
 	
-	int COHERENCENUM = 11;								// K-coherence 11
+	int COHERENCENUM = 13;								// K-coherence 11
 	bool useRandomSeed;									// Use random seed or fixed (0) for test (false)
 	
 	const size_idx GRID = 2;							// sparse grid
@@ -66,7 +66,7 @@ private:
 	bool GenerateDMTI = false;							// generate DM transformed TI
 	bool PrintHisYN = false;							// generate Histogram
 
-	bool testDISCRETE = true;
+	bool testNoDiscrete = true;
 
 	bool ColorHis_ON = false;
 	vector<size_dist> avgIndexHis;						// default average value of IndexHis
