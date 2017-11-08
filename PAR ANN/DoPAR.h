@@ -59,22 +59,21 @@ private:
 	bool useRandomSeed;									// Use random seed or fixed (0) for test (false)
 	
 	const size_idx GRID = 2;							// sparse grid
-	const size_dist min_dist = 0.1f;
-	const bool DISTANCEMAP_ON = true;					// convert to distance map model
-	const bool ColorHis_ON = false;			
+	const size_dist min_dist = 0.1f;	
 	
-	bool HisEqYN = true;								// apply histogram equalization
-	bool DMtransformYN = true;							// use DM transformation
+	bool HisEqYN = false;								// apply histogram equalization
+	bool DMtransformYN = false;							// use DM transformation
 	bool GenerateDMTI = false;							// generate DM transformed TI
 	bool PrintHisYN = false;							// generate Histogram
 
+	bool testDISCRETE = true;
+
+	bool ColorHis_ON = false;
 	vector<size_dist> avgIndexHis;						// default average value of IndexHis
 	vector<size_dist> avgPosHis;						// default average value of PosHis
-	vector<size_dist> pdfdevO;							// gaussian distribution factor for optimize step
-	vector<size_dist> pdfdevColor;						// gaussian distribution factor for colorHis
 	size_dist factorIndex;
 	size_dist factorPos;
-	size_dist factorC = 1;
+	vector<size_dist> factorC;
 
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -241,7 +240,7 @@ private:
 	void writeHistogram(int level);
 
 	//============ Color Histogram ===============
-	int ColorHis_BinNum;
+	int ColorHis_BinNum = 256;
 	vector<vector<size_hiscount>> ColorHis_exemplar;								//[level][BinNum], BinNum is the same for all level
 	vector<vector<size_hiscount>> ColorHis_synthesis;
 

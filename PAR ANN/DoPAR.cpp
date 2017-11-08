@@ -281,12 +281,23 @@ void DoPAR::ReadRunPar(string CurExeFile)
 		if (tempoutputformat == ".png") {
 			cout << endl << "2D simulation ON, just use the first TI.";
 			SIM2D_YN = true;
+			COHERENCENUM = 21;			// to approximate ANN search
+
+			cout << endl;
+			char type;
+			do {
+				cout << "Enable discrete solver? [y/n] (default y)";
+				cin >> type;
+			} while (!cin.fail() && type != 'y' && type != 'n');
+			if (type == 'y') testDISCRETE = false;
+			else testDISCRETE = true;
 		}
 		
 		tempoutputfilename = ParV[0].substr(0, ParV[0].rfind('.') == string::npos ? ParV[0].length() : ParV[0].rfind('.'));
 	}
-	parametername = /*"i" + to_string((int)factorIndex) + "p" + to_string((int)factorPos) + */"Eq" + to_string((int)HisEqYN) + "DM" + to_string((int)DMtransformYN);
-	outputfilename = tempoutputfilename + "_" + parametername + tempoutputformat;
+	parametername = /*"i" + to_string((int)factorIndex) + "p" + to_string((int)factorPos) + */ "_Eq" + to_string((int)HisEqYN) + "DM" + to_string((int)DMtransformYN);
+	if (SIM2D_YN) parametername = "";
+	outputfilename = tempoutputfilename + parametername + tempoutputformat;
 }
 
 bool DoPAR::ReadTxtFiles(const string PFName, vector<string>& ResLines)
@@ -574,12 +585,23 @@ void DoPAR::DoANNOptimization() {
 				t3 = GetTickCount();
 				if (loop % (MAXITERATION[curlevel] / 2) == 0)
 					cout << endl << "search: " << (t3 - t2) / 1000.0 << " s";
+
+				if (SIM2D_YN && curlevel >= MULTIRES-2) {		// output for 2D tests
+					if (curlevel == MULTIRES - 2 && loop % 4 == 0) {
+						outputmodel(curlevel);
+						cout << "output every 4 iteration..  ";
+					}
+					else if (curlevel == MULTIRES - 1 && loop % 2 == 0) {
+						outputmodel(curlevel);
+						cout << "output every 2 iteration..  ";
+					}
+				}
 			}
+
 			if (curlevel == MULTIRES - 1 || TEXSIZE[curlevel] >= 256) {// ouput model & histogram
 				outputmodel(curlevel);
 				if (PrintHisYN) writeHistogram(curlevel);
 			}
-
 			if (curlevel < MULTIRES - 1) {// level up
 				upsampleVolume(curlevel);
 				//upsampleVolume_nosparsed(curlevel);
@@ -624,10 +646,11 @@ void DoPAR::allocateVectors() {
 }
 
 void DoPAR::init() {
-	cout << endl <<endl;
-	cout<<endl<<"Select maximum threads for CPU parallelization, no more than "<< omp_get_num_procs()<<endl;
-	int maxthread;
-	cin >> maxthread;
+	int maxthread = 1;
+	if (!SIM2D_YN) {
+		cout << endl << "Select maximum threads for CPU parallelization, no more than " << omp_get_num_procs() << endl;
+		cin >> maxthread;
+	}
 	//omp_set_dynamic(0);     // Explicitly disable dynamic teams
 	//omp_set_num_threads(omp_get_num_procs()-1);
 
@@ -649,8 +672,21 @@ void DoPAR::init() {
 		avgPosHis[i] = floor((TEXSIZE[i] * TEXSIZE[i] * TEXSIZE[i]) / ((TEXSIZE[i] - 2)*(TEXSIZE[i] - 2)) / 3.0);
 		if (SIM2D_YN) avgPosHis[i] = ceil((TEXSIZE[i] * TEXSIZE[i]) / ((TEXSIZE[i] - 2)*(TEXSIZE[i] - 2)));
 		avgPosHis[i] -= 1;
-		pdfdevO[i] = (avgPosHis[i]+1) * 1.0/3.0/factorPos;
-		factorC = 1.0 / 3.0 / factorC;
+	}
+	if (SIM2D_YN) {
+		cout << endl;
+		char type;
+		do {
+			cout << "Enable Index/Pos Histogram? [y/n] (default y)";
+			cin >> type;
+		} while (!cin.fail() && type != 'y' && type != 'n');
+		if (type == 'n') {						// minimum influence of Index/PosHis
+			factorIndex = 0;
+			factorPos = 0;
+			ColorHis_ON = true;
+			factorC.resize(MULTIRES);
+			for (int l = 0; l < MULTIRES; l++)	factorC[l] = 1.0*ColorHis_BinNum / (TEXSIZE[l] * TEXSIZE[l]);
+		}
 	}
 
 	if (ColorHis_ON) initColorHis_exemplar();
@@ -813,7 +849,7 @@ bool DoPAR::loadExemplar() {
 
 	//--------------[begin] initial global parameters -------------
 	int tempSize = matyz.cols;
-	if (tempSize < 128) { cout << endl << "TI size < 128, too small!"; _getch(); exit(0); }
+	if (tempSize < 40) { cout << endl << "TI size < 40, too small!"; _getch(); exit(0); }
 	else if (tempSize > 832) { cout << endl << "TI size > 832, too big!"; _getch(); exit(0); }
 	//if (tempSize == 1024) {
 	//	MULTIRES = 6;
@@ -832,10 +868,10 @@ bool DoPAR::loadExemplar() {
 			cout << endl << "TIs are croped to "<< cropedsize <<" to fit multi-grid";
 		}
 		MULTIRES = 5;
-		blockSize = {12, 10, 8, 8, 6};
+		blockSize = {10, 10, 8, 8, 6};
 		MAXITERATION = {25, 15, 4, 4, 3 };
 	}
-	else if (tempSize >= 256) {
+	else if (tempSize >= 200) {
 		if (tempSize % 16 != 0) { 
 			int cropedsize = tempSize / 16 * 16;
 			Mat cropedMatyz = matyz(Rect(0, 0, cropedsize, cropedsize));
@@ -865,12 +901,16 @@ bool DoPAR::loadExemplar() {
 		blockSize = { 12, 10, 8 };
 		MAXITERATION = { 25, 15, 5};
 	}
+	else if (tempSize < 128) {
+		cout << endl << "for small TI, test just using one level, 12*12";
+		MULTIRES = 1;
+		blockSize = { 12 };
+		MAXITERATION = { 20 };
+	}
 	TEXSIZE.resize(MULTIRES);
 	avgIndexHis.resize(MULTIRES); avgPosHis.resize(MULTIRES);
-	pdfdevO.resize(MULTIRES);
 	ColorHis_exemplar.resize(MULTIRES);
 	ColorHis_synthesis.resize(MULTIRES);
-	pdfdevColor.resize(MULTIRES);
 	Solid_Upper.resize(MULTIRES);	Pore_Upper.resize(MULTIRES);
 	//--------------[end] initial global parameters -------------
 
@@ -1018,7 +1058,7 @@ bool DoPAR::loadExemplar() {
 		cout << endl << "output TI.";	//_getch();
 	}
 
-	if (DMtransformYN && GenerateDMTI) {
+	if (GenerateDMTI) {
 		testPCA();
 	}
 
@@ -1028,8 +1068,16 @@ bool DoPAR::loadExemplar() {
 void DoPAR::testPCA() {
 	//test PCA TI and back-project
 	
-	double PCA_RATIO_VARIANCE = 0.95;
+	double PCA_RATIO_VARIANCE = 0.99;
+	cout << endl << "input PCA_RATIO:";
+	cin >> PCA_RATIO_VARIANCE; 
+	if (PCA_RATIO_VARIANCE< 0.5 || PCA_RATIO_VARIANCE>1.0) { cout << endl << "wrong value, use 99%"; PCA_RATIO_VARIANCE = 0.99; }
 	int MINDIMS = 2;
+	int MAXDIMS = 20;
+	cout << endl << "input MINDIMS, MAXDIMS:";
+	cin >> MINDIMS >> MAXDIMS;
+	if (MINDIMS < 2) { cout << endl << "MINDIMS<2, use 2"; MINDIMS = 2; }
+	if (MAXDIMS > 80) { cout << endl << "MINDIMS<80, use 80"; MAXDIMS = 80; }
 
 	int level = MULTIRES - 1;
 	int N = 4;
@@ -1127,6 +1175,7 @@ void DoPAR::testPCA() {
 		}
 		if (PCA_RATIO_VARIANCE <= ratio_x && PCA_RATIO_VARIANCE <= ratio_y && PCA_RATIO_VARIANCE <= ratio_z 
 			&& dimPCA_x >= MINDIMS) break;
+		if (dimPCA_x >= MAXDIMS) break;
 	}
 
 	cout << endl;
@@ -2601,7 +2650,6 @@ void DoPAR::optimizeVolume(int level) {
 		int inttempcolor;
 
 		if (!SIM2D_YN) {
-
 			// For Z	
 			tempx0 = (i / GRID) * GRID;
 			tempy0 = (j / GRID) * GRID;
@@ -2636,7 +2684,7 @@ void DoPAR::optimizeVolume(int level) {
 					if (ColorHis_ON && !FIRSTRUN) {
 						inttempcolor = (int)tempcolor;
 						tempColorHisDiff = max(0.0f, 1.0f*(ColorHis_synthesis[level][inttempcolor] - ColorHis_exemplar[level][inttempcolor]));
-						weightc = gaussian_pdf(tempColorHisDiff, pdfdevColor[level]);
+						weightc = 1.0f / (1.0f + tempColorHisDiff * factorC[level]);
 					}
 					minweight = min(weightc, weightp);
 					if (minweight < FLT_MIN) continue;
@@ -2685,7 +2733,7 @@ void DoPAR::optimizeVolume(int level) {
 					if (ColorHis_ON && !FIRSTRUN) {
 						inttempcolor = (int)tempcolor;
 						tempColorHisDiff = max(0.0f, 1.0f*(ColorHis_synthesis[level][inttempcolor] - ColorHis_exemplar[level][inttempcolor]));
-						weightc = gaussian_pdf(tempColorHisDiff, pdfdevColor[level]);
+						weightc = 1.0f / (1.0f + tempColorHisDiff * factorC[level]);
 					}
 					minweight = min(weightc, weightp);
 					if (minweight < FLT_MIN) continue;
@@ -2729,7 +2777,7 @@ void DoPAR::optimizeVolume(int level) {
 				if (ColorHis_ON && !FIRSTRUN) {
 					inttempcolor = (int)tempcolor;
 					tempColorHisDiff = max(0.0f, 1.0f*(ColorHis_synthesis[level][inttempcolor] - ColorHis_exemplar[level][inttempcolor]));
-					weightc = gaussian_pdf(tempColorHisDiff, pdfdevColor[level]);
+					weightc = 1.0f / (1.0f + tempColorHisDiff * factorC[level]);
 				}
 				minweight = min(weightc, weightp);
 				if (minweight < FLT_MIN) continue;
@@ -2864,6 +2912,7 @@ void DoPAR::optimizeVolume(int level) {
 				break;
 			}		
 		}
+		if (SIM2D_YN && testDISCRETE) tempcolor = color_avg;	
 
 		size_idx formerPos = SelectedPos[level][idx];										// update PosHis
 		size_hiscount& addressformerPos = PosHis[level][formerPos];							
@@ -2884,7 +2933,7 @@ void DoPAR::optimizeVolume(int level) {
 #pragma omp atomic
 			addressnewColor++;
 		}
-		
+	
 		m_volume[level][idx] = tempcolor;													// update m_volume
 
 	}//for (size_idx i2 = 0; i2 < Size; ++i2) {
@@ -2920,38 +2969,43 @@ bool DoPAR::setNearestIndex(int level, vector<size_idx>& nearestIdx, vector<size
 
 // ========= Color Histogram for optimize step =======
 void DoPAR::initColorHis_exemplar() {
+	if (!SIM2D_YN) { cout << endl << "only enabled in test 2D."; _getch(); exit(0); }
+
 	for (int level = 0; level < MULTIRES; level++) {
 		size_idx Size2d = TEXSIZE[level] * TEXSIZE[level];
-		size_idx Size3d = TEXSIZE[level] * TEXSIZE[level] * TEXSIZE[level];
+		//size_idx Size3d = TEXSIZE[level] * TEXSIZE[level] * TEXSIZE[level];
 		ColorHis_exemplar[level].resize(ColorHis_BinNum, 0);
 		vector<size_color>* p[3] = { &m_exemplar_x[level], &m_exemplar_y[level], &m_exemplar_z[level] };
-		for (int ori = 0; ori < 3; ++ori) {
+		//for (int ori = 0; ori < 3; ++ori) {
+		int ori = 0;
 			for (size_idx i = 0; i < Size2d; ++i) {
 				size_color c = (*p[ori])[i];
 				ColorHis_exemplar[level][(int)c] ++;
 			}
-		}
-		int actualBinNum = 0;
-		for (int bin = 0; bin < ColorHis_BinNum; bin++) {
-			if (ColorHis_exemplar[level][bin] >0) actualBinNum++;
-		}
-		cout << endl << "actualBinNum= " << actualBinNum;
-		pdfdevColor[level] = (floor(Size3d / actualBinNum)) * factorC;
-		if (pdfdevColor[level] < 1.0f) pdfdevColor[level] = 1.0f;
+		//}
+		
+		//int actualBinNum = 0;
+		//for (int bin = 0; bin < ColorHis_BinNum; bin++) {
+		//	if (ColorHis_exemplar[level][bin] >0) actualBinNum++;
+		//}
+		//cout << endl << "actualBinNum= " << actualBinNum;
 
 		//!!!need to rescale to fit ColorHis_synthesis!!!
-		float factor = Size3d*1.0f / (3 * Size2d);
-		for (int bin = 0; bin < ColorHis_BinNum; bin++) {
-			ColorHis_exemplar[level][bin] = round(ColorHis_exemplar[level][bin]*factor);
-			if (ColorHis_exemplar[level][bin]>0) ColorHis_exemplar[level][bin] -= 1;		//similar to IndexHis,PosHis
-		}
+		//float factor = Size3d*1.0f / (3 * Size2d);
+		//for (int bin = 0; bin < ColorHis_BinNum; bin++) {
+		//	ColorHis_exemplar[level][bin] = ceil(ColorHis_exemplar[level][bin]*factor);
+		//	if (ColorHis_exemplar[level][bin]>0) ColorHis_exemplar[level][bin] -= 1;		//similar to IndexHis,PosHis
+		//}
 	}
 }
 void DoPAR::initColorHis_synthesis(int level) {
-	ColorHis_synthesis[level].resize(ColorHis_BinNum, 0L);
-	size_idx Size3d = TEXSIZE[level] * TEXSIZE[level] * TEXSIZE[level];
+	if (!SIM2D_YN) { cout << endl << "only enabled in test 2D."; _getch(); exit(0); }
 
-	for (size_idx i = 0; i < Size3d; i++) {
+	ColorHis_synthesis[level].resize(ColorHis_BinNum, 0L);
+	//size_idx Size3d = TEXSIZE[level] * TEXSIZE[level] * TEXSIZE[level];
+	size_idx Size2d = TEXSIZE[level] * TEXSIZE[level];
+
+	for (size_idx i = 0; i < /*Size3d*/Size2d; i++) {
 		ColorHis_synthesis[level][(int)m_volume[level][i]]++;
 	}
 }
