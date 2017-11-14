@@ -55,7 +55,7 @@ private:
 	vector<int> MAXITERATION;							// max iteration time	
 	int NumRealization;
 	
-	int COHERENCENUM = 13;								// K-coherence 11
+	int COHERENCENUM = 11;								// K-coherence 11
 	bool useRandomSeed;									// Use random seed or fixed (0) for test (false)
 	
 	const size_idx GRID = 2;							// sparse grid
@@ -71,8 +71,9 @@ private:
 	bool ColorHis_ON = false;
 	vector<size_dist> avgIndexHis;						// default average value of IndexHis
 	vector<size_dist> avgPosHis;						// default average value of PosHis
-	size_dist factorIndex;
-	size_dist factorPos;
+	
+	size_dist factorIndex = 0.25;
+	size_dist factorPos = 0.25;
 	vector<size_dist> factorC;
 
 
@@ -210,6 +211,7 @@ private:
 	bool searchVolume(int level);
 
 	size_dist getFullDistance(int level, vector<size_color>& exemplar, size_idx idx2d, CvMat* dataMat);
+	size_dist getFullDistance(int level, vector<size_color>& exemplar, size_idx idx2d, CvMat * dataMat, bool shrinkYN);
 
 	vector<vector<bool>> isUnchanged_x, isUnchanged_y, isUnchanged_z;				//[level][idx3d]=isUnchanged	bool
 	bool isUnchangedBlock(int level, int direction, size_idx i, size_idx j, size_idx k);
@@ -220,6 +222,8 @@ private:
 	void optimizeVolume(int level);
 
 	bool FIRSTRUN = true;
+	
+	bool shrinkDistanceTemplate = false;
 
 	//============== index histogram ============
 	vector<vector<size_hiscount>> IndexHis_x, IndexHis_y, IndexHis_z;//sparse grid!	//[level][idx2d/4]=IndexHis		 //3TI different IndexHis

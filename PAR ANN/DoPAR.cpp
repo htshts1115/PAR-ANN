@@ -215,9 +215,7 @@ void DoPAR::ReadRunPar(string CurExeFile)
 	if (ParV.size() > 0) {
 		/*if (atoi(ParV[0].c_str()) == 0) useRandomSeed = false;
 		else */useRandomSeed = true;
-		/*if (ParV.size() > 1)*/ factorIndex = 1.0;
-		/*if (ParV.size() > 2)*/ factorPos = 1.0;
-
+		
 		if (ParV.size() > 0) { if (atoi(ParV[0].c_str()) == 0) HisEqYN = false; else HisEqYN = true; }
 		if (ParV.size() > 1) { if (atoi(ParV[1].c_str()) == 0) DMtransformYN = false; else DMtransformYN = true; }
 		if (ParV.size() > 2) { if (atoi(ParV[2].c_str()) == 0) GenerateDMTI = false; else GenerateDMTI = true; }
@@ -554,29 +552,33 @@ void DoPAR::DoANNOptimization() {
 
 			FIRSTRUN = true;
 			initPermutation(curlevel);
+
+			shrinkDistanceTemplate = false;
+			
 			for (int loop = 0; loop < MAXITERATION[curlevel]; loop++) {
 				shuffle(m_permutation.begin(), m_permutation.end(), mersennetwistergenerator);
 				if (loop % (MAXITERATION[curlevel] / 2) == 0)
 					cout << endl << "iteration: " << loop;
-				if (curlevel == 0 && loop == 0) searchVolume(curlevel);			//!!the first run on level0 should be started by search	
-																				//if (curlevel == 0 && loop == 0) searchVolume_nosparsed(curlevel);			//!!the first run on level0 should be started by search	
+				//the first run on level0 should be started by search	
+				if (curlevel == 0 && loop == 0) searchVolume(curlevel);			
+
+				//if (loop >= MAXITERATION[curlevel] / 2 && blockSize[curlevel]>=12) shrinkDistanceTemplate = true;
 
 				t1 = GetTickCount();
 				optimizeVolume(curlevel);
-				//optimizeVolume_nosparsed(curlevel);
 				t2 = GetTickCount();
 				if (loop % (MAXITERATION[curlevel] / 2) == 0)
 					cout << endl << "optmize: " << (t2 - t1) / 1000.0 << " s";
 
-				if (curlevel == MULTIRES - 1 && loop == MAXITERATION[curlevel] - 1) break;	//last search step is not needed.
 				if (searchVolume(curlevel)) {
-					//if (searchVolume_nosparsed(curlevel)){
 					cout << endl << "converged, skip to next level.";
 					break;
 				}
 				t3 = GetTickCount();
 				if (loop % (MAXITERATION[curlevel] / 2) == 0)
 					cout << endl << "search: " << (t3 - t2) / 1000.0 << " s";
+
+				if (curlevel == MULTIRES - 1 && loop == MAXITERATION[curlevel] - 1) optimizeVolume(curlevel);	//do one optimization after the last search
 
 				//if (SIM2D_YN && curlevel >= MULTIRES-1) {		// output for 2D tests
 				//	if (curlevel == MULTIRES - 2 && loop % 4 == 0) {
@@ -596,8 +598,6 @@ void DoPAR::DoANNOptimization() {
 			}
 			if (curlevel < MULTIRES - 1) {// level up
 				upsampleVolume(curlevel);
-				//upsampleVolume_nosparsed(curlevel);
-				//cleardata(curlevel);
 				FIRSTRUN = true;
 			}
 		}
@@ -865,8 +865,8 @@ bool DoPAR::loadExemplar() {
 	//	MAXITERATION = { 30, 15, 8, 6, 6, 4 };
 	//}
 	
-	if (tempSize > 400) { 
-		if (tempSize % 32 != 0) { 
+	if (tempSize >= 400) { 
+		if (tempSize % 16 != 0) { 
 			int cropedsize = tempSize / 32 * 32;
 			Mat cropedMatyz = matyz(Rect(0, 0, cropedsize, cropedsize));
 			cropedMatyz.copyTo(matyz);
@@ -878,11 +878,11 @@ bool DoPAR::loadExemplar() {
 		}
 		MULTIRES = 5;
 		//blockSize = {12, 12, 10, 8, 6};
-		blockSize = { 12, 12, 12, 12, 12 };
+		blockSize = { 14, 14, 14, 14, 12 };
 		MAXITERATION = {16, 8, 4, 2, 2 };
 	}
 	else if (tempSize >= 200) {
-		if (tempSize % 16 != 0) { 
+		if (tempSize % 8 != 0) { 
 			int cropedsize = tempSize / 16 * 16;
 			Mat cropedMatyz = matyz(Rect(0, 0, cropedsize, cropedsize));
 			cropedMatyz.copyTo(matyz);
@@ -896,11 +896,11 @@ bool DoPAR::loadExemplar() {
 		//blockSize = { 12, 10, 8, 6 };			// T<=12
 		//MAXITERATION = { 20, 15, 4, 4 };		
 
-		blockSize = { 14, 14, 12, 12 };
+		blockSize = { 14, 14, 14, 12 };
 		MAXITERATION = { 16, 8, 4, 2 };
 	}
 	else if (tempSize >= 128) {
-		if (tempSize % 8 != 0) { 
+		if (tempSize % 4 != 0) { 
 			int cropedsize = tempSize / 8 * 8;
 			Mat cropedMatyz = matyz(Rect(0, 0, cropedsize, cropedsize));
 			cropedMatyz.copyTo(matyz);
@@ -914,14 +914,14 @@ bool DoPAR::loadExemplar() {
 		//blockSize = { 12, 10, 8 };
 		//MAXITERATION = { 20, 15, 5 };
 
-		blockSize = { 12, 12, 12 };
+		blockSize = { 16, 12, 8 };
 		MAXITERATION = { 16, 8, 4 };
 	}
 	else if (tempSize < 128) {
-		cout << endl << "for small TI, test just using one level, 12*12";
+		cout << endl << "for small TI, test just using one level";
 		MULTIRES = 1;
-		blockSize = { 12 };
-		MAXITERATION = { 20 };
+		blockSize = { 14 };
+		MAXITERATION = { 16 };
 	}
 
 
@@ -1882,7 +1882,7 @@ void DoPAR::computeKCoherence(){
 
 #pragma omp parallel for schedule(static)
 			for (size_idx idx = 0; idx < maxSize2d; idx++) {
-				if (idx%TEXSIZE_ > width) continue;
+				if (idx%TEXSIZE_ >= width) continue;
 				ANNpoint queryPt_x;
 				queryPt_x = annAllocPt(dim);
 				ANNidxArray ann_index_x = new size_idx[COHERENCENUM];
@@ -1968,7 +1968,7 @@ void DoPAR::computeKCoherence(){
 
 #pragma omp parallel for schedule(static)
 			for (size_idx idx = 0; idx < maxSize2d; idx++) {
-				if (idx%TEXSIZE_ > width) continue;
+				if (idx%TEXSIZE_ >= width) continue;
 				ANNpoint queryPt_x, queryPt_y, queryPt_z;
 				queryPt_x = annAllocPt(dim);
 				queryPt_y = annAllocPt(dim);
@@ -2069,10 +2069,10 @@ bool DoPAR::searchVolume(int level) {
 	size_idx start = static_cast<size_idx>(blockSize_ / 2);			//5	//4	//4	//3			//-cstart<=x<=cend
 	size_idx end = static_cast<size_idx>((blockSize_-1) / 2);			//4	//3	//3	//2
 	size_idx cstart(start), cend(end);
-	if (level > 0 && end>2) {//reduce the candidates of KCoherence. reduce computation. But the template size is not reduced in getFullDistance()
-		cstart -= 1;														//5	//3	//3	//3
-		cend -= 1;															//4	//2	//2	//2
-	}
+	//if (level > 0 && end>2) {//reduce the candidates of KCoherence. reduce computation. But the template size is not reduced in getFullDistance()
+	//	cstart -= 1;														//5	//3	//3	//3
+	//	cend -= 1;															//4	//2	//2	//2
+	//}
 
 	bool isUnchanged = true;	
 
@@ -2139,7 +2139,7 @@ bool DoPAR::searchVolume(int level) {
 						}
 						if (p < compareNum)	continue;
 
-						curDis = getFullDistance(level, m_exemplar_z[level], temp2didx, current_neighbor);
+						curDis = getFullDistance(level, m_exemplar_z[level], temp2didx, current_neighbor, shrinkDistanceTemplate);
 
 						//IndexHis needs sparse grid
 						curhis = IndexHis_z[level][sparseIdx(level, temp2didx)];
@@ -2287,7 +2287,9 @@ bool DoPAR::searchVolume(int level) {
 								if (compareIdx[p] == temp2didx)	break;
 							}
 							if (p < compareNum)	continue;
-							curDis = getFullDistance(level, m_exemplar_y[level], temp2didx, current_neighbor);
+
+							curDis = getFullDistance(level, m_exemplar_y[level], temp2didx, current_neighbor, shrinkDistanceTemplate);
+
 							curhis = IndexHis_y[level][sparseIdx(level, temp2didx)];
 							tempHisDiff = max(0.0f, curhis - avgIndexHis[level]);
 							IndexHisWeight = 1.0f + factorIndex * tempHisDiff;
@@ -2414,9 +2416,15 @@ bool DoPAR::searchVolume(int level) {
 					eposy = (Origin_x[level][temp3didx] % Sz) - v;
 
 					if (!(eposx >= start && eposx < Sz - end && eposy >= start && eposy < Sy - end))
+					{
+						printf("\nj,k = %d,%d", j, k);
+						printf("\nu,v = %d,%d", u, v);
+						printf("\nori = %d,%d", eposx+u, eposy+v);
+						printf("\nepos = %d,%d", eposx, eposy);
+						_getch();
 						continue;
-					//if (!(eposx >= 0 && eposx < Sx && eposy >= 0 && eposy < Sy))
-					//	continue;
+					}
+						
 
 					tempTIidx = eposx*Sz + eposy;								//[x][y] idx=x*Sz+y			
 					for (int l = 0; l < COHERENCENUM; ++l) {						//[0,COHERENCENUM]				
@@ -2426,9 +2434,9 @@ bool DoPAR::searchVolume(int level) {
 							if (compareIdx[p] == temp2didx)	break;
 						}
 						if (p < compareNum)	continue;
+						
+						curDis = getFullDistance(level, m_exemplar_x[level], temp2didx, current_neighbor, shrinkDistanceTemplate);
 
-						//IndexHis needs sparse grid
-						curDis = getFullDistance(level, m_exemplar_x[level], temp2didx, current_neighbor);
 						curhis = IndexHis_x[level][sparseIdx(level, temp2didx)];
 						tempHisDiff = max(0.0f, curhis - avgIndexHis[level]);
 						IndexHisWeight = 1.0f + factorIndex * tempHisDiff;
@@ -2516,19 +2524,20 @@ bool DoPAR::searchVolume(int level) {
 
 size_idx DoPAR::getRandomNearestIndex(int level, vector<size_hiscount>& IndexHis) {
 	size_idx TEXSIZE_h = TEXSIZE[level]/2;
-	//size_idx start = 2, end = TEXSIZE_h - 2;
-	size_idx start = 3, end = TEXSIZE_h - 3;//5,TEXSIZE_h - 5	
-	//if (end <= start) { start = 3; end = TEXSIZE_h - 3; }
-
-	size_idx coordx, coordy, tempidx;
+	size_idx start = 5, end = TEXSIZE_h - 5;
+	if (end <= start) { start = 3; end = TEXSIZE_h - 3; }
+	//size_idx start = 3, end = TEXSIZE_h - 3;
+	
+	size_idx coordx, coordy, tempidx, tempidxj;
 	size_hiscount minVal = LONG_MAX, curVal = 0;
 
 	for (size_idx i = start; i < end; i += GRID){
 		tempidx = i* TEXSIZE_h;
 		for (size_idx j = start; j < end; j += GRID){
+			tempidxj = tempidx + j;
 			//!!IndexHis is sparsed
-			curVal = IndexHis[tempidx + j] + IndexHis[tempidx + TEXSIZE_h + j]
-				+ IndexHis[tempidx + j + 1]	+ IndexHis[tempidx + TEXSIZE_h + j + 1];
+			curVal = IndexHis[tempidxj] + IndexHis[tempidxj + TEXSIZE_h]
+				+ IndexHis[tempidxj + 1]	+ IndexHis[tempidxj + TEXSIZE_h + 1];
 			if (curVal < minVal) {
 				coordx = i; coordy = j; 
 				minVal = curVal;
@@ -2564,6 +2573,38 @@ size_dist DoPAR::getFullDistance(int level, vector<size_color>& exemplar, size_i
 	}
 	
 	for (size_idx i = -R; i < R; ++i) {		
+		tempIdx = idx2d + i*Sx;
+		for (size_idx j = -R; j < R; ++j) {
+			dif = exemplar[tempIdx + j] - cvmGet(dataMat, 0, n++);
+			sum += (dif * dif);
+		}
+	}
+	return (sum < min_dist) ? min_dist : sum;
+}
+
+size_dist DoPAR::getFullDistance(int level, vector<size_color>& exemplar, size_idx idx2d, CvMat * dataMat, bool shrinkYN) {
+	//2d square distance, if shrinkYN==true, then R = R/2
+	size_dist sum = 0.0f;
+	size_idx R = static_cast<size_idx>(blockSize[level] / 2);
+	if (shrinkYN) R = ceil(R*0.5);
+	size_idx n = 0;
+	size_idx Sx = TEXSIZE[level];
+	size_idx tempIdx;
+	size_dist dif;
+	size_idx x = idx2d / Sx, y = idx2d % Sx;
+
+	if (x< R || x > Sx - R - 1 || y< R || y> Sx - R - 1) {//near boundary
+		for (size_idx i = -R; i < R; ++i) {
+			tempIdx = trimIndex(level, x + i)*Sx;
+			for (size_idx j = -R; j < R; ++j) {
+				dif = exemplar[tempIdx + trimIndex(level, y + j)] - cvmGet(dataMat, 0, n++);
+				sum += (dif * dif);
+			}
+		}
+		return (sum < min_dist) ? min_dist : sum;
+	}
+
+	for (size_idx i = -R; i < R; ++i) {
 		tempIdx = idx2d + i*Sx;
 		for (size_idx j = -R; j < R; ++j) {
 			dif = exemplar[tempIdx + j] - cvmGet(dataMat, 0, n++);
@@ -2639,6 +2680,11 @@ void DoPAR::optimizeVolume(int level) {
 	size_idx candSize = static_cast<size_idx>(blockSize_ / GRID) * static_cast<size_idx>(blockSize_ / GRID);	//candidate has sparse grid
 	size_idx start = static_cast<size_idx>(blockSize_ / (2 * GRID)) + 1;		
 	size_idx end = start;					
+	//if (shrinkDistanceTemplate) {
+	//	start = ceil(start*0.5);
+	//	end = start;
+	//}
+
 	size_idx s1 = -static_cast<size_idx>(blockSize_ / 2);							
 	size_idx e1 = static_cast<size_idx>((blockSize_ - 1) / 2);					
 
@@ -2691,7 +2737,12 @@ void DoPAR::optimizeVolume(int level) {
 					tempnearestidx = nearestIdx_z[level][tempidx];
 					tempnearestweight = nearestWeight_z[level][tempidx];									//nearestidx from search step, weight=eudis^-0.6, larger means closer
 
-					tempnearestidx = Sz * trimIndex(level, tempnearestidx / Sz + deltax) + trimIndex(level, tempnearestidx%Sz + deltay);
+					//tempnearestidx = Sz * trimIndex(level, tempnearestidx / Sz + deltax) + trimIndex(level, tempnearestidx%Sz + deltay);				
+					size_idx coordx = tempnearestidx / Sz + deltax;
+					size_idx coordy = tempnearestidx%Sz + deltay;
+					if (coordx< 0 || coordy<0 || coordx >= Sz || coordy >= Sz) continue;
+					tempnearestidx = Sz * coordx + coordy;
+
 					tempcolor = m_exemplar_z[level][tempnearestidx];
 
 					//if (tempnearestidx > Sxy -1 || tempnearestidx <0) {
@@ -2747,7 +2798,12 @@ void DoPAR::optimizeVolume(int level) {
 					tempnearestidx = nearestIdx_y[level][tempidx];										//nearestidx from search step, weight=eudis^-0.6				
 					tempnearestweight = nearestWeight_y[level][tempidx];
 
-					tempnearestidx = Sz * trimIndex(level, tempnearestidx / Sz + deltax) + trimIndex(level, tempnearestidx%Sz + deltay);
+					//tempnearestidx = Sz * trimIndex(level, tempnearestidx / Sz + deltax) + trimIndex(level, tempnearestidx%Sz + deltay);
+					size_idx coordx = tempnearestidx / Sz + deltax;
+					size_idx coordy = tempnearestidx%Sz + deltay;
+					if (coordx< 0 || coordy<0 || coordx >= Sz || coordy >= Sz) continue;
+					tempnearestidx = Sz * coordx + coordy;
+
 					tempcolor = m_exemplar_y[level][tempnearestidx];
 
 					weightc = FLT_MAX;
@@ -2793,7 +2849,12 @@ void DoPAR::optimizeVolume(int level) {
 				tempnearestidx = nearestIdx_x[level][tempidx];
 				tempnearestweight = nearestWeight_x[level][tempidx];								//nearestidx from search step, weight=eudis^-0.6
 				
-				tempnearestidx = Sz * trimIndex(level, tempnearestidx / Sz + deltax) + trimIndex(level, tempnearestidx%Sz + deltay);
+				//tempnearestidx = Sz * trimIndex(level, tempnearestidx / Sz + deltax) + trimIndex(level, tempnearestidx%Sz + deltay);
+				size_idx coordx = tempnearestidx / Sz + deltax;
+				size_idx coordy = tempnearestidx%Sz + deltay;
+				if (coordx< 0 || coordy<0 || coordx >= Sz || coordy >= Sz) continue;
+				tempnearestidx = Sz * coordx + coordy;
+
 				tempcolor = m_exemplar_x[level][tempnearestidx];
 				
 				weightc = FLT_MAX;
@@ -3237,6 +3298,7 @@ void DoPAR::upsampleVolume(int level) {
 			for (size_idx k = 0; k < Sz; k += GRID) {				//sparse grid
 				idx3d = iSyz + jSz + k;
 				nidx2d = nearestIdx_x[level][idx3d];
+				//rnidx2d = KCoherence_x[level][nidx2d][1 + static_cast<unsigned int>(rand() % (COHERENCENUM - 1))];
 				rnidx2d = KCoherence_x[level][nidx2d][static_cast<unsigned int>(rand() % (COHERENCENUM))];
 				coordx = nidx2d / Sz;	coordy = nidx2d % Sz;
 				rcoordx = rnidx2d / Sz;	rcoordy = rnidx2d % Sz;
