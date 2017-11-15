@@ -50,12 +50,13 @@ private:
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////
 	int MULTIRES;										// # of multi-resolution (0 -> MULTIRES - 1 :: coarsest -> finest)
-	vector<int> blockSize;								// template size
+	vector<int> blockSize;								// template size	//tested: coarse level big for quality, fine level small for speed
 	vector<size_idx> TEXSIZE;							// size of input exemplar
-	vector<int> MAXITERATION;							// max iteration time	
+	vector<int> MAXITERATION;							// max iteration time	//tested: fine level does not need many iterations
 	int NumRealization;
 	
 	int COHERENCENUM = 11;								// K-coherence 11
+	double ANNerror = 0.0;
 	bool useRandomSeed;									// Use random seed or fixed (0) for test (false)
 	
 	const size_idx GRID = 2;							// sparse grid
@@ -72,8 +73,8 @@ private:
 	vector<size_dist> avgIndexHis;						// default average value of IndexHis
 	vector<size_dist> avgPosHis;						// default average value of PosHis
 	
-	size_dist factorIndex = 0.25;
-	size_dist factorPos = 0.25;
+	size_dist factorIndex = 0.5;
+	size_dist factorPos = 0.5;
 	vector<size_dist> factorC;
 
 

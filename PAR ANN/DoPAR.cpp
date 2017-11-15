@@ -665,10 +665,10 @@ void DoPAR::init() {
 	for (int i = 0; i < MULTIRES; i++){
 		avgIndexHis[i] = ceil((1.0f * TEXSIZE[i] * (TEXSIZE[i] / 2) * (TEXSIZE[i] / 2)) / ((TEXSIZE[i] / 2 - blockSize[i] / 2 + 1)*(TEXSIZE[i] / 2 - blockSize[i] / 2 + 1)));
 		if (SIM2D_YN) avgIndexHis[i] = ceil((1.0f * (TEXSIZE[i] / 2) * (TEXSIZE[i] / 2)) / ((TEXSIZE[i] / 2 - blockSize[i] / 2 + 1)*(TEXSIZE[i] / 2 - blockSize[i] / 2 + 1)));
-		avgIndexHis[i] -= 1;
+		//avgIndexHis[i] -= 1;
 		avgPosHis[i] = ceil((TEXSIZE[i] * TEXSIZE[i] * TEXSIZE[i]) / ((TEXSIZE[i] - 2)*(TEXSIZE[i] - 2)) / 3.0);
 		if (SIM2D_YN) avgPosHis[i] = ceil((TEXSIZE[i] * TEXSIZE[i]) / ((TEXSIZE[i] - 2)*(TEXSIZE[i] - 2)));
-		avgPosHis[i] -= 1;
+		//avgPosHis[i] -= 1;
 	}
 	
 	cout << endl;
@@ -684,10 +684,12 @@ void DoPAR::init() {
 		cout << "Enable Index/Pos Histogram? [y/n] (default y)";
 		cin >> type;
 	} while (!cin.fail() && type != 'y' && type != 'n');
-	if (type == 'n') {						// minimum influence of Index/PosHis
+	if (type == 'y') {
+		cout << endl << "Index/Pos Histogram weight= " << factorIndex << ", " << factorPos;
+	}
+	else if (type == 'n') {						// minimum influence of Index/PosHis
 		factorIndex = 0;
-		factorPos = 0;
-			
+		factorPos = 0;			
 		do {
 			cout << "Enable Color Histogram? [y/n] ";
 			cin >> type;
@@ -854,20 +856,32 @@ bool DoPAR::loadExemplar() {
 	porosityZX = countNonZero(matzx)*1.0f / (matzx.cols*matzx.rows);
 	porosityXY = countNonZero(matxy)*1.0f / (matxy.cols*matxy.rows);
 	cout << endl << "porosity: " << porosityYZ << " " << porosityZX << " " << porosityXY;
-
 	//--------------[begin] initial global parameters -------------
 	int tempSize = matyz.cols;
 	if (tempSize < 40) { cout << endl << "TI size < 40, too small!"; _getch(); exit(0); }
 	else if (tempSize > 832) { cout << endl << "TI size > 832, too big!"; _getch(); exit(0); }
-	//if (tempSize == 1024) {
-	//	MULTIRES = 6;
-	//	blockSize = { 10, 10, 8, 8, 8, 6 };
-	//	MAXITERATION = { 30, 15, 8, 6, 6, 4 };
-	//}
 	
-	if (tempSize >= 400) { 
-		if (tempSize % 16 != 0) { 
+	if (tempSize >= 600) {
+		if (tempSize % 32 != 0) {
 			int cropedsize = tempSize / 32 * 32;
+			Mat cropedMatyz = matyz(Rect(0, 0, cropedsize, cropedsize));
+			cropedMatyz.copyTo(matyz);
+			Mat cropedMatzx = matzx(Rect(0, 0, cropedsize, cropedsize));
+			cropedMatzx.copyTo(matzx);
+			Mat cropedMatxy = matxy(Rect(0, 0, cropedsize, cropedsize));
+			cropedMatxy.copyTo(matxy);
+			cout << endl << "TIs are croped to " << cropedsize << " to fit multi-grid";
+		}
+		MULTIRES = 6;
+
+		blockSize = { 16, 14, 12, 10, 8, 8 };
+		MAXITERATION = { 16, 8, 4, 2, 2, 1 };
+
+		ANNerror = 0.5;		//for big model use ANN
+	}
+	else if (tempSize >= 400) { 
+		if (tempSize % 16 != 0) { 
+			int cropedsize = tempSize / 16 * 16;
 			Mat cropedMatyz = matyz(Rect(0, 0, cropedsize, cropedsize));
 			cropedMatyz.copyTo(matyz);
 			Mat cropedMatzx = matzx(Rect(0, 0, cropedsize, cropedsize));
@@ -877,30 +891,12 @@ bool DoPAR::loadExemplar() {
 			cout << endl << "TIs are croped to "<< cropedsize <<" to fit multi-grid";
 		}
 		MULTIRES = 5;
-		//blockSize = {12, 12, 10, 8, 6};
-		blockSize = { 14, 14, 14, 14, 12 };
+
+		blockSize = { 16, 14, 12, 10, 8 };
 		MAXITERATION = {16, 8, 4, 2, 2 };
 	}
 	else if (tempSize >= 200) {
 		if (tempSize % 8 != 0) { 
-			int cropedsize = tempSize / 16 * 16;
-			Mat cropedMatyz = matyz(Rect(0, 0, cropedsize, cropedsize));
-			cropedMatyz.copyTo(matyz);
-			Mat cropedMatzx = matzx(Rect(0, 0, cropedsize, cropedsize));
-			cropedMatzx.copyTo(matzx);
-			Mat cropedMatxy = matxy(Rect(0, 0, cropedsize, cropedsize));
-			cropedMatxy.copyTo(matxy);
-			cout << endl << "TIs are croped to " << cropedsize << " to fit multi-grid";
-		}
-		MULTIRES = 4;
-		//blockSize = { 12, 10, 8, 6 };			// T<=12
-		//MAXITERATION = { 20, 15, 4, 4 };		
-
-		blockSize = { 14, 14, 14, 12 };
-		MAXITERATION = { 16, 8, 4, 2 };
-	}
-	else if (tempSize >= 128) {
-		if (tempSize % 4 != 0) { 
 			int cropedsize = tempSize / 8 * 8;
 			Mat cropedMatyz = matyz(Rect(0, 0, cropedsize, cropedsize));
 			cropedMatyz.copyTo(matyz);
@@ -910,18 +906,35 @@ bool DoPAR::loadExemplar() {
 			cropedMatxy.copyTo(matxy);
 			cout << endl << "TIs are croped to " << cropedsize << " to fit multi-grid";
 		}
-		MULTIRES = 3;
-		//blockSize = { 12, 10, 8 };
-		//MAXITERATION = { 20, 15, 5 };
+		MULTIRES = 4;
 
-		blockSize = { 16, 12, 8 };
-		MAXITERATION = { 16, 8, 4 };
+		blockSize = { 16, 14, 12, 8 };
+		MAXITERATION = { 16, 8, 4, 2 };
+	}
+	else if (tempSize >= 128) {
+		if (tempSize % 4 != 0) { 
+			int cropedsize = tempSize / 4 * 4;
+			Mat cropedMatyz = matyz(Rect(0, 0, cropedsize, cropedsize));
+			cropedMatyz.copyTo(matyz);
+			Mat cropedMatzx = matzx(Rect(0, 0, cropedsize, cropedsize));
+			cropedMatzx.copyTo(matzx);
+			Mat cropedMatxy = matxy(Rect(0, 0, cropedsize, cropedsize));
+			cropedMatxy.copyTo(matxy);
+			cout << endl << "TIs are croped to " << cropedsize << " to fit multi-grid";
+		}
+		MULTIRES = 3;
+
+		blockSize = { 16, 12, 8 };		//tested: coarse level big for quality, fine level small for speed
+		MAXITERATION = { 16, 8, 4 };	//tested: fine level does not need many iterations
 	}
 	else if (tempSize < 128) {
 		cout << endl << "for small TI, test just using one level";
 		MULTIRES = 1;
-		blockSize = { 14 };
+		blockSize = { 16 };
 		MAXITERATION = { 16 };
+		//MULTIRES = 2;
+		//blockSize = { 16, 12 };
+		//MAXITERATION = { 16, 8 };
 	}
 
 
@@ -1792,18 +1805,39 @@ void DoPAR::outputmodel(int level) {
 	short resizedSolid_Upper;
 
 	if (SIM2D_YN) {
-		tempoutputfilename = outputfilename.substr(0, outputfilename.find('.')) + "_Size" + to_string(TEXSIZE[level]) + ".png";
-		
-		int i(1);
-		string nonrepeatFPName = tempoutputfilename;
-		while (fileExists(nonrepeatFPName) == true) {
-			nonrepeatFPName = tempoutputfilename.substr(0, tempoutputfilename.find('.')) + "_" + to_string(i) + ".png";
-			i++;
-		}
+		if (!DMtransformYN) {
+			tempoutputfilename = outputfilename.substr(0, outputfilename.find('.')) + "_Size" + to_string(TEXSIZE[level]) + ".png";
 
-		Mat tempM = Mat(TEXSIZE[level], TEXSIZE[level], CV_8UC1);
-		tempM = Mat(tempUchar, true).reshape(1, tempM.rows);						
-		imwrite(nonrepeatFPName, tempM);
+			int i(1);
+			string nonrepeatFPName = tempoutputfilename;
+			while (fileExists(nonrepeatFPName) == true) {
+				nonrepeatFPName = tempoutputfilename.substr(0, tempoutputfilename.find('.')) + "_" + to_string(i) + ".png";
+				i++;
+			}
+
+			Mat tempM = Mat(TEXSIZE[level], TEXSIZE[level], CV_8UC1);
+			tempM = Mat(tempUchar, true).reshape(1, tempM.rows);
+			imwrite(nonrepeatFPName, tempM);
+		}
+		else if (DMtransformYN) {
+			tempoutputfilename = outputfilename.substr(0, outputfilename.find('.')) + "_Size" + to_string(TEXSIZE[level]) + ".png";
+			int i(1);
+			string nonrepeatFPName = tempoutputfilename;
+			while (fileExists(nonrepeatFPName) == true) {
+				nonrepeatFPName = tempoutputfilename.substr(0, tempoutputfilename.find('.')) + "_" + to_string(i) + "DM.png";
+				i++;
+			}
+			Mat tempM = Mat(TEXSIZE[level], TEXSIZE[level], CV_8UC1);
+			tempM = Mat(tempUchar, true).reshape(1, tempM.rows);
+			if (GenerateDMTI)	imwrite(nonrepeatFPName, tempM);
+
+			// binary model
+			vector<short> tempshort(m_volume[level].begin(), m_volume[level].end());
+			binaryUchar(tempshort, tempUchar, Solid_Upper[level] + 1);						// binary thresholded to 0&255
+			tempM = Mat(tempUchar, true).reshape(1, tempM.rows);
+			nonrepeatFPName = tempoutputfilename.substr(0, tempoutputfilename.find('.')) + "_" + to_string(i) + ".png";
+			imwrite(nonrepeatFPName, tempM);
+		}
 	}
 	else {
 		tempoutputfilename = outputfilename.substr(0, outputfilename.find('.')) + "_Size" + to_string(TEXSIZE[level]) + ".RAW";
@@ -1897,7 +1931,7 @@ void DoPAR::computeKCoherence(){
 					}
 				}
 
-				kdTree_x->annkSearch(queryPt_x, COHERENCENUM, ann_index_x, ann_dist_x, 0);
+				kdTree_x->annkSearch(queryPt_x, COHERENCENUM, ann_index_x, ann_dist_x, ANNerror);
 
 				//Set K-Coherence
 				size_idx bias_TIindex = idx + bias*TEXSIZE_ + bias;
@@ -2415,13 +2449,14 @@ bool DoPAR::searchVolume(int level) {
 					eposx = (Origin_x[level][temp3didx] / Sz) - u;
 					eposy = (Origin_x[level][temp3didx] % Sz) - v;
 
+					//if (!(eposx >= 0 && eposx < Sz && eposy >= 0 && eposy < Sy))
 					if (!(eposx >= start && eposx < Sz - end && eposy >= start && eposy < Sy - end))
 					{
-						printf("\nj,k = %d,%d", j, k);
-						printf("\nu,v = %d,%d", u, v);
-						printf("\nori = %d,%d", eposx+u, eposy+v);
-						printf("\nepos = %d,%d", eposx, eposy);
-						_getch();
+						//printf("\nj,k = %d,%d", j, k);
+						//printf("\nu,v = %d,%d", u, v);
+						//printf("\nori = %d,%d", eposx+u, eposy+v);
+						//printf("\nepos = %d,%d", eposx, eposy);
+						//_getch();
 						continue;
 					}
 						
