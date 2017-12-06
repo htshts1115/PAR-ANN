@@ -56,27 +56,27 @@ private:
 	int NumRealization;
 	
 	int COHERENCENUM = 11;								// K-coherence 11
-	double ANNerror = 0.0;
+	vector<double> ANNerror;
 	bool useRandomSeed;									// Use random seed or fixed (0) for test (false)
 	
 	const size_idx GRID = 2;							// sparse grid
 	const size_dist min_dist = 0.1f;	
 	
-	bool HisEqYN = false;								// apply histogram equalization
-	bool DMtransformYN = false;							// use DM transformation
+	bool HisEqYN = true;								// apply histogram equalization
+	bool DMtransformYN = true;							// use DM transformation
 	bool GenerateDMTI = false;							// generate DM transformed TI
 	bool PrintHisYN = false;							// generate Histogram
 
-	bool testNoDiscrete = true;
-
+	bool testNoDiscrete = false;
+	size_dist factorIndex = 1;
+	size_dist factorPos = 1;
 	bool ColorHis_ON = false;
+	vector<size_dist> factorC;
+
 	vector<size_dist> avgIndexHis;						// default average value of IndexHis
 	vector<size_dist> avgPosHis;						// default average value of PosHis
 	
-	size_dist factorIndex = 0.5;
-	size_dist factorPos = 0.5;
-	vector<size_dist> factorC;
-
+	int MaxThread = 1;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -114,7 +114,7 @@ private:
 		//convert ANNSearch m_volume_nearest_x_index to TI index
 		size_idx i, j, height, bias;
 		height = TEXSIZE[level] - blockSize[level] + 1;
-		bias = static_cast<size_idx>(blockSize[level] / 2);
+		bias = static_cast<size_idx>(blockSize[level] * 0.5);
 		i = index / height + bias;
 		j = index % height + bias;
 		return (i*TEXSIZE[level] + j);
@@ -224,8 +224,6 @@ private:
 
 	bool FIRSTRUN = true;
 	
-	bool shrinkDistanceTemplate = false;
-
 	//============== index histogram ============
 	vector<vector<size_hiscount>> IndexHis_x, IndexHis_y, IndexHis_z;//sparse grid!	//[level][idx2d/4]=IndexHis		 //3TI different IndexHis
 	vector<vector<size_idx>> nearestIdx_x, nearestIdx_y, nearestIdx_z;				//[level][idx3d]=nearestIdx2d
