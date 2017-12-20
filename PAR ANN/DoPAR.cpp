@@ -866,9 +866,29 @@ bool DoPAR::loadExemplar() {
 		flip(matzx, matzx, 0);
 		flip(matzx, matzx, 1);
 	}
-	if (matyz.cols != matyz.rows) { cout << endl << "matyz.cols != matyz.rows"; _getch(); exit(0); }
-	if (matzx.cols != matzx.rows) { cout << endl << "matzx.cols != matzx.rows"; _getch(); exit(0); }
-	if (matxy.cols != matxy.rows) { cout << endl << "matxy.cols != matxy.rows"; _getch(); exit(0); }
+
+	if (matyz.cols != matyz.rows) {
+		//cout << endl << "matyz.cols != matyz.rows"; _getch(); exit(0); 
+		cout << endl << "matyz.cols != matyz.rows, crop to square";
+		int mindim = min(matyz.cols, matyz.rows);
+		Mat cropedMatyz = matyz(Rect(0, 0, mindim, mindim));
+		cropedMatyz.copyTo(matyz);
+	}
+	if (matzx.cols != matzx.rows) { 
+		//cout << endl << "matzx.cols != matzx.rows"; _getch(); exit(0); 
+		cout << endl << "matzx.cols != matzx.rows, crop to square";
+		int mindim = min(matzx.cols, matzx.rows);
+		Mat cropedMatzx = matzx(Rect(0, 0, mindim, mindim));
+		cropedMatzx.copyTo(matzx);
+	}
+	if (matxy.cols != matxy.rows) { 
+		//cout << endl << "matxy.cols != matxy.rows"; _getch(); exit(0);
+		cout << endl << "matxy.cols != matxy.rows, crop to square";
+		int mindim = min(matxy.cols, matxy.rows);
+		Mat cropedMatxy = matxy(Rect(0, 0, mindim, mindim));
+		cropedMatxy.copyTo(matxy);
+	}
+
 	float porosityYZ, porosityZX, porosityXY;
 	porosityYZ = countNonZero(matyz)*1.0f / (matyz.cols*matyz.rows);
 	porosityZX = countNonZero(matzx)*1.0f / (matzx.cols*matzx.rows);
