@@ -733,6 +733,11 @@ bool DoPAR::loadExemplar() {
 	//YZ slice is done by: reslice left
 	/////////////////////////////////////////////////////////////
 
+	//in imagej:
+	//exemplar_x -> XY
+	//exemplar_y -> XZ
+	//exemplar_z -> YZ
+
 	//-------------- convert Mat to IplImage* --------------
 	Mat matyz = cv::imread(FNameXY, CV_LOAD_IMAGE_ANYDEPTH);		 // ti grayscale, could be 16 bit!
 	Mat matzx = cv::imread(FNameXZ, CV_LOAD_IMAGE_ANYDEPTH);
@@ -789,8 +794,8 @@ bool DoPAR::loadExemplar() {
 		}
 		MULTIRES = 6;
 
-		blockSize = { 16, 14, 12, 10, 8, 8 };
-		MAXITERATION = { 16, 8, 4, 2, 2, 1 };
+		blockSize = { 14, 12, 12, 10, 10, 8 };
+		MAXITERATION = { 16, 8, 4, 3, 2, 2 };
 
 		ANNerror = { 0, 0, 0, 0.5, 1.0, 1.0 };		//for big model use ANN
 	}
@@ -807,8 +812,8 @@ bool DoPAR::loadExemplar() {
 		}
 		MULTIRES = 5;
 
-		blockSize = { 16, 14, 12, 10, 8 };
-		MAXITERATION = { 16, 8, 4, 2, 2 };
+		blockSize = { 14, 12, 12, 10, 8 };
+		MAXITERATION = { 16, 8, 4, 3, 2 };
 
 		ANNerror = { 0, 0, 0, 0.5, 1.0 };
 	}
@@ -825,8 +830,8 @@ bool DoPAR::loadExemplar() {
 		}
 		MULTIRES = 4;
 
-		blockSize = { 16, 14, 12, 8 };
-		MAXITERATION = { 16, 8, 4, 2 };
+		blockSize = { 14, 12, 10, 8 };
+		MAXITERATION = { 16, 8, 4, 3 };
 
 	}
 	else if (tempSize >= 128) {
@@ -842,7 +847,7 @@ bool DoPAR::loadExemplar() {
 		}
 		MULTIRES = 3;
 
-		blockSize = { 16, 12, 8 };		//tested: coarse level big for quality, fine level small for speed
+		blockSize = { 14, 12, 10 };		//tested: coarse level big for quality, fine level small for speed
 		MAXITERATION = { 16, 8, 4 };	//tested: fine level does not need many iterations
 
 	}
@@ -869,7 +874,6 @@ bool DoPAR::loadExemplar() {
 
 	for (int level = MULTIRES - 1; level >= 0; --level) {	// size registration		
 		TEXSIZE[level] = TEXSIZE[MULTIRES - 1] / pow(2, MULTIRES - 1 - level);
-		//if (TEXSIZE[MULTIRES - 1] % (size_idx)pow(2, MULTIRES-1) != 0) { cout << endl << "TI size not right for multi-level"; _getch(); exit(1); }
 		// [begin] memory allocation -------------------------------------------
 		m_exemplar_x.resize(MULTIRES);
 		m_exemplar_y.resize(MULTIRES);
@@ -893,7 +897,8 @@ bool DoPAR::loadExemplar() {
 
 	if (DMtransformYN) transformDM(MULTIRES - 1, m_exemplar_x[MULTIRES - 1], m_exemplar_y[MULTIRES - 1], m_exemplar_z[MULTIRES - 1]);
 
-	if (MULTIRES > 1) {										//! gauss filter resizing better than opencv interpolation resize(inter_area)
+	//Gaussian filter resizing better than opencv interpolation resize(inter_area)
+	if (MULTIRES > 1) {										
 		cout << endl << "use Gaussian filter to resize.";
 		for (int l = MULTIRES - 1; l > 0; --l) {
 			gaussImage(l, m_exemplar_x);
@@ -907,7 +912,6 @@ bool DoPAR::loadExemplar() {
 	//	size_idx porocount;
 	//	size_color segvalue;
 	//	vector<size_color> tmpv;
-
 	//	tmpv = m_exemplar_x[l];
 	//	sort(tmpv.begin(), tmpv.end());//first sort
 	//	porocount = floor((1-porosityYZ) * m_exemplar_x[l].size());//then calc the seg point 
@@ -917,7 +921,6 @@ bool DoPAR::loadExemplar() {
 	//		if (m_exemplar_x[l][i] < segvalue && solidcount < porocount) { m_exemplar_x[l][i] = 0; solidcount++; }
 	//		else  m_exemplar_x[l][i] = 255;
 	//	}
-
 	//	tmpv = m_exemplar_y[l];
 	//	sort(tmpv.begin(), tmpv.end());
 	//	porocount = floor((1-porosityZX) * m_exemplar_y[l].size());
@@ -1462,6 +1465,78 @@ void DoPAR::InitRandomVolume(int level) {
 	}
 }
 
+// assign fixed layer
+void DoPAR::AssignFixedLayer(int level, int dir) {
+	//assign origin, m_volume in direction(dir)
+
+	if (!FixedLayerYN || SIM2D_YN) return;
+
+	size_idx TEXSIZE_ = TEXSIZE[level];
+	size_idx Sx = TEXSIZE_;
+	size_idx Sy = TEXSIZE_;
+	size_idx Sz = TEXSIZE_;
+	size_idx Sxy = Sx * Sy;
+	size_idx Sxz = Sx * Sz;
+	size_idx Syz = Sy * Sz;
+	size_idx baseidx, temp3didx;
+
+	switch (dir)
+	{
+	case(0) :	
+		size_idx baseidx_middle = (Sx / 2 - 1) * Syz;	//fix YZ layer, in the middle of x direction [1/2 x][j][k]		
+		size_idx baseidx_bottom = (Sx - 1) * Syz;		//fix YZ layer, [Sx-1][j][k]
+		size_idx baseidx_top = 0;						//fix YZ layer, [0][j][k]
+
+		for (size_idx jk = 0; jk < Syz; jk++) {
+			temp3didx = baseidx_top + jk;
+			Origin_x[level][temp3didx] = jk;
+			m_volume[level][temp3didx] = m_exemplar_x[level][jk];
+
+			temp3didx = baseidx_middle + jk;
+			Origin_x[level][temp3didx] = jk;
+			m_volume[level][temp3didx] = m_exemplar_x[level][jk];
+			
+			temp3didx = baseidx_bottom + jk;
+			Origin_x[level][temp3didx] = jk;
+			m_volume[level][temp3didx] = m_exemplar_x[level][jk];
+		}
+
+		break;
+	case(1) :
+		//fix ZX layer, in the middle of y direction [i][1/2 y][k]
+		baseidx = Sz*(Sy / 2 - 1);
+		size_idx ik;
+		for (size_idx i = 0; i < Sx; i++) {
+			for (size_idx k = 0; k < Sz; k++) {
+				ik = i*Sx + k;
+				temp3didx = baseidx + i*Syz + k;
+				Origin_y[level][temp3didx] = ik;
+				m_volume[level][temp3didx] = m_exemplar_y[level][ik];
+			}
+		}
+		break;
+	case(2) :
+		//fix XY layer, in the middle of z direction [i][j][1/2 z]
+		baseidx = Sz / 2 - 1;
+		size_idx ij;
+		for (size_idx i = 0; i < Sx; i++) {
+			for (size_idx j = 0; j < Sy; j++) {
+				ij = i*Sz + j;
+				temp3didx = baseidx + i*Syz + j*Sz;
+				Origin_y[level][temp3didx] = ij;
+				m_volume[level][temp3didx] = m_exemplar_y[level][ij];
+			}
+		}
+		break;
+	default:
+		return;
+		break;
+	}
+
+}
+
+
+// clear data
 void DoPAR::cleardata(int level) {
 	m_volume[level].clear();
 	m_exemplar_x[level].clear();	m_exemplar_y[level].clear();	m_exemplar_z[level].clear();
@@ -1527,6 +1602,7 @@ void DoPAR::cleardata() {
 	//m_permutation.shrink_to_fit();
 }
 
+// write model
 void DoPAR::outputmodel(int level) {
 	//vector<uchar> tempUchar(m_volume[level].size());
 	vector<uchar> tempUchar(m_volume[level].begin(), m_volume[level].end());
@@ -2101,7 +2177,7 @@ void DoPAR::computeKCoherence(){
 				kdTree_y->annkSearch(queryPt_y, COHERENCENUM, ann_index_y, ann_dist_y, ANNerror[level]);
 				kdTree_z->annkSearch(queryPt_z, COHERENCENUM, ann_index_z, ann_dist_z, ANNerror[level]);
 
-				//Set K-Coherence
+				//Set K-Coherence biased means shifted
 				size_idx bias_TIindex = idx + bias*TEXSIZE_ + bias;
 				KCoherence_x[level][bias_TIindex].resize(COHERENCENUM);
 				KCoherence_y[level][bias_TIindex].resize(COHERENCENUM);
@@ -2181,6 +2257,10 @@ bool DoPAR::searchVolume(int level) {
 	//}
 
 	bool isUnchanged = true;	
+
+	//check fix layer
+	int dir = 0;
+	AssignFixedLayer(level, dir);
 
 #pragma omp parallel 
 	{

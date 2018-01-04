@@ -68,8 +68,11 @@ private:
 	bool PrintHisYN = false;							// generate Histogram
 
 	bool testNoDiscrete = false;
-	size_dist factorIndex = 1;
-	size_dist factorPos = 1;
+	size_dist factorIndex = 0.5;
+	size_dist factorPos = 0.5;
+
+	bool FixedLayerYN = true;
+
 	bool ColorHis_ON = false;
 	vector<size_dist> factorC;
 
@@ -190,6 +193,9 @@ private:
 	void outputmodel(int level);
 
 	void InitRandomVolume(int level);
+
+	// assign fixed layer
+	void AssignFixedLayer(int level, int dir);
 	
 	// random permutation (precomputed)
 	vector<size_idx>	 m_permutation;												//[idx3d] = idx3d
