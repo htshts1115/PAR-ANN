@@ -213,13 +213,13 @@ void DoPAR::ReadRunPar(string CurExeFile)
 	vector<string> ParV;
 	GetNextRowParameters(Row, ResLines, ParV);
 	if (ParV.size() > 0) {
-		/*if (atoi(ParV[0].c_str()) == 0) useRandomSeed = false;
-		else */useRandomSeed = true;
+		useRandomSeed = true;
 		
-		if (ParV.size() > 0) { if (atoi(ParV[0].c_str()) == 0) HisEqYN = false; else HisEqYN = true; }
-		if (ParV.size() > 1) { if (atoi(ParV[1].c_str()) == 0) DMtransformYN = false; else DMtransformYN = true; }
-		if (ParV.size() > 2) { if (atoi(ParV[2].c_str()) == 0) GenerateDMTI = false; else GenerateDMTI = true; }
-		if (ParV.size() > 3) { if (atoi(ParV[3].c_str()) == 0) PrintHisYN = false; else PrintHisYN = true; }
+		//if (ParV.size() > 0) { if (atoi(ParV[0].c_str()) == 0) HisEqYN = false; else HisEqYN = true; }
+		//if (ParV.size() > 1) { if (atoi(ParV[1].c_str()) == 0) DMtransformYN = false; else DMtransformYN = true; }
+		if (ParV.size() > 0) FixedLayerDir = atoi(ParV[0].c_str()) - 1;
+		if (ParV.size() > 1) { if (atoi(ParV[1].c_str()) == 0) GenerateDMTI = false; else GenerateDMTI = true; }
+		if (ParV.size() > 2) { if (atoi(ParV[2].c_str()) == 0) PrintHisYN = false; else PrintHisYN = true; }	
 	}
 	if (useRandomSeed) {
 		cout << endl << "use Random Seed";
@@ -285,9 +285,7 @@ void DoPAR::ReadRunPar(string CurExeFile)
 		
 		tempoutputfilename = ParV[0].substr(0, ParV[0].rfind('.') == string::npos ? ParV[0].length() : ParV[0].rfind('.'));
 	}
-	parametername = /*"i" + to_string((int)factorIndex) + "p" + to_string((int)factorPos) + */ "_Eq" + to_string((int)HisEqYN) + "DM" + to_string((int)DMtransformYN);
-	if (SIM2D_YN) parametername = "";
-	outputfilename = tempoutputfilename + parametername + tempoutputformat;
+	outputfilename = tempoutputfilename;
 }
 
 bool DoPAR::ReadTxtFiles(const string PFName, vector<string>& ResLines)
@@ -770,11 +768,27 @@ bool DoPAR::loadExemplar() {
 		cropedMatxy.copyTo(matxy);
 	}
 
-	float porosityYZ, porosityZX, porosityXY;
-	porosityYZ = countNonZero(matyz)*1.0f / (matyz.cols*matyz.rows);
-	porosityZX = countNonZero(matzx)*1.0f / (matzx.cols*matzx.rows);
-	porosityXY = countNonZero(matxy)*1.0f / (matxy.cols*matxy.rows);
-	cout << endl << "porosity: " << porosityYZ << " " << porosityZX << " " << porosityXY;
+	////check TI is grayscale or binary, if grayscale disable DM, if binary enable DM
+	bool binaryYN = false;
+	Mat tempMatyz, tempMatzx, tempMatxy;
+	Mat maskyz, maskzx, maskxy;
+	matyz.copyTo(tempMatyz);	matzx.copyTo(tempMatzx);	matxy.copyTo(tempMatxy);
+	inRange(tempMatyz, 255, 255, maskyz);	inRange(tempMatzx, 255, 255, maskzx);	inRange(tempMatxy, 255, 255, maskxy);
+	size_idx countNonZeroYZ, countNonZeroZX, countNonZeroXY;
+	countNonZeroYZ = countNonZero(matyz);	countNonZeroZX = countNonZero(matzx);	countNonZeroXY = countNonZero(matxy);
+
+	if (countNonZero(maskyz) != countNonZeroYZ || countNonZero(maskzx) != countNonZeroZX || countNonZero(maskxy) != countNonZeroXY) {
+		cout << endl << "TI is not binary, disable distance map transformation";
+		DMtransformYN = false;
+	}
+	else {
+		DMtransformYN = true;
+		cout << endl << "TI is binary, enable distance map transformation";
+		cout << endl << "porosity: " << countNonZeroYZ*1.0f / (matyz.cols*matyz.rows)
+			<< " " << countNonZeroZX*1.0f / (matzx.cols*matzx.rows) << " " << countNonZeroXY*1.0f / (matxy.cols*matxy.rows);
+	}
+
+	
 	//--------------[begin] initial global parameters -------------
 	int tempSize = matyz.cols;
 	if (tempSize < 40) { cout << endl << "TI size < 40, too small!"; _getch(); exit(0); }
@@ -862,7 +876,6 @@ bool DoPAR::loadExemplar() {
 	}
 
 
-
 	TEXSIZE.resize(MULTIRES);
 	avgIndexHis.resize(MULTIRES); avgPosHis.resize(MULTIRES);
 	ColorHis_exemplar.resize(MULTIRES);
@@ -894,7 +907,7 @@ bool DoPAR::loadExemplar() {
 
 	///////--------------Processing TI----------------------------------
 
-
+	////Distance map transformation
 	if (DMtransformYN) transformDM(MULTIRES - 1, m_exemplar_x[MULTIRES - 1], m_exemplar_y[MULTIRES - 1], m_exemplar_z[MULTIRES - 1]);
 
 	//Gaussian filter resizing better than opencv interpolation resize(inter_area)
@@ -947,7 +960,7 @@ bool DoPAR::loadExemplar() {
 	//	transformDM(l, m_exemplar_x[l], m_exemplar_y[l], m_exemplar_z[l]);		
 	//}
 
-	if (HisEqYN) {
+	if (DMtransformYN) {
 		cout << endl << "apply histogram equalization";
 		_Solid_Upper = Solid_Upper[MULTIRES - 1];
 		for (int l = MULTIRES - 1; l >= 0; --l)
@@ -1469,7 +1482,7 @@ void DoPAR::InitRandomVolume(int level) {
 void DoPAR::AssignFixedLayer(int level, int dir) {
 	//assign origin, m_volume in direction(dir)
 
-	if (!FixedLayerYN || SIM2D_YN) return;
+	if (SIM2D_YN || dir<0 || dir>2) return;
 
 	size_idx TEXSIZE_ = TEXSIZE[level];
 	size_idx Sx = TEXSIZE_;
@@ -1478,14 +1491,15 @@ void DoPAR::AssignFixedLayer(int level, int dir) {
 	size_idx Sxy = Sx * Sy;
 	size_idx Sxz = Sx * Sz;
 	size_idx Syz = Sy * Sz;
-	size_idx baseidx, temp3didx;
+	size_idx temp3didx;
+	size_idx baseidx_top, baseidx_middle, baseidx_bottom;
 
 	switch (dir)
 	{
 	case(0) :	
-		size_idx baseidx_middle = (Sx / 2 - 1) * Syz;	//fix YZ layer, in the middle of x direction [1/2 x][j][k]		
-		size_idx baseidx_bottom = (Sx - 1) * Syz;		//fix YZ layer, [Sx-1][j][k]
-		size_idx baseidx_top = 0;						//fix YZ layer, [0][j][k]
+		baseidx_top = 0;						//fix YZ layer, [0][j][k]
+		baseidx_middle = (Sx / 2 - 1) * Syz;	//fix YZ layer, in the middle of x direction [1/2x-1][j][k]		
+		baseidx_bottom = (Sx - 1) * Syz;		//fix YZ layer, [Sx-1][j][k]	
 
 		for (size_idx jk = 0; jk < Syz; jk++) {
 			temp3didx = baseidx_top + jk;
@@ -1500,39 +1514,60 @@ void DoPAR::AssignFixedLayer(int level, int dir) {
 			Origin_x[level][temp3didx] = jk;
 			m_volume[level][temp3didx] = m_exemplar_x[level][jk];
 		}
-
 		break;
 	case(1) :
-		//fix ZX layer, in the middle of y direction [i][1/2 y][k]
-		baseidx = Sz*(Sy / 2 - 1);
-		size_idx ik;
+		baseidx_top = 0;						//fix ZX layer, [i][0][k]
+		baseidx_middle = Sz*(Sy / 2 - 1);		//fix ZX layer, in the middle of y direction [i][1/2y-1][k]
+		baseidx_bottom = Sz*(Sy-1);				//fix ZX layer, [i][Sy-1][k]
+
+		size_idx ik2d, ik3d;
 		for (size_idx i = 0; i < Sx; i++) {
 			for (size_idx k = 0; k < Sz; k++) {
-				ik = i*Sx + k;
-				temp3didx = baseidx + i*Syz + k;
-				Origin_y[level][temp3didx] = ik;
-				m_volume[level][temp3didx] = m_exemplar_y[level][ik];
+				ik2d = i*Sz + k;
+				ik3d = i*Syz + k;
+
+				temp3didx = baseidx_top + ik3d;
+				Origin_y[level][temp3didx] = ik2d;
+				m_volume[level][temp3didx] = m_exemplar_y[level][ik2d];
+
+				temp3didx = baseidx_middle + ik3d;
+				Origin_y[level][temp3didx] = ik2d;
+				m_volume[level][temp3didx] = m_exemplar_y[level][ik2d];
+				
+				temp3didx = baseidx_bottom + ik3d;
+				Origin_y[level][temp3didx] = ik2d;
+				m_volume[level][temp3didx] = m_exemplar_y[level][ik2d];
 			}
 		}
 		break;
 	case(2) :
-		//fix XY layer, in the middle of z direction [i][j][1/2 z]
-		baseidx = Sz / 2 - 1;
-		size_idx ij;
+		baseidx_top = 0;						//fix XY layer, [i][j][0]
+		baseidx_middle = Sz / 2 - 1;			//fix XY layer, in the middle of z direction [i][j][1/2z]
+		baseidx_bottom = Sz - 1;				//fix XY layer, [i][j][Sz-1]
+
+		size_idx ij2d, ij3d;
 		for (size_idx i = 0; i < Sx; i++) {
 			for (size_idx j = 0; j < Sy; j++) {
-				ij = i*Sz + j;
-				temp3didx = baseidx + i*Syz + j*Sz;
-				Origin_y[level][temp3didx] = ij;
-				m_volume[level][temp3didx] = m_exemplar_y[level][ij];
+				ij2d = i*Sy + j;
+				ij3d = i*Syz + j*Sz;
+
+				temp3didx = baseidx_top + ij3d;
+				Origin_z[level][temp3didx] = ij2d;
+				m_volume[level][temp3didx] = m_exemplar_z[level][ij2d];
+
+				temp3didx = baseidx_middle + ij3d;
+				Origin_z[level][temp3didx] = ij2d;
+				m_volume[level][temp3didx] = m_exemplar_z[level][ij2d];
+
+				temp3didx = baseidx_bottom + ij3d;
+				Origin_z[level][temp3didx] = ij2d;
+				m_volume[level][temp3didx] = m_exemplar_z[level][ij2d];
 			}
-		}
+		}	
 		break;
 	default:
-		return;
 		break;
 	}
-
 }
 
 
@@ -1609,9 +1644,14 @@ void DoPAR::outputmodel(int level) {
 	string tempoutputfilename = outputfilename;
 	short resizedSolid_Upper;
 
+	string parametername = /*"_Eq" + to_string((int)HisEqYN) +*/ "DM" + to_string((int)DMtransformYN);
+	if (SIM2D_YN) parametername = "";
+	outputfilename += parametername;
+
 	if (SIM2D_YN) {
 		if (!DMtransformYN) {
-			tempoutputfilename = outputfilename.substr(0, outputfilename.find('.')) + "_Size" + to_string(TEXSIZE[level]) + ".png";
+			//tempoutputfilename = outputfilename.substr(0, outputfilename.find('.')) + "_Size" + to_string(TEXSIZE[level]) + ".png";
+			tempoutputfilename = outputfilename + "_Size" + to_string(TEXSIZE[level]) + ".png";
 
 			int i(1);
 			string nonrepeatFPName = tempoutputfilename;
@@ -1625,7 +1665,8 @@ void DoPAR::outputmodel(int level) {
 			imwrite(nonrepeatFPName, tempM);
 		}
 		else if (DMtransformYN) {
-			tempoutputfilename = outputfilename.substr(0, outputfilename.find('.')) + "_Size" + to_string(TEXSIZE[level]) + "DM.png";
+			//tempoutputfilename = outputfilename.substr(0, outputfilename.find('.')) + "_Size" + to_string(TEXSIZE[level]) + "DM.png";
+			tempoutputfilename = outputfilename + "_Size" + to_string(TEXSIZE[level]) + "DM.png";
 			int i(1);
 			string nonrepeatFPName = tempoutputfilename;
 			while (fileExists(nonrepeatFPName) == true) {
@@ -1655,7 +1696,8 @@ void DoPAR::outputmodel(int level) {
 			vector<short> tempshort(m_volume[level].begin(), m_volume[level].end());
 			binaryUchar(tempshort, tempUchar, Solid_Upper[level] + 1);						// binary thresholded to 0&255
 		}
-		tempoutputfilename = outputfilename.substr(0, outputfilename.find('.')) + "_Size" + to_string(TEXSIZE[level]) + ".RAW";
+		//tempoutputfilename = outputfilename.substr(0, outputfilename.find('.')) + "_Size" + to_string(TEXSIZE[level]) + ".RAW";
+		tempoutputfilename = outputfilename + "_Size" + to_string(TEXSIZE[level]) + ".RAW";
 		Write(outputpath + tempoutputfilename, tempUchar);
 	}
 
@@ -2258,9 +2300,8 @@ bool DoPAR::searchVolume(int level) {
 
 	bool isUnchanged = true;	
 
-	//check fix layer
-	int dir = 0;
-	AssignFixedLayer(level, dir);
+	//assign fixed layer
+	AssignFixedLayer(level, FixedLayerDir);
 
 #pragma omp parallel 
 	{

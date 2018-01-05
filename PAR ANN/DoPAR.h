@@ -68,10 +68,10 @@ private:
 	bool PrintHisYN = false;							// generate Histogram
 
 	bool testNoDiscrete = false;
-	size_dist factorIndex = 0.5;
-	size_dist factorPos = 0.5;
+	size_dist factorIndex = 1.0;//0; // 0.5;
+	size_dist factorPos = 1.0;//0; // 0.5;
 
-	bool FixedLayerYN = true;
+	int FixedLayerDir = -1;
 
 	bool ColorHis_ON = false;
 	vector<size_dist> factorC;
