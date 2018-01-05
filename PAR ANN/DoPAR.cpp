@@ -221,6 +221,9 @@ void DoPAR::ReadRunPar(string CurExeFile)
 		if (ParV.size() > 1) { if (atoi(ParV[1].c_str()) == 0) GenerateDMTI = false; else GenerateDMTI = true; }
 		if (ParV.size() > 2) { if (atoi(ParV[2].c_str()) == 0) PrintHisYN = false; else PrintHisYN = true; }	
 	}
+	if (FixedLayerDir >= 0 && FixedLayerDir < 3) {
+		cout << endl << "enable fixed layer, modify directional weight: " << "1.0-->" << DirectionalWeight;
+	}
 	if (useRandomSeed) {
 		cout << endl << "use Random Seed";
 		srand((unsigned)time(NULL));
@@ -1644,7 +1647,7 @@ void DoPAR::outputmodel(int level) {
 	string tempoutputfilename = outputfilename;
 	short resizedSolid_Upper;
 
-	string parametername = /*"_Eq" + to_string((int)HisEqYN) +*/ "DM" + to_string((int)DMtransformYN);
+	string parametername = /*"_Eq" + to_string((int)HisEqYN) +*/ "DM" + to_string((int)DMtransformYN) + "Fix"+ to_string(FixedLayerDir) +"W"+to_string((int)(100*DirectionalWeight));
 	if (SIM2D_YN) parametername = "";
 	outputfilename += parametername;
 
@@ -2997,14 +3000,11 @@ void DoPAR::optimizeVolume(int level) {
 					posCand_z.push_back(tempnearestidx);
 
 					weight = tempnearestweight * minweight;
+					////// modify weight according to fix layer
+					if (FixedLayerDir == 0 || FixedLayerDir == 1) weight *= DirectionalWeight;
+
 					color_acc += weight * tempcolor;
 					weight_acc += weight;
-
-
-					//if (tempcolor > Pore_Upper[level] || tempcolor<0) {
-					//	cout << endl << "tempcolor=" << tempcolor << " neareastIdx=" << nearestIdx_z[level][tempidx] << " tempidx=" << tempidx;
-					//	_getch();
-					//}
 				}
 			}
 
@@ -3053,6 +3053,9 @@ void DoPAR::optimizeVolume(int level) {
 					posCand_y.push_back(tempnearestidx);
 
 					weight = tempnearestweight * minweight;
+					////// modify weight according to fix layer
+					if (FixedLayerDir == 0 || FixedLayerDir == 2) weight *= DirectionalWeight;
+
 					color_acc += weight * tempcolor;
 					weight_acc += weight;
 				}
@@ -3104,6 +3107,9 @@ void DoPAR::optimizeVolume(int level) {
 				posCand_x.push_back(tempnearestidx);
 
 				weight = tempnearestweight * minweight;
+				////// modify weight according to fix layer
+				if (FixedLayerDir == 1 || FixedLayerDir == 2) weight *= DirectionalWeight;
+
 				color_acc += weight * tempcolor;
 				weight_acc += weight;
 			}

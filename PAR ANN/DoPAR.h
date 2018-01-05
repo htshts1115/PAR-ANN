@@ -72,6 +72,7 @@ private:
 	size_dist factorPos = 1.0;//0; // 0.5;
 
 	int FixedLayerDir = -1;
+	size_dist DirectionalWeight = 0.66;
 
 	bool ColorHis_ON = false;
 	vector<size_dist> factorC;
