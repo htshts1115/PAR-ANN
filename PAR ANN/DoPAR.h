@@ -64,8 +64,10 @@ private:
 	
 	bool HisEqYN = true;								// apply histogram equalization
 	bool DMtransformYN = true;							// use DM transformation
-	bool GenerateDMTI = false;							// generate DM transformed TI
+	bool GenerateTI = false;							// generate DM transformed TI
 	bool PrintHisYN = false;							// generate Histogram
+	bool PatternEntropyAnalysisYN = true;				// analyse pattern size entropy
+
 
 	bool testNoDiscrete = false;
 	size_dist factorIndex = 1.0;//0; // 0.5;
@@ -175,6 +177,10 @@ private:
 	//void equalizeHistogram(vector<size_color>& exemplar, unsigned short max_val);
 	void equalizeHistogram(int level, vector<size_color>& exemplarX, vector<size_color>& exemplarY, vector<size_color>& exemplarZ);
 	size_color _Solid_Upper;
+
+	//=============== Pattern entropy analysis ====
+	void patternentropyanalysis(int templatesize, Mat &exemplar, double &entropy);
+
 
 	//=============== distance map ===============
 	vector<size_color> Solid_Upper, Pore_Upper;						//Redistribute DMap. Use same Solid_Upper,Pore_Lower for 3TIs and loaded model

@@ -7,7 +7,7 @@
 /* currently will fix 3 layers: top,middle,bottom
 ///////Automatically decide DistanceMap transformation or not (binary TI yes; grey TI no)	
 ///////Automatically apply Histogram Equalization for Distance transformed TI
-/* (2) Print DistanceMap / TI or not (0:false, 1:true)	
+/* (2) Print TI / DistanceMap or not (0:false, 1:true)	
 /* (3) Print Histogram or not (0:false, 1:true)	
 /*=============================================
 0, 0, 0
@@ -18,14 +18,14 @@
 /*=============================================
 /* Specify working directory (e.g. d:\test\)
 /*=============================================
-E:\Tests_results\ICCR_Surmas\JoaoPaulo\TI\256
+E:\Tests_results\test\testDM\berea128
 /*=============================================
 /* Specify training images in XY, XZ and YZ-plane
 /* in code coord3d= [x,y,z]
 /*=============================================
-XY_256g.png, XZ_256g.png, YZ_256g.png
+BereaResizeIQ256.png, BereaResizeIQ256.png, BereaResizeIQ256.png
 /*=============================================
 /* Specify output model 
 /* if format is ".png", then output 2D reconstruction based on X TI(YZ)
 /*=============================================
-256g.raw
+BereaResizeIQ256.png

@@ -218,12 +218,10 @@ void DoPAR::ReadRunPar(string CurExeFile)
 		//if (ParV.size() > 0) { if (atoi(ParV[0].c_str()) == 0) HisEqYN = false; else HisEqYN = true; }
 		//if (ParV.size() > 1) { if (atoi(ParV[1].c_str()) == 0) DMtransformYN = false; else DMtransformYN = true; }
 		if (ParV.size() > 0) FixedLayerDir = atoi(ParV[0].c_str()) - 1;
-		if (ParV.size() > 1) { if (atoi(ParV[1].c_str()) == 0) GenerateDMTI = false; else GenerateDMTI = true; }
+		if (ParV.size() > 1) { if (atoi(ParV[1].c_str()) == 0) GenerateTI = false; else GenerateTI = true; }
 		if (ParV.size() > 2) { if (atoi(ParV[2].c_str()) == 0) PrintHisYN = false; else PrintHisYN = true; }	
 	}
-	if (FixedLayerDir >= 0 && FixedLayerDir < 3) {
-		cout << endl << "enable fixed layer, modify directional weight: " << "1.0-->" << DirectionalWeight;
-	}
+
 	if (useRandomSeed) {
 		cout << endl << "use Random Seed";
 		srand((unsigned)time(NULL));
@@ -289,6 +287,11 @@ void DoPAR::ReadRunPar(string CurExeFile)
 		tempoutputfilename = ParV[0].substr(0, ParV[0].rfind('.') == string::npos ? ParV[0].length() : ParV[0].rfind('.'));
 	}
 	outputfilename = tempoutputfilename;
+
+	if (SIM2D_YN) FixedLayerDir = -1;
+	if (FixedLayerDir >= 0 && FixedLayerDir < 3) {
+		cout << endl << "enable fixed layer, modify directional weight: " << "1.0-->" << DirectionalWeight;
+	}
 }
 
 bool DoPAR::ReadTxtFiles(const string PFName, vector<string>& ResLines)
@@ -811,7 +814,7 @@ bool DoPAR::loadExemplar() {
 		}
 		MULTIRES = 6;
 
-		blockSize = { 14, 12, 12, 10, 10, 8 };
+		blockSize = { 12, 12, 12, 10, 10, 10 };
 		MAXITERATION = { 16, 8, 4, 3, 2, 2 };
 
 		ANNerror = { 0, 0, 0, 0.5, 1.0, 1.0 };		//for big model use ANN
@@ -829,7 +832,7 @@ bool DoPAR::loadExemplar() {
 		}
 		MULTIRES = 5;
 
-		blockSize = { 14, 12, 12, 10, 8 };
+		blockSize = { 12, 12, 12, 10, 10 };
 		MAXITERATION = { 16, 8, 4, 3, 2 };
 
 		ANNerror = { 0, 0, 0, 0.5, 1.0 };
@@ -847,7 +850,7 @@ bool DoPAR::loadExemplar() {
 		}
 		MULTIRES = 4;
 
-		blockSize = { 14, 12, 10, 8 };
+		blockSize = { 12, 12, 10, 10 };
 		MAXITERATION = { 16, 8, 4, 3 };
 
 	}
@@ -864,7 +867,7 @@ bool DoPAR::loadExemplar() {
 		}
 		MULTIRES = 3;
 
-		blockSize = { 14, 12, 10 };		//tested: coarse level big for quality, fine level small for speed
+		blockSize = { 12, 12, 10 };		//tested: coarse level big for quality, fine level small for speed
 		MAXITERATION = { 16, 8, 4 };	//tested: fine level does not need many iterations
 
 	}
@@ -969,9 +972,35 @@ bool DoPAR::loadExemplar() {
 		for (int l = MULTIRES - 1; l >= 0; --l)
 			equalizeHistogram(l, m_exemplar_x[l], m_exemplar_y[l], m_exemplar_z[l]);
 	}
+	
+	if (GenerateTI) {
+		testPCA();
+	}
 
+	if (PatternEntropyAnalysisYN) {
+		double entropy;
+		//int templatesize = blockSize[MULTIRES - 1];
+		for (int templatesize = 4; templatesize < 34; templatesize += 2) {
+			if (!DMtransformYN) patternentropyanalysis(templatesize, matyz, entropy);
+			else {
+				GenerateTI = true;
 
-	if (GenerateDMTI) {						//Generate DM TI
+				cout << endl << "noDM:";
+				patternentropyanalysis(templatesize, matyz, entropy);
+
+				cout << endl << "DM:";
+				vector<unsigned char> tmpchar;
+				Mat DM1 = Mat(TEXSIZE[MULTIRES - 1], TEXSIZE[MULTIRES - 1], CV_8UC1);
+				tmpchar = vector<unsigned char>(m_exemplar_x[MULTIRES - 1].begin(), m_exemplar_x[MULTIRES - 1].end());
+				DM1 = Mat(tmpchar, true).reshape(1, DM1.rows);
+				patternentropyanalysis(templatesize, DM1, entropy);
+			}
+		}
+
+		_getch();
+	}
+
+	if (GenerateTI && DMtransformYN) {						//Generate DM TI
 		ostringstream name;
 		//for (int lv = MULTIRES-1; lv >=0 ; --lv) {
 		int lv = MULTIRES - 1;
@@ -1028,10 +1057,6 @@ bool DoPAR::loadExemplar() {
 		cout << endl << "output TI.";	//_getch();
 	}
 
-	if (GenerateDMTI) {
-		testPCA();
-	}
-
 	return true;
 }
 
@@ -1045,7 +1070,7 @@ void DoPAR::testPCA() {
 	if (PCA_RATIO_VARIANCE <= 0) { cout << endl << "no PCA"; return; }
 	int MINDIMS = 2;
 	int MAXDIMS = 20;
-	cout << endl << "input MINDIMS, MAXDIMS:";
+	cout << endl << "input MINDIMS(>=2), MAXDIMS(<=80):";
 	cin >> MINDIMS >> MAXDIMS;
 	if (MINDIMS < 2) { cout << endl << "MINDIMS<2, use 2"; MINDIMS = 2; }
 	if (MAXDIMS > 80) { cout << endl << "MINDIMS<80, use 80"; MAXDIMS = 80; }
@@ -1240,9 +1265,9 @@ void DoPAR::testPCA() {
 			}
 		}
 
-		imwrite("PCA_DM1.png", PCAbackprojectDM1);
-		if (!(FNameXY == FNameXZ && FNameXY == FNameYZ)) imwrite("PCA_DM2.png", PCAbackprojectDM2);
-		if (!(FNameXY == FNameXZ && FNameXY == FNameYZ)) imwrite("PCA_DM3.png", PCAbackprojectDM3);
+		imwrite("PCA_TI1.png", PCAbackprojectDM1);
+		if (!(FNameXY == FNameXZ && FNameXY == FNameYZ)) imwrite("PCA_TI2.png", PCAbackprojectDM2);
+		if (!(FNameXY == FNameXZ && FNameXY == FNameYZ)) imwrite("PCA_TI3.png", PCAbackprojectDM3);
 		cvReleaseMat(&backproject_x);
 		cvReleaseMat(&backproject_y);
 		cvReleaseMat(&backproject_z);
@@ -1678,7 +1703,7 @@ void DoPAR::outputmodel(int level) {
 			}
 			Mat tempM = Mat(TEXSIZE[level], TEXSIZE[level], CV_8UC1);
 			tempM = Mat(tempUchar, true).reshape(1, tempM.rows);
-			if (GenerateDMTI)	imwrite(nonrepeatFPName, tempM);
+			if (GenerateTI)	imwrite(nonrepeatFPName, tempM);
 
 			// binary model
 			vector<short> tempshort(m_volume[level].begin(), m_volume[level].end());
@@ -1718,6 +1743,71 @@ void DoPAR::outputmodel(int level) {
 	//colorhis_ti.close();
 	//cout << endl << "colorhis outputed.";
 }
+
+// ============== Pattern entropy analysis ===========
+void DoPAR::patternentropyanalysis(int templatesize, Mat &exemplar, double &entropy) {
+	//compute pattern entropy for given template,TI
+	int Width = exemplar.cols;
+	int Height = exemplar.rows;
+	//initial
+	Mat countmask = Mat::zeros(Height-templatesize+1, Width - templatesize + 1, CV_8UC1);
+	vector<long> patterncount, patternloc;
+	patterncount.reserve((Width - templatesize)*(Height - templatesize)); 
+	patternloc.reserve((Width - templatesize)*(Height - templatesize));
+	long totalcount(0), tempcount;
+	entropy = 0;
+	float threshval = 4.0f;
+
+	//build pattern database
+	for (int y = 0; y < Height - templatesize + 1; y++) {
+		if (y%(Height/10)==0)cout << ".";
+		for (int x = 0; x < Width - templatesize + 1; x++) {
+			//skip 
+			if (countmask.at<uchar>(y, x) !=0) continue;
+			//template matching
+			Mat matchdst;		//32-bit, (H-h+1, W-w+1)
+			Mat tempmat = exemplar(Rect(x, y, templatesize, templatesize));
+			matchTemplate(exemplar, tempmat, matchdst, TM_SQDIFF);
+			//build database
+			Mat dstmask;
+
+			///// Localizing the best match with minMaxLoc		
+			//double minVal; double maxVal; Point minLoc; Point maxLoc;
+			//Point matchLoc;
+			//minMaxLoc(matchdst, &minVal, &maxVal, &minLoc, &maxLoc, Mat());
+			//if (matchdst.at<float>(y, x) < -4.0f || matchdst.at<float>(y, x) > 4.0f) { cout << endl << "val("<<y<<","<<x<<")="<< matchdst.at<float>(y, x); }			
+			if (matchdst.at<float>(y, x) < -threshval || matchdst.at<float>(y, x) > threshval) {
+				threshval = abs(matchdst.at<float>(y, x));
+			}
+			//if (minLoc.x != x && minLoc.y != y) { cout << endl << "(" << y << "," << x << ") minVal=" << minVal << " minloc=" << minLoc.y << "," << minLoc.x; _getch(); }		
+			//float threshval = abs(matchdst.at<float>(y, x));
+			
+			inRange(matchdst, -threshval, threshval, dstmask);	//dstmask 255&0
+			tempcount = countNonZero(dstmask);
+			//if (tempcount == 0) { cout << endl << "(" << y << "," << x << ")"; }
+			patterncount.push_back(tempcount);
+			patternloc.push_back(y*Width + x);
+			totalcount += tempcount;
+			//dstmask.setTo(1, dstmask);
+			//countmask.mul(dstmask);
+			countmask.setTo(1, dstmask);
+		}
+	}	
+	if (patterncount.size() != patternloc.size()) {	cout << endl << "error:patterncount.size!=patternloc.size"; _getch(); exit(0);	}
+	long tempsize = (Height - templatesize + 1)*(Width - templatesize + 1);
+	Mat tempmat;
+	inRange(countmask, 2, tempsize, tempmat); 
+	if (countNonZero(tempmat)>0) { cout << endl << "error:countmask has >1:"<< countNonZero(tempmat); }
+	if (countNonZero(countmask)< tempsize) { cout << endl << "error:countmask has 0: " << tempsize-countNonZero(countmask); }
+
+	//compute entropy	
+	for (int i = 0; i < patterncount.size(); i++) {
+		double pi = patterncount[i] * 1.0 / totalcount;
+		entropy -= pi * log(pi);
+	}
+	cout << endl << "template:" << templatesize << " entropy=" << entropy << "pattern count="<< patterncount.size();
+}
+
 
 
 
@@ -2276,7 +2366,7 @@ void DoPAR::computeKCoherence(){
 	cout << endl << "done. clocks = " << (time_end - time_start) / CLOCKS_PER_SEC << " s";
 }
 
-// ================ phase 1: search ===========================
+// ================ phase 1: search (M-step)===========================
 bool DoPAR::searchVolume(int level) {
 	size_dist PreviousDis;
 	if (!FIRSTRUN) PreviousDis = TotalDis;
@@ -2893,7 +2983,7 @@ bool DoPAR::isUnchangedBlock(int level, int direction, size_idx i, size_idx j, s
 }
 
 
-// ================ phase 2: optimization =====================
+// ================ phase 2: optimization (E-step)=====================
 void DoPAR::optimizeVolume(int level) {
 	size_idx TEXSIZE_ = TEXSIZE[level];
 	size_idx blockSize_ = blockSize[level];
