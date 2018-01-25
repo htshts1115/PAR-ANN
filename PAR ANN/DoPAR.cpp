@@ -1,4 +1,5 @@
 ﻿#include "stdafx.h"
+
 #include "DoPAR.h"
 
 
@@ -1745,69 +1746,133 @@ void DoPAR::outputmodel(int level) {
 }
 
 // ============== Pattern entropy analysis ===========
+
+//void DoPAR::patternentropyanalysis(int templatesize, Mat &exemplar, double &entropy) {
+//	//compute pattern entropy for given template,TI
+//	int Width = exemplar.cols;
+//	int Height = exemplar.rows;
+//	//initial
+//	Mat countmask = Mat::zeros(Height-templatesize+1, Width - templatesize + 1, CV_8UC1);
+//	vector<long> patterncount, patternloc;
+//	patterncount.reserve((Width - templatesize)*(Height - templatesize)); 
+//	patternloc.reserve((Width - templatesize)*(Height - templatesize));
+//	long totalcount(0), tempcount;
+//	entropy = 0;
+//	float threshval = 4.0f;
+//
+//	//build pattern database
+//	for (int y = 0; y < Height - templatesize + 1; y++) {
+//		if (y%(Height/10)==0)cout << ".";
+//		for (int x = 0; x < Width - templatesize + 1; x++) {
+//			//skip 
+//			if (countmask.at<uchar>(y, x) !=0) continue;
+//			//template matching
+//			Mat matchdst;		//32-bit, (H-h+1, W-w+1)
+//			Mat tempmat = exemplar(Rect(x, y, templatesize, templatesize));
+//			matchTemplate(exemplar, tempmat, matchdst, TM_SQDIFF);
+//			//build database
+//			Mat dstmask;
+//
+//			///// Localizing the best match with minMaxLoc		
+//			//double minVal; double maxVal; Point minLoc; Point maxLoc;
+//			//Point matchLoc;
+//			//minMaxLoc(matchdst, &minVal, &maxVal, &minLoc, &maxLoc, Mat());
+//			//if (matchdst.at<float>(y, x) < -4.0f || matchdst.at<float>(y, x) > 4.0f) { cout << endl << "val("<<y<<","<<x<<")="<< matchdst.at<float>(y, x); }			
+//			if (matchdst.at<float>(y, x) < -threshval || matchdst.at<float>(y, x) > threshval) {
+//				threshval = abs(matchdst.at<float>(y, x));
+//			}
+//			//if (minLoc.x != x && minLoc.y != y) { cout << endl << "(" << y << "," << x << ") minVal=" << minVal << " minloc=" << minLoc.y << "," << minLoc.x; _getch(); }		
+//			//float threshval = abs(matchdst.at<float>(y, x));
+//			
+//			inRange(matchdst, -threshval, threshval, dstmask);	//dstmask 255&0
+//			tempcount = countNonZero(dstmask);
+//			//if (tempcount == 0) { cout << endl << "(" << y << "," << x << ")"; }
+//			patterncount.push_back(tempcount);
+//			patternloc.push_back(y*Width + x);
+//			totalcount += tempcount;
+//			//dstmask.setTo(1, dstmask);
+//			//countmask.mul(dstmask);
+//			countmask.setTo(1, dstmask);
+//		}
+//	}	
+//	if (patterncount.size() != patternloc.size()) {	cout << endl << "error:patterncount.size!=patternloc.size"; _getch(); exit(0);	}
+//	long tempsize = (Height - templatesize + 1)*(Width - templatesize + 1);
+//	Mat tempmat;
+//	inRange(countmask, 2, tempsize, tempmat); 
+//	if (countNonZero(tempmat)>0) { cout << endl << "error:countmask has >1:"<< countNonZero(tempmat); }
+//	if (countNonZero(countmask)< tempsize) { cout << endl << "error:countmask has 0: " << tempsize-countNonZero(countmask); }
+//
+//	//compute entropy	
+//	for (int i = 0; i < patterncount.size(); i++) {
+//		double pi = patterncount[i] * 1.0 / totalcount;
+//		entropy -= pi * log(pi);
+//	}
+//	cout << endl << "template:" << templatesize << " entropy=   " << entropy << "   pattern count=   "<< patterncount.size();
+//}
+
 void DoPAR::patternentropyanalysis(int templatesize, Mat &exemplar, double &entropy) {
 	//compute pattern entropy for given template,TI
 	int Width = exemplar.cols;
 	int Height = exemplar.rows;
 	//initial
-	Mat countmask = Mat::zeros(Height-templatesize+1, Width - templatesize + 1, CV_8UC1);
+	Mat countmask = Mat::zeros(Height - templatesize + 1, Width - templatesize + 1, CV_8UC1);
 	vector<long> patterncount, patternloc;
-	patterncount.reserve((Width - templatesize)*(Height - templatesize)); 
+	patterncount.reserve((Width - templatesize)*(Height - templatesize));
 	patternloc.reserve((Width - templatesize)*(Height - templatesize));
-	long totalcount(0), tempcount;
+	long totalcount(0);
 	entropy = 0;
 	float threshval = 4.0f;
 
 	//build pattern database
 	for (int y = 0; y < Height - templatesize + 1; y++) {
-		if (y%(Height/10)==0)cout << ".";
+		//if (y % (Height / 10) == 0)cout << ".";
+#pragma omp parallel for schedule(static)
 		for (int x = 0; x < Width - templatesize + 1; x++) {
 			//skip 
-			if (countmask.at<uchar>(y, x) !=0) continue;
+			if (countmask.at<uchar>(y, x) != 0) continue;
 			//template matching
 			Mat matchdst;		//32-bit, (H-h+1, W-w+1)
 			Mat tempmat = exemplar(Rect(x, y, templatesize, templatesize));
 			matchTemplate(exemplar, tempmat, matchdst, TM_SQDIFF);
 			//build database
 			Mat dstmask;
+			long tempcount;
 
-			///// Localizing the best match with minMaxLoc		
-			//double minVal; double maxVal; Point minLoc; Point maxLoc;
-			//Point matchLoc;
-			//minMaxLoc(matchdst, &minVal, &maxVal, &minLoc, &maxLoc, Mat());
-			//if (matchdst.at<float>(y, x) < -4.0f || matchdst.at<float>(y, x) > 4.0f) { cout << endl << "val("<<y<<","<<x<<")="<< matchdst.at<float>(y, x); }			
 			if (matchdst.at<float>(y, x) < -threshval || matchdst.at<float>(y, x) > threshval) {
 				threshval = abs(matchdst.at<float>(y, x));
 			}
-			//if (minLoc.x != x && minLoc.y != y) { cout << endl << "(" << y << "," << x << ") minVal=" << minVal << " minloc=" << minLoc.y << "," << minLoc.x; _getch(); }		
-			//float threshval = abs(matchdst.at<float>(y, x));
-			
 			inRange(matchdst, -threshval, threshval, dstmask);	//dstmask 255&0
-			tempcount = countNonZero(dstmask);
-			//if (tempcount == 0) { cout << endl << "(" << y << "," << x << ")"; }
-			patterncount.push_back(tempcount);
-			patternloc.push_back(y*Width + x);
-			totalcount += tempcount;
-			//dstmask.setTo(1, dstmask);
-			//countmask.mul(dstmask);
-			countmask.setTo(1, dstmask);
+			tempcount = countNonZero(dstmask);		
+
+#pragma omp critical (patternanalysis)
+			{
+				//check again, due to OpenMP
+				if (countmask.at<uchar>(y, x) == 0) {
+					patterncount.push_back(tempcount);
+					patternloc.push_back(y*Width + x);
+					totalcount += tempcount;
+					countmask.setTo(1, dstmask);
+				}
+			}
+
 		}
-	}	
-	if (patterncount.size() != patternloc.size()) {	cout << endl << "error:patterncount.size!=patternloc.size"; _getch(); exit(0);	}
+	//#pragma omp parallel for schedule(static)
+	}
+
+	if (patterncount.size() != patternloc.size()) { cout << endl << "error:patterncount.size!=patternloc.size"; _getch(); exit(0); }
 	long tempsize = (Height - templatesize + 1)*(Width - templatesize + 1);
 	Mat tempmat;
-	inRange(countmask, 2, tempsize, tempmat); 
-	if (countNonZero(tempmat)>0) { cout << endl << "error:countmask has >1:"<< countNonZero(tempmat); }
-	if (countNonZero(countmask)< tempsize) { cout << endl << "error:countmask has 0: " << tempsize-countNonZero(countmask); }
+	inRange(countmask, 2, tempsize, tempmat);
+	if (countNonZero(tempmat)>0) { cout << endl << "error:countmask has >1:" << countNonZero(tempmat); }
+	if (countNonZero(countmask)< tempsize) { cout << endl << "error:countmask has 0: " << tempsize - countNonZero(countmask); }
 
 	//compute entropy	
 	for (int i = 0; i < patterncount.size(); i++) {
 		double pi = patterncount[i] * 1.0 / totalcount;
 		entropy -= pi * log(pi);
 	}
-	cout << endl << "template:" << templatesize << " entropy=" << entropy << "pattern count="<< patterncount.size();
+	cout << endl << "template:" << templatesize << " entropy=   " << entropy << "   pattern count=   " << patterncount.size();
 }
-
 
 
 
