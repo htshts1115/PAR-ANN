@@ -4,13 +4,15 @@
 /* &&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&
 /*=============================================
 /* (1) Fix layer to be exemplar_x/y/z? (1:fix exemplar_x, 2:y,3:z, otherwise(default0) no fixed)
-/* currently will fix 3 layers: top,middle,bottom
-///////Automatically decide DistanceMap transformation or not (binary TI yes; grey TI no)	
-///////Automatically apply Histogram Equalization for Distance transformed TI
-/* (2) Print TI / DistanceMap or not (0:false, 1:true)	
-/* (3) Print Histogram or not (0:false, 1:true)	
+/* currently will fix 3 layers: top,middle,bottom	
+/* (2) Histogram equalization or not (0:false, 1:true)	
+///////disabled for test: Automatically apply Histogram Equalization for Distance transformed TI
+///////Automatically decide DistanceMap transformation or not (binary TI yes; grey TI no)
+/* (3) Test PCA / Print TI / DistanceMap or not (0:false, 1:true)	
+/* (4) Test pattern entropy (0:false, 1:true)	
+/* (5) Print Histogram or not (0:false, 1:true)	
 /*=============================================
-0, 0, 0
+0, 1, 0, 0, 1
 /*=============================================
 /* Number of realizations (default:1, dont set too many for 3D reconstruction)
 /*=============================================
@@ -18,14 +20,20 @@
 /*=============================================
 /* Specify working directory (e.g. d:\test\)
 /*=============================================
-E:\Tests_results\test\testDM\berea128
+//E:\Tests_results\test\testDM\halfdots
+//E:\Tests_results\test\testDM\MaMiPores_256_ZX128
+E:\Tests_results\TwoscaleB\TIs
 /*=============================================
 /* Specify training images in XY, XZ and YZ-plane
 /* in code coord3d= [x,y,z]
 /*=============================================
-BereaResizeIQ256.png, BereaResizeIQ256.png, BereaResizeIQ256.png
+//Largedots256.png, Largedots256.png, Largedots256.png
+//PCA99_9d_complete.png,PCA99_9d_complete.png,PCA99_9d_complete.png
+//MaMiPores_256_ZX128.png,MaMiPores_256_ZX128.png,MaMiPores_256_ZX128.png
+TwoScaleB_256_XY2.png,TwoScaleB_256_XY2.png,TwoScaleB_256_XY2.png
 /*=============================================
 /* Specify output model 
 /* if format is ".png", then output 2D reconstruction based on X TI(YZ)
 /*=============================================
-BereaResizeIQ256.png
+//Largedots256.png
+TwoScaleB_256_XY2.raw

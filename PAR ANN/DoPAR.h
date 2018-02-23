@@ -55,14 +55,14 @@ private:
 	vector<int> MAXITERATION;							// max iteration time	//tested: fine level does not need many iterations
 	int NumRealization;
 	
-	int COHERENCENUM = 11;								// K-coherence 11
+	int COHERENCENUM = 9;								// K-coherence 11
 	vector<double> ANNerror;
 	bool useRandomSeed;									// Use random seed or fixed (0) for test (false)
 	
 	const size_idx GRID = 2;							// sparse grid
 	const size_dist min_dist = 0.1f;	
 	
-	bool HisEqYN = true;								// apply histogram equalization
+	bool HisEqYN = false;								// apply histogram equalization
 	bool DMtransformYN = true;							// use DM transformation
 	bool GenerateTI = false;							// generate DM transformed TI
 	bool PrintHisYN = false;							// generate Histogram
@@ -70,11 +70,11 @@ private:
 
 
 	bool testNoDiscrete = false;
-	size_dist factorIndex = 1.0;//0; // 0.5;
-	size_dist factorPos = 1.0;//0; // 0.5;
+	size_dist factorIndex = 1;//0; // 0.5;				//!! change to factor * (MULTIRES-level)
+	size_dist factorPos = 1;//0; // 0.5;
 
 	int FixedLayerDir = -1;
-	size_dist DirectionalWeight = 0.66;
+	size_dist DirectionalWeight = 0.66; 
 
 	bool ColorHis_ON = false;
 	vector<size_dist> factorC;
@@ -176,14 +176,14 @@ private:
 
 	//void equalizeHistogram(vector<size_color>& exemplar, unsigned short max_val);
 	void equalizeHistogram(int level, vector<size_color>& exemplarX, vector<size_color>& exemplarY, vector<size_color>& exemplarZ);
-	size_color _Solid_Upper;
+	size_color _Solid_Upper, _Pore_Lower;
 
 	//=============== Pattern entropy analysis ====
 	void patternentropyanalysis(int templatesize, Mat &exemplar, double &entropy);
 
 
 	//=============== distance map ===============
-	vector<size_color> Solid_Upper, Pore_Upper;						//Redistribute DMap. Use same Solid_Upper,Pore_Lower for 3TIs and loaded model
+	vector<size_color> Solid_Upper, Pore_Upper, Pore_Lower;						//Redistribute DMap. Use same Solid_Upper,Pore_Lower for 3TIs and loaded model
 	void binaryChar(vector<short>& DMap, vector<char>& Binarised, short threshold);
 	void binaryUchar(vector<short>& DMap, vector<uchar>& Binarised, short threshold);
 	vector<unsigned short> BarDMap(short tSx, short tSy, short tSz, vector<char>& OImg);
