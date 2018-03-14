@@ -70,7 +70,7 @@ private:
 
 
 	bool testNoDiscrete = false;
-	size_dist factorIndex = 1;//0; // 0.5;				//!! change to factor * (MULTIRES-level)
+	size_dist factorIndex = 0;//0; // 0.5;				//!! change to factor * (MULTIRES-level)
 	size_dist factorPos = 1;//0; // 0.5;
 
 	int FixedLayerDir = -1;
