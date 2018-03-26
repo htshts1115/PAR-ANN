@@ -164,7 +164,7 @@ bool DoPAR::iFileExistYN(const string& PFileName)
 void DoPAR::ReadRunPar(string CurExeFile)
 {
 	cout << endl << "===========================================";
-	cout << endl << "Set up your running parameters... ";
+	cout << endl << "Set up your running parameters...    ";
 	cout << endl << "===========================================";
 
 	string tempoutputfilename;
@@ -176,6 +176,7 @@ void DoPAR::ReadRunPar(string CurExeFile)
 	{//Read setup file
 		string tmpstr, name;
 		iCGetDirFileName(CurExeFile, Path, name);
+		//string PFName = Path + "PAR-GO_Setup_series.DAT";//!changed to series 
 		string PFName = Path + "PAR-GO_Setup.DAT";
 		vector<string> TmpLines;
 		if (!ReadTxtFiles(PFName, TmpLines)) {
@@ -305,6 +306,161 @@ void DoPAR::ReadRunPar(string CurExeFile)
 	if (SIM2D_YN) parameterstring = "";
 	outputfilename += parameterstring;
 }
+
+void DoPAR::ReadRunPar_series(string CurExeFile, int TIseries)
+{
+	cout << endl << "===========================================";
+	cout << endl << "Set up your running parameters...    Series:" << TIseries;
+	cout << endl << "===========================================";
+
+	string tempoutputfilename;
+	string tempoutputformat;
+	string parametername;
+
+	string Path;
+	vector<string> ResLines;
+	{//Read setup file
+		string tmpstr, name;
+		iCGetDirFileName(CurExeFile, Path, name);
+		string PFName = Path + "PAR-GO_Setup_series.DAT";//!changed to series 
+		vector<string> TmpLines;
+		if (!ReadTxtFiles(PFName, TmpLines)) {
+			cout << endl;
+			cout << endl << " @@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@";
+			cout << endl << " Failed to open file '" << PFName.c_str() << "' !";
+			cout << endl << " @@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@";
+			cout << endl;
+			cout << endl << "Press any key to quit ...";
+			_getch(); exit(1);
+		}
+
+		for (unsigned long Row = 0; Row < TmpLines.size(); Row++) {
+			string::size_type Posidx = TmpLines[Row].find("//");
+			if (Posidx != string::npos) {
+				continue;
+			}
+			else {
+				Posidx = TmpLines[Row].find("/*");
+				if (Posidx != string::npos) continue;
+			}
+			ResLines.push_back(TmpLines[Row]);
+		} //for(int Row=0; Row < LineLst.size(); Row++)
+
+		if (ResLines.size() == 0) {
+			cout << endl << " ============================================================";
+			cout << endl << " Failed to open PAR-GO_Setup.DAT in current working directory !";
+			cout << endl << " ============================================================";
+			cout << endl << " Press any key to quit....";
+			_getch(); exit(1);
+		}
+	}//Read setup file
+	short Row(0);
+
+	///////////////////////// check random seed
+	vector<string> ParV;
+	GetNextRowParameters(Row, ResLines, ParV);
+	if (ParV.size() > 0) {
+		useRandomSeed = true;
+
+		//if (ParV.size() > 1) { if (atoi(ParV[1].c_str()) == 0) DMtransformYN = false; else DMtransformYN = true; }
+		if (ParV.size() > 0) FixedLayerDir = atoi(ParV[0].c_str()) - 1;
+		if (ParV.size() > 1) { if (atoi(ParV[1].c_str()) == 0) HisEqYN = false; else HisEqYN = true; }
+		if (ParV.size() > 2) { if (atoi(ParV[2].c_str()) == 0) GenerateTI = false; else GenerateTI = true; }
+		if (ParV.size() > 3) { if (atoi(ParV[3].c_str()) == 0) PatternEntropyAnalysisYN = false; else PatternEntropyAnalysisYN = true; }
+		if (ParV.size() > 4) { if (atoi(ParV[4].c_str()) == 0) PrintHisYN = false; else PrintHisYN = true; }
+		if (ParV.size() > 5) factorPos = atof(ParV[5].c_str());
+		if (ParV.size() > 6) factorC = atof(ParV[6].c_str()) * 100;
+	}
+
+	if (useRandomSeed) {
+		cout << endl << "use Random Seed";
+		srand((unsigned)time(NULL));
+		mersennetwistergenerator = mt19937(randomseed());
+	}
+	else {
+		cout << endl << "use Fixed Seed = 0";
+		srand(0);
+		mersennetwistergenerator = mt19937(0);
+	}
+	probabilitydistribution = uniform_real_distribution<double>(0.0, 1.0);
+
+	///////////////////////// Number of realizations
+	GetNextRowParameters(++Row, ResLines, ParV);
+	if (ParV.size() > 0) {
+		if (ParV.size() > 0) NumRealization = atoi(ParV[0].c_str());
+	}
+
+	//jump, according to series num
+	for (int i = 0; i < TIseries; i++)
+		Row+=3;
+
+
+	///////////////////////// Working directory
+	workpath = ResLines[++Row];
+	if (workpath.back() != '\\') workpath += '\\';
+	if (workpath == "\\") {
+		printf("\nFinish series, quit.");
+		_getch();
+		exit(0);
+	}
+
+	///////////////////////// Specify training images in XY, XZ and YZ-plane	
+	cout << endl << "Workpath:" << workpath;
+	if (ResLines.size() > ++Row) {
+		vector<string> ParV;
+		GetNextRowParameters(Row, ResLines, ParV);
+		if (ParV.size() > 0) {
+			if (ParV.size() > 0) { FNameXY = workpath + ParV[0]; if (!fileExists(FNameXY)) { cout << endl << "Cannot find: " << endl << FNameXY; _getch(); exit(1); } else cout << endl << ParV[0]; }
+			if (ParV.size() > 1) {
+				FNameXZ = workpath + ParV[1];
+				if (!fileExists(FNameXZ)) { cout << endl << "Cannot find: " << endl << FNameXZ; _getch(); exit(1); }
+				else cout << endl << ParV[1];
+			}
+			if (ParV.size() > 2) {
+				FNameYZ = workpath + ParV[2];
+				if (!fileExists(FNameYZ)) { cout << endl << "Cannot find: " << endl << FNameYZ; _getch(); exit(1); }
+				else cout << endl << ParV[2];
+			}
+		}
+	}
+
+	///////////////////////// read 3D model name
+	outputpath = "";
+	if (ResLines.size() > ++Row) {
+		vector<string> ParV;
+		GetNextRowParameters(Row, ResLines, ParV);
+		if (ParV.size() > 0) {
+			if (ParV.size() > 0) modelFilename3D = outputpath + ParV[0];
+		}
+		//////seperate filename and format
+		auto idx = ParV[0].rfind('.');
+		if (idx != std::string::npos) tempoutputformat = ParV[0].substr(idx);
+
+		/////2d simulation
+		if (tempoutputformat == ".png") {
+			cout << endl << "2D simulation ON, just use the first TI.";
+			SIM2D_YN = true;
+			COHERENCENUM = 21;			// to approximate ANN search
+		}
+
+		tempoutputfilename = ParV[0].substr(0, ParV[0].rfind('.') == string::npos ? ParV[0].length() : ParV[0].rfind('.'));
+	}
+	outputfilename = tempoutputfilename;
+
+	if (SIM2D_YN) FixedLayerDir = -1;
+	if (FixedLayerDir >= 0 && FixedLayerDir < 3) {
+		cout << endl << "enable fixed layer, modify directional weight: " << "1.0-->" << DirectionalWeight;
+	}
+
+	if (DMtransformYN && HisEqYN) parameterstring += "_Eq" + to_string((int)HisEqYN);
+	parameterstring += "DM" + to_string((int)DMtransformYN);
+	parameterstring += "Phis" + to_string((int)(10 * factorPos));
+	if (FixedLayerDir > -1 && FixedLayerDir < 3)  parameterstring += "Fix" + to_string(FixedLayerDir) + "W" + to_string((int)(100 * DirectionalWeight));
+
+	if (SIM2D_YN) parameterstring = "";
+	outputfilename += parameterstring;
+}
+
 
 bool DoPAR::ReadTxtFiles(const string PFName, vector<string>& ResLines)
 {
@@ -479,7 +635,7 @@ vector<uchar> DoPAR::load3Dmodel(const char* filename)
 //	TIx = S1; TIy = S2;
 //}
 
-void DoPAR::GetStarted(string CurExeFile)
+void DoPAR::GetStarted(string CurExeFile, int TIseries)
 {
 	cout << endl << "===========================================";
 	cout << endl << "PAR-KC                     ";
@@ -495,7 +651,8 @@ void DoPAR::GetStarted(string CurExeFile)
 		exit(0);
 	}
 	
-	ReadRunPar(CurExeFile);
+	//ReadRunPar(CurExeFile);
+	ReadRunPar_series(CurExeFile, TIseries);
 
 	DoANNOptimization();
 }
@@ -834,8 +991,8 @@ bool DoPAR::loadExemplar() {
 		}
 		MULTIRES = 6;
 
-		blockSize = { 10, 8, 6, 6, 6, 6 };
-		MAXITERATION = { 15, 6, 3, 2, 2, 2 };
+		blockSize = { 10, 8, 8, 6, 6, 6 };
+		MAXITERATION = { 30, 5, 3, 2, 2, 2 };
 
 		ANNerror = { 0, 0, 0, 0.5, 1.0, 1.0 };		//for big model use ANN
 	}
@@ -858,8 +1015,8 @@ bool DoPAR::loadExemplar() {
 			}
 			MULTIRES = 5;
 
-			blockSize = { 10, 8, 6, 6, 6 };
-			MAXITERATION = { 15, 6, 3, 2, 2 };
+			blockSize = { 10, 8, 8, 6, 6 };
+			MAXITERATION = { 30, 5, 3, 2, 2 };
 
 			ANNerror = { 0, 0, 0, 0.5, 0.5};
 		}
@@ -1780,8 +1937,11 @@ void DoPAR::outputmodel(int level) {
 		}
 	}
 	else {
-		tempoutputfilename = outputfilename + "_Size" + to_string(TEXSIZE[level]) + "DM.RAW";
-		Write(outputpath + tempoutputfilename, tempUchar);
+		if (GenerateTI) {
+			tempoutputfilename = outputfilename + "_Size" + to_string(TEXSIZE[level]) + "DM.RAW";
+			Write(outputpath + tempoutputfilename, tempUchar);
+		}
+
 
 		if (DMtransformYN) {
 			// binary model
@@ -3526,7 +3686,7 @@ void DoPAR::optimizeVolume(int level) {
 	}//for (size_idx i2 = 0; i2 < Size; ++i2) {
 //#pragma omp parallel for schedule(static)
 
-	if (!FIRSTRUN) cout << endl << "poretotal=" << poretotal_synthesis << " pore_require=" << poretotal_required;
+	if (!FIRSTRUN) cout << endl << "(poretotal-pore_require)/pore_require=" << 100.0f*(poretotal_synthesis-poretotal_required)/ poretotal_required<<"%";
 
 	if (FIRSTRUN) {
 		if (ColorHis_ON) initColorHis_synthesis(level);
@@ -3593,11 +3753,13 @@ void DoPAR::initColorHis_synthesis(int level) {
 
 	ColorHis_synthesis[level].resize(ColorHis_BinNum, 0L);
 	size_idx Size3d = TEXSIZE[level] * TEXSIZE[level] * TEXSIZE[level];
-	//size_idx Size2d = TEXSIZE[level] * TEXSIZE[level];
+	size_idx Size2d = TEXSIZE[level] * TEXSIZE[level];
+	
+	poretotal_required = m_volume[level].size() * porosity_required[level];
+	//!!can add a random shift value to porosity
 
-	poretotal_required = Size3d * porosity_required[level];
 	poretotal_synthesis = 0;
-	for (size_idx i = 0; i < Size3d/*Size2d*/; i++) {
+	for (size_idx i = 0; i < m_volume[level].size(); i++) {
 		ColorHis_synthesis[level][(int)m_volume[level][i]]++;
 
 		if (m_volume[level][i] > Solid_Upper[level]) poretotal_synthesis++;

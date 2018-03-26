@@ -8,11 +8,15 @@ int main(int argc, const char* argv[])
 {		
 	string CurWorkExeFile = argv[0];
 
-	DoPAR DoItNow;
-	DoItNow.GetStarted(CurWorkExeFile);	
+	for (int series = 0; series < 20; series++) {
+		DoPAR DoItNow;
+		DoItNow.GetStarted(CurWorkExeFile, series);	
+		//_getch();
+		DoItNow.~DoPAR();
+	}
+
 
 	cout << endl << "Finally: Press any key to quit...";
-
 	_getch();
 
 	return 0;

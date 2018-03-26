@@ -27,14 +27,16 @@ class DoPAR
 public:
 	DoPAR();
 	~DoPAR();
-	void GetStarted(string CurWorkExeFile);
+	void GetStarted(string CurWorkExeFile, int TIseries);
 private:
+
 	bool ReadTxtFiles(const string PFName, vector<string>& ResLines);
 	bool GetNextRowParameters(short Cno, vector<string>& ValidParStr, vector<string>& ParV);
 	long FileLength(const string& FName);
 	bool Write(const string FPathName, vector<uchar> Data);
 	bool iFileExistYN(const string& PFileName);		
 	void ReadRunPar(string CurExeFile); //Read running parameters
+	void ReadRunPar_series(string CurExeFile, int TIseries);
 	//=============================================================
 	string FNameXY, FNameXZ, FNameYZ;
 	string workpath, outputpath, outputfilename, parameterstring;
