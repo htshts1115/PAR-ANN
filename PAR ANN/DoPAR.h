@@ -55,7 +55,7 @@ private:
 	vector<int> MAXITERATION;							// max iteration time	//tested: fine level does not need many iterations
 	int NumRealization;
 	
-	int COHERENCENUM = 9;								// K-coherence 11
+	int COHERENCENUM = 11;								// K-coherence 11
 	vector<double> ANNerror;
 	bool useRandomSeed;									// Use random seed or fixed (0) for test (false)
 	
@@ -76,8 +76,11 @@ private:
 	int FixedLayerDir = -1;
 	size_dist DirectionalWeight = 0.66; 
 
-	bool ColorHis_ON = false;
-	vector<size_dist> factorC;
+	bool ColorHis_ON = true;
+	size_dist factorC = 200;
+	size_hiscount poretotal_synthesis, poretotal_required;
+	size_dist porosityX, porosityY, porosityZ;
+	vector<size_dist> porosity_required;
 
 	vector<size_dist> avgIndexHis;						// default average value of IndexHis
 	vector<size_dist> avgPosHis;						// default average value of PosHis
