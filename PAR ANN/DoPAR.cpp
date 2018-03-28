@@ -396,13 +396,15 @@ void DoPAR::ReadRunPar_series(string CurExeFile, int TIseries)
 
 
 	///////////////////////// Working directory
-	workpath = ResLines[++Row];
-	if (workpath.back() != '\\') workpath += '\\';
-	if (workpath == "\\") {
+	if (Row == ResLines.size()-1) {
 		printf("\nFinish series, quit.");
 		_getch();
 		exit(0);
 	}
+	
+	workpath = ResLines[++Row];
+	if (workpath.back() != '\\') workpath += '\\';
+
 
 	///////////////////////// Specify training images in XY, XZ and YZ-plane	
 	cout << endl << "Workpath:" << workpath;
@@ -654,7 +656,7 @@ void DoPAR::GetStarted(string CurExeFile, int TIseries)
 	//ReadRunPar(CurExeFile);
 	ReadRunPar_series(CurExeFile, TIseries);
 
-	DoANNOptimization();
+	DoANNOptimization(TIseries);
 }
 
 //void VectorShortToMat(const vector<short>& in, Mat& out)
@@ -707,37 +709,27 @@ const float DoPAR::inv_sqrt_2pi = 0.398942280401433f;
 /////////////////////////////////////////////////////////////
 
 
-void DoPAR::DoANNOptimization() {
+void DoPAR::DoANNOptimization(int TIseries) {
 	time_t StartTime;	time(&StartTime);
 	unsigned long t1, t2, t3;
 	
-	init();	
+	init(TIseries);
 
 	for (int numsim = 0; numsim < NumRealization; ++numsim) {
 		cout << endl << "Realization :  " << numsim+1 << "========================================";
 		if (numsim > 0) {
 			allocateVectors();
 			InitRandomVolume(0);
-		}
+		}		
 
 		for (int curlevel = 0; curlevel < MULTIRES; curlevel++) {
 			cout << endl << "=============level: " << curlevel << "===============";
 
 			FIRSTRUN = true;
 			initPermutation(curlevel);
-			
-			//if (curlevel <= 1) {
-			//	omp_set_dynamic(0);
-			//	omp_set_num_threads(min(4 * (curlevel + 1), MaxThread));
-			//}
-			//else { 
-			//	omp_set_dynamic(0); 
-			//	omp_set_num_threads(MaxThread);
-			//}
-			omp_set_dynamic(0); 
-			omp_set_num_threads(MaxThread);
 
-			for (int loop = 0; loop < MAXITERATION[curlevel]; loop++) {
+
+			for (int loop = 0; loop < MAXITERATION[curlevel]; loop++) {			
 				shuffle(m_permutation.begin(), m_permutation.end(), mersennetwistergenerator);
 				if (loop % (int)ceil(MAXITERATION[curlevel] * 0.5) == 0)
 					cout << endl << "iteration: " << loop;
@@ -782,15 +774,13 @@ void DoPAR::DoANNOptimization() {
 			if (curlevel < MULTIRES - 1) {// level up
 				upsampleVolume(curlevel);			
 				FIRSTRUN = true;
-				//if (NumRealization==1) cleardata(curlevel);
 			}
 		}
 	}
 
 	time_t NewTime;		time(&NewTime);
-	cout << endl << "Total reconstruction time: " << unsigned long(NewTime - StartTime) << " s (" << unsigned long(NewTime - StartTime)/60 <<" min)";
-	//if (NumRealization == 1) cleardata(MULTIRES-1);
-	/*else */cleardata();
+	cout << endl << "Total reconstruction time: " << unsigned long(NewTime - StartTime) << " s (" << unsigned long(NewTime - StartTime)/60 <<" min)";	
+	cleardata();
 }
 
 void DoPAR::allocateVectors() {
@@ -821,19 +811,26 @@ void DoPAR::allocateVectors() {
 	}
 }
 
-void DoPAR::init() {
+void DoPAR::init(int TIseries) {
 	int tempcore, tempthread;
 	MaxThread = omp_get_num_procs();
 	if (!SIM2D_YN) {
-		cout << endl << "Select maximum cores for CPU parallelization, no more than " << MaxThread/2 << endl;
-		cin >> tempcore;
-		tempthread = max(1, tempcore *2);
+		if (TIseries == 0) {
+			cout << endl << "Select maximum cores for CPU parallelization, no more than " << MaxThread / 2 << endl;
+			cin >> tempcore;
+			tempthread = max(1, tempcore * 2);
+		}	
+
+		if (tempthread <= MaxThread && TIseries == 0) {
+			omp_set_dynamic(0);     // Explicitly disable dynamic teams
+			MaxThread = tempthread;
+			omp_set_num_threads(MaxThread);
+		}
+		else {
+			omp_set_dynamic(0);
+			omp_set_num_threads(MaxThread);
+		}
 	}
-	if (tempthread <= MaxThread) {
-		omp_set_dynamic(0);     // Explicitly disable dynamic teams
-		MaxThread = tempthread;
-		omp_set_num_threads(MaxThread);
-	}//else use omp_get_num_procs()
 	else {
 		omp_set_dynamic(0);     // Explicitly disable dynamic teams
 		omp_set_num_threads(MaxThread);
@@ -898,8 +895,6 @@ void DoPAR::init() {
 
 	// K-Coherence
 	computeKCoherence();
-
-	if (SIM2D_YN) omp_set_num_threads(1);
 }
 
 // load 2D Exemplar, initialize multi-level!
@@ -996,7 +991,7 @@ bool DoPAR::loadExemplar() {
 
 		ANNerror = { 0, 0, 0, 0.5, 1.0, 1.0 };		//for big model use ANN
 	}
-	else if (tempSize >= 400) {
+	else if (tempSize > 400) {
 		if (PatternEntropyAnalysisYN) {
 			MULTIRES = 1;
 			blockSize = { 12 };
@@ -1015,10 +1010,36 @@ bool DoPAR::loadExemplar() {
 			}
 			MULTIRES = 5;
 
+			//blockSize = { 4, 4, 4, 2, 2 };
+			//MAXITERATION = { 2, 2, 1, 1, 1 };
 			blockSize = { 10, 8, 8, 6, 6 };
-			MAXITERATION = { 30, 5, 3, 2, 2 };
+			MAXITERATION = { 30, 5, 2, 2, 2 };
 
 			ANNerror = { 0, 0, 0, 0.5, 0.5};
+		}
+	}
+	else if (tempSize == 400) {
+		if (PatternEntropyAnalysisYN) {
+			MULTIRES = 1;
+			blockSize = { 12 };
+			MAXITERATION = { 3 };
+		}
+		else {
+			if (tempSize % 16 != 0) {
+				int cropedsize = tempSize / 16 * 16;
+				Mat cropedMatyz = matyz(Rect(0, 0, cropedsize, cropedsize));
+				cropedMatyz.copyTo(matyz);
+				Mat cropedMatzx = matzx(Rect(0, 0, cropedsize, cropedsize));
+				cropedMatzx.copyTo(matzx);
+				Mat cropedMatxy = matxy(Rect(0, 0, cropedsize, cropedsize));
+				cropedMatxy.copyTo(matxy);
+				cout << endl << "TIs are croped to " << cropedsize << " to fit multi-grid";
+			}
+			MULTIRES = 4;
+			blockSize = { 10, 8, 6, 6};	//50,100,200,400
+			MAXITERATION = { 30, 4, 2, 2};
+
+			ANNerror = { 0, 0, 0, 0.5 };
 		}
 	}
 	else if (tempSize >= 200) {
@@ -1040,7 +1061,7 @@ bool DoPAR::loadExemplar() {
 			}
 
 			MULTIRES = 4;
-			blockSize = {  10, 8, 6, 6 };
+			blockSize = {  10, 8, 8, 6 };
 			//blockSize = { 12, 10, 8, 8 };
 			MAXITERATION = { 40, 5, 3, 2 };
 			//MULTIRES = 3;
@@ -1061,6 +1082,8 @@ bool DoPAR::loadExemplar() {
 		}
 		MULTIRES = 3;
 
+		//blockSize = { 4, 4, 4};
+		//MAXITERATION = { 2, 2, 2 };
 		blockSize = { 10, 8, 8 };		//tested: coarse level big for quality, fine level small for speed
 		MAXITERATION = { 40, 5, 3 };	//tested: fine level does not need many iterations
 
@@ -1866,24 +1889,24 @@ void DoPAR::cleardata() {
 		PosHis[level].clear();
 		SelectedPos[level].clear();
 
-		//m_volume[level].shrink_to_fit();
-		//m_exemplar_x[level].shrink_to_fit();	m_exemplar_y[level].shrink_to_fit();	m_exemplar_z[level].shrink_to_fit();
-		//KCoherence_x[level].shrink_to_fit();	KCoherence_y[level].shrink_to_fit();	KCoherence_z[level].shrink_to_fit();
-		//isUnchanged_x[level].shrink_to_fit();
-		//isUnchanged_y[level].shrink_to_fit();
-		//isUnchanged_z[level].shrink_to_fit();
-		//nearestIdx_x[level].shrink_to_fit();
-		//nearestIdx_y[level].shrink_to_fit();
-		//nearestIdx_z[level].shrink_to_fit();
-		//nearestWeight_x[level].shrink_to_fit();	nearestWeight_y[level].shrink_to_fit();	nearestWeight_z[level].shrink_to_fit();
-		//Origin_x[level].shrink_to_fit();		Origin_y[level].shrink_to_fit();		Origin_z[level].shrink_to_fit();
-		//IndexHis_x[level].shrink_to_fit();		IndexHis_y[level].shrink_to_fit();		IndexHis_z[level].shrink_to_fit();
-		//PosHis[level].shrink_to_fit();
-		//SelectedPos[level].shrink_to_fit();
+		m_volume[level].shrink_to_fit();
+		m_exemplar_x[level].shrink_to_fit();	m_exemplar_y[level].shrink_to_fit();	m_exemplar_z[level].shrink_to_fit();
+		KCoherence_x[level].shrink_to_fit();	KCoherence_y[level].shrink_to_fit();	KCoherence_z[level].shrink_to_fit();
+		isUnchanged_x[level].shrink_to_fit();
+		isUnchanged_y[level].shrink_to_fit();
+		isUnchanged_z[level].shrink_to_fit();
+		nearestIdx_x[level].shrink_to_fit();
+		nearestIdx_y[level].shrink_to_fit();
+		nearestIdx_z[level].shrink_to_fit();
+		nearestWeight_x[level].shrink_to_fit();	nearestWeight_y[level].shrink_to_fit();	nearestWeight_z[level].shrink_to_fit();
+		Origin_x[level].shrink_to_fit();		Origin_y[level].shrink_to_fit();		Origin_z[level].shrink_to_fit();
+		IndexHis_x[level].shrink_to_fit();		IndexHis_y[level].shrink_to_fit();		IndexHis_z[level].shrink_to_fit();
+		PosHis[level].shrink_to_fit();
+		SelectedPos[level].shrink_to_fit();
 	}
 
 	m_permutation.clear();
-	//m_permutation.shrink_to_fit();
+	m_permutation.shrink_to_fit();
 }
 
 // write model
@@ -3686,7 +3709,7 @@ void DoPAR::optimizeVolume(int level) {
 	}//for (size_idx i2 = 0; i2 < Size; ++i2) {
 //#pragma omp parallel for schedule(static)
 
-	if (!FIRSTRUN) cout << endl << "(poretotal-pore_require)/pore_require=" << 100.0f*(poretotal_synthesis-poretotal_required)/ poretotal_required<<"%";
+	if (!FIRSTRUN) printf("porosity loss = %d", 100*(poretotal_synthesis - poretotal_required) / poretotal_required);
 
 	if (FIRSTRUN) {
 		if (ColorHis_ON) initColorHis_synthesis(level);

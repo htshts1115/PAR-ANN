@@ -6,20 +6,32 @@
 
 int main(int argc, const char* argv[])
 {		
+	SetErrorMode(SEM_FAILCRITICALERRORS | SEM_NOGPFAULTERRORBOX);	//!ignore error!!
+	
 	string CurWorkExeFile = argv[0];
-
-	for (int series = 0; series < 20; series++) {
+	
+	//for (int series = 0; series < 30; series++) {
+	//	DoPAR DoItNow;	
+	//	DoItNow.GetStarted(CurWorkExeFile, series);			
+	//	printf("series %d done", series);
+	//}
+	
+	if (argc == 1) {
 		DoPAR DoItNow;
-		DoItNow.GetStarted(CurWorkExeFile, series);	
-		//_getch();
-		DoItNow.~DoPAR();
+		DoItNow.GetStarted(CurWorkExeFile, 0);
+	}
+	else if (argc==2){
+		DoPAR DoItNow;
+		DoItNow.GetStarted(CurWorkExeFile, stoi(argv[1]));
 	}
 
 
-	cout << endl << "Finally: Press any key to quit...";
-	_getch();
 
-	return 0;
+	//cout << endl << "Finally: Press any key to quit...";
+	//_getch();
+
+	exit(0);
+	//return 0;
 }
 
 //string parv = "soilcrack_PCTOSIM_histeq.raw";

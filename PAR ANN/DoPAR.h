@@ -57,7 +57,7 @@ private:
 	vector<int> MAXITERATION;							// max iteration time	//tested: fine level does not need many iterations
 	int NumRealization;
 	
-	int COHERENCENUM = 11;								// K-coherence 11
+	int COHERENCENUM = 9;								// K-coherence 11
 	vector<double> ANNerror;
 	bool useRandomSeed;									// Use random seed or fixed (0) for test (false)
 	
@@ -163,9 +163,9 @@ private:
 	//}
 
 
-	void DoANNOptimization();
+	void DoANNOptimization(int TIseries);
 	
-	void init();
+	void init(int TIseries);
 
 	void allocateVectors();
 
