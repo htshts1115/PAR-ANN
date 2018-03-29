@@ -53,7 +53,10 @@ private:
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////
 	int MULTIRES;										// # of multi-resolution (0 -> MULTIRES - 1 :: coarsest -> finest)
 	vector<int> blockSize;								// template size	//tested: coarse level big for quality, fine level small for speed
-	vector<size_idx> TEXSIZE;							// size of input exemplar
+	vector<int> TIsize;									// size of input exemplar
+	vector<int> OUTsize;								// size of output 
+	int outputsizeatlastlevel = 0;
+
 	vector<int> MAXITERATION;							// max iteration time	//tested: fine level does not need many iterations
 	int NumRealization;
 	
@@ -61,7 +64,7 @@ private:
 	vector<double> ANNerror;
 	bool useRandomSeed;									// Use random seed or fixed (0) for test (false)
 	
-	const size_idx GRID = 2;							// sparse grid
+	const int GRID = 2;							// sparse grid
 	const size_dist min_dist = 0.1f;	
 	
 	bool HisEqYN = false;								// apply histogram equalization
@@ -72,8 +75,9 @@ private:
 
 
 	bool testNoDiscrete = false;
-	size_dist factorIndex = 0;//0; // 0.5;				//!! change to factor * (MULTIRES-level)
+	size_dist factorIndex = 1;//0; // 0.5;				//!! change to factor * (MULTIRES-level)
 	size_dist factorPos = 1;//0; // 0.5;
+	size_dist IndexHisManualControl = 2.5f, PosHisManualControl = 2.5f;
 
 	int FixedLayerDir = -1;
 	size_dist DirectionalWeight = 0.66; 
@@ -92,9 +96,11 @@ private:
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 	inline size_idx trimIndex(int level, size_idx index) {
+		//!!for 3d output
+
 		//if (isToroidal) {
-			if (index < 0) index += TEXSIZE[level];
-			return index % TEXSIZE[level];
+			if (index < 0) index += OUTsize[level];
+			return index % OUTsize[level];
 		//}
 		//else {//mirror
 		//	while (true) {
@@ -122,18 +128,19 @@ private:
 	}
 
 	inline size_idx convertIndexANN(int level, size_idx index){
-		//convert ANNSearch m_volume_nearest_x_index to TI index
+		//convert ANNSearch_nearest_x_index to TI index
 		size_idx i, j, height, bias;
-		height = TEXSIZE[level] - blockSize[level] + 1;
+		height = TIsize[level] - blockSize[level] + 1;
 		bias = static_cast<size_idx>(blockSize[level] * 0.5);
 		i = index / height + bias;
 		j = index % height + bias;
-		return (i*TEXSIZE[level] + j);
+		return (i*TIsize[level] + j);
 	}
 	inline size_idx sparseIdx(int level, size_idx index) {
+		//index is 2d. IndexHis
 		//convert idx to sparsed grid --> width/2!
 		size_idx i, j, height, sheight;
-		height = TEXSIZE[level];
+		height = TIsize[level];
 		sheight = height / GRID;
 		i = (index / height) / GRID;
 		j = (index % height) / GRID;
@@ -199,7 +206,7 @@ private:
 
 	// 3D Model
 	string modelFilename3D;
-	vector<uchar> load3Dmodel(const char* filename);
+	//vector<uchar> load3Dmodel(const char* filename);
 	bool loadVolume();
 	vector<vector<size_color>> m_volume;		// synthesized volume				//[level][idx3d] = color	//can be short, others can also use unsignedint_16
 	void outputmodel(int level);
@@ -207,7 +214,8 @@ private:
 	void InitRandomVolume(int level);
 
 	// assign fixed layer
-	void AssignFixedLayer(int level, int dir);
+
+	//void AssignFixedLayer(int level, int dir);
 	
 	// random permutation (precomputed)
 	vector<size_idx>	 m_permutation;												//[idx3d] = idx3d

@@ -5,7 +5,8 @@
 #include "DoPAR.h"
 
 int main(int argc, const char* argv[])
-{		
+{	
+
 	SetErrorMode(SEM_FAILCRITICALERRORS | SEM_NOGPFAULTERRORBOX);	//!ignore error!!
 	
 	string CurWorkExeFile = argv[0];
