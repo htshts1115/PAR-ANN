@@ -1088,15 +1088,68 @@ bool DoPAR::loadExemplar() {
 		// [end] memory allocation -------------------------------------------
 	}
 
+	
+	
+
+	if (DMtransformYN) {
+		//!add padding border to image
+		copyMakeBorder(matyz, matyz, 1, 1, 1, 1, BORDER_REPLICATE);
+		copyMakeBorder(matzx, matzx, 1, 1, 1, 1, BORDER_REPLICATE);
+		copyMakeBorder(matxy, matxy, 1, 1, 1, 1, BORDER_REPLICATE);
+		//imwrite("pd.png", matyz); _getch();
+
+		// convert mat to vector
+		vector<short> padded_x, padded_y, padded_z;
+		int padded_TIsize = TIsize[MULTIRES - 1] + 2;
+		padded_x.resize(padded_TIsize*padded_TIsize);
+		padded_y.resize(padded_TIsize*padded_TIsize);
+		padded_z.resize(padded_TIsize*padded_TIsize);
+		if (matyz.isContinuous()) 	padded_x.assign(matyz.datastart, matyz.dataend);
+		if (matzx.isContinuous()) 	padded_y.assign(matzx.datastart, matzx.dataend);
+		if (matxy.isContinuous()) 	padded_z.assign(matxy.datastart, matxy.dataend);
+
+		//!invert border
+		for (int x = 0; x < padded_TIsize; x++) {
+			int idx1 = x, idx2 = (padded_TIsize - 1)*padded_TIsize + x;
+			padded_x[idx1] = (255 - padded_x[idx1]); padded_x[idx2] = (255 - padded_x[idx2]);
+			padded_y[idx1] = (255 - padded_y[idx1]); padded_y[idx2] = (255 - padded_y[idx2]);
+			padded_z[idx1] = (255 - padded_z[idx1]); padded_z[idx2] = (255 - padded_z[idx2]);
+		}
+		for (int y = 0; y < padded_TIsize; y++) {
+			int idx1 = y*padded_TIsize, idx2 = (padded_TIsize - 1) + y*padded_TIsize;
+			padded_x[idx1] = (255 - padded_x[idx1]); padded_x[idx2] = (255 - padded_x[idx2]);
+			padded_y[idx1] = (255 - padded_y[idx1]); padded_y[idx2] = (255 - padded_y[idx2]);
+			padded_z[idx1] = (255 - padded_z[idx1]); padded_z[idx2] = (255 - padded_z[idx2]);
+		}	
+
+		//Distance map transformation
+		transformDM(MULTIRES - 1, padded_x, padded_y, padded_z);
+		//if (DMtransformYN) transformDM(MULTIRES - 1, m_exemplar_x[MULTIRES - 1], m_exemplar_y[MULTIRES - 1], m_exemplar_z[MULTIRES - 1]);
+
+		//!crop vector to mat
+		vector<unsigned char> tmpchar = vector<unsigned char>(padded_x.begin(), padded_x.end());
+		matyz = Mat(tmpchar, true).reshape(1, matyz.rows);// vector to mat, need the same data type!
+		Mat cropedmatyz = matyz(Rect(1, 1, TIsize[MULTIRES-1], TIsize[MULTIRES - 1]));
+		cropedmatyz.copyTo(matyz);
+		tmpchar = vector<unsigned char>(padded_y.begin(), padded_y.end());
+		matzx = Mat(tmpchar, true).reshape(1, matzx.rows);// vector to mat, need the same data type!
+		Mat cropedmatzx = matzx(Rect(1, 1, TIsize[MULTIRES - 1], TIsize[MULTIRES - 1]));
+		cropedmatzx.copyTo(matzx);
+		tmpchar = vector<unsigned char>(padded_z.begin(), padded_z.end());
+		matxy = Mat(tmpchar, true).reshape(1, matxy.rows);// vector to mat, need the same data type!
+		Mat cropedmatxy = matxy(Rect(1, 1, TIsize[MULTIRES - 1], TIsize[MULTIRES - 1]));
+		cropedmatxy.copyTo(matxy);
+
+		//imwrite("dmpd_c.png", matyz); _getch();
+	}
 	// convert mat to vector
 	if (matyz.isContinuous()) 	m_exemplar_x[MULTIRES - 1].assign(matyz.datastart, matyz.dataend);
 	if (matzx.isContinuous()) 	m_exemplar_y[MULTIRES - 1].assign(matzx.datastart, matzx.dataend);
 	if (matxy.isContinuous()) 	m_exemplar_z[MULTIRES - 1].assign(matxy.datastart, matxy.dataend);
-
+	
+	
 	///////--------------Processing TI----------------------------------
 
-	////Distance map transformation
-	if (DMtransformYN) transformDM(MULTIRES - 1, m_exemplar_x[MULTIRES - 1], m_exemplar_y[MULTIRES - 1], m_exemplar_z[MULTIRES - 1]);
 
 	//Gaussian filter resizing better than opencv interpolation resize(inter_area)
 	if (MULTIRES > 1) {										
@@ -2262,8 +2315,9 @@ vector<short> DoPAR::GetDMap(short Sx, short Sy, short Sz, vector<char>& OImg, c
 void DoPAR::transformDM(int level, vector<size_color>& exemplar1, vector<size_color>& exemplar2, vector<size_color>& exemplar3) {
 	// redistribute TI based on DM, no need to resize to 0-255
 	// first transform to DMap, then linear project (just make -s and +p to positive values)
-	const short TEXSIZE_ = TIsize[level];
+	const short TEXSIZE_ = sqrt(exemplar1.size());
 	if (exemplar1.size() != exemplar2.size() || exemplar1.size() != exemplar3.size()) { cout << endl << "exemplars size different!"; getch(); exit(0); }
+
 	vector<short> DMap_x(exemplar1.begin(), exemplar1.end());
 	vector<short> DMap_y(exemplar2.begin(), exemplar2.end());
 	vector<short> DMap_z(exemplar3.begin(), exemplar3.end());
@@ -2338,6 +2392,89 @@ void DoPAR::transformDM(int level, vector<size_color>& exemplar1, vector<size_co
 	exemplar1 = vector<size_color>(DMap_x.begin(), DMap_x.end());
 	exemplar2 = vector<size_color>(DMap_y.begin(), DMap_y.end());
 	exemplar3 = vector<size_color>(DMap_z.begin(), DMap_z.end());
+}
+
+void DoPAR::transformDM(int level, vector<short>& exemplar1, vector<short>& exemplar2, vector<short>& exemplar3) {
+	// redistribute TI based on DM, no need to resize to 0-255
+	// first transform to DMap, then linear project (just make -s and +p to positive values)
+	const short TEXSIZE_ = sqrt(exemplar1.size());
+
+	if (exemplar1.size() != exemplar2.size() || exemplar1.size() != exemplar3.size()) { cout << endl << "exemplars size different!"; getch(); exit(0); }
+
+	vector<short> DMap_x(exemplar1.begin(), exemplar1.end());
+	vector<short> DMap_y(exemplar2.begin(), exemplar2.end());
+	vector<short> DMap_z(exemplar3.begin(), exemplar3.end());
+	vector<char> tempchar(exemplar1.size());
+
+	binaryChar(DMap_x, tempchar);
+	DMap_x = GetDMap(TEXSIZE_, TEXSIZE_, 1, tempchar, 2, true);
+	binaryChar(DMap_y, tempchar);
+	DMap_y = GetDMap(TEXSIZE_, TEXSIZE_, 1, tempchar, 2, true);
+	binaryChar(DMap_z, tempchar);
+	DMap_z = GetDMap(TEXSIZE_, TEXSIZE_, 1, tempchar, 2, true);
+	//binaryChar(DMap_x, tempchar);
+	//DMap_x = GetDMap(TEXSIZE_, TEXSIZE_, 1, tempchar, 2, false);
+	//binaryChar(DMap_y, tempchar);
+	//DMap_y = GetDMap(TEXSIZE_, TEXSIZE_, 1, tempchar, 2, false);
+	//binaryChar(DMap_z, tempchar);
+	//DMap_z = GetDMap(TEXSIZE_, TEXSIZE_, 1, tempchar, 2, false);
+
+	for (long idx = 0; idx < DMap_x.size(); ++idx) {	//get the true distance
+		DMap_x[idx] = (DMap_x[idx] / abs(DMap_x[idx])) * round(sqrt(abs(DMap_x[idx])));
+		DMap_y[idx] = (DMap_y[idx] / abs(DMap_y[idx])) * round(sqrt(abs(DMap_y[idx])));
+		DMap_z[idx] = (DMap_z[idx] / abs(DMap_z[idx])) * round(sqrt(abs(DMap_z[idx])));
+	}
+
+	// prepare, get maxDis & minDis for TIs
+	short minVal, maxVal, minVal1, minVal2, minVal3, maxVal1, maxVal2, maxVal3;	//total min, max for 3TIs; and separately
+	minVal = maxVal = DMap_x[0];
+	minVal1 = maxVal1 = DMap_x[0]; minVal2 = maxVal2 = DMap_y[0]; minVal3 = maxVal3 = DMap_z[0];
+	for (long idx = 0; idx < DMap_x.size(); ++idx) {
+		if (DMap_x[idx] == 0) { cout << endl << "DMap_x[" << idx << "]= 0!!"; _getch(); }
+		if (DMap_x[idx] < minVal1) minVal1 = DMap_x[idx];
+		if (DMap_x[idx] > maxVal1) maxVal1 = DMap_x[idx];
+
+		if (DMap_y[idx] < minVal2) minVal2 = DMap_y[idx];
+		if (DMap_y[idx] > maxVal2) maxVal2 = DMap_y[idx];
+
+		if (DMap_z[idx] < minVal3) minVal3 = DMap_z[idx];
+		if (DMap_z[idx] > maxVal3) maxVal3 = DMap_z[idx];
+	}
+
+	//if (!HisEqYN) {
+	minVal = max(minVal1, max(minVal2, minVal3));
+	maxVal = min(maxVal1, min(maxVal2, maxVal3));
+	//}
+	//else {
+	//	minVal = min(minVal1, min(minVal2, minVal3));
+	//	maxVal = max(maxVal1, max(maxVal2, maxVal3));
+	//}
+
+
+	// transform to exemplar			// no need to resize to 0-255!   min -> 0, +1 -> -min
+	Solid_Upper[level] = -minVal;
+	Pore_Upper[level] = maxVal - minVal;	//total bins
+	Pore_Lower[level] = Solid_Upper[level] + 1;
+
+	for (long i = 0; i < DMap_x.size(); i++) {
+		if (DMap_x[i] < 0) DMap_x[i] = max(0, DMap_x[i] - minVal) + 1;
+		else DMap_x[i] = min(DMap_x[i] - minVal, maxVal - minVal);
+
+		if (DMap_y[i] < 0) DMap_y[i] = max(0, DMap_y[i] - minVal) + 1;
+		else DMap_y[i] = min(DMap_y[i] - minVal, maxVal - minVal);
+
+		if (DMap_z[i] < 0) DMap_z[i] = max(0, DMap_z[i] - minVal) + 1;
+		else DMap_z[i] = min(DMap_z[i] - minVal, maxVal - minVal);
+
+
+
+
+	}
+
+	//convert from vector<short> to vector<float>
+	exemplar1 = vector<short>(DMap_x.begin(), DMap_x.end());
+	exemplar2 = vector<short>(DMap_y.begin(), DMap_y.end());
+	exemplar3 = vector<short>(DMap_z.begin(), DMap_z.end());
 }
 
 

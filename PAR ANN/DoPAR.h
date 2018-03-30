@@ -202,6 +202,7 @@ private:
 	vector<short> GetDMap(short Sx, short Sy, short Sz, vector<char>& OImg, char DM_Type, bool DisValYN);		//calculate Distance Map
 	//redistribute TI based on DM, no need to resize to 0-255
 	void transformDM(int level, vector<size_color>& exemplar1, vector<size_color>& exemplar2, vector<size_color>& exemplar3);
+	void transformDM(int level, vector<short>& exemplar1, vector<short>& exemplar2, vector<short>& exemplar3);
 
 
 	// 3D Model
