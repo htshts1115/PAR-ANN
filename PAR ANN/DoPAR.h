@@ -75,9 +75,9 @@ private:
 
 
 	bool testNoDiscrete = false;
-	size_dist factorIndex = 1;//0; // 0.5;				//!! change to factor * (MULTIRES-level)
-	size_dist factorPos = 1;//0; // 0.5;
-	size_dist IndexHisManualControl = 2.5f, PosHisManualControl = 2.5f;
+	size_dist factorIndex = 1.0f;//0; // 0.5;				//!! change to factor * (MULTIRES-level)
+	size_dist factorPos = 1.0f;//0; // 0.5;
+	size_dist IndexHisManualControl = 1.0f, PosHisManualControl = 1.0f;
 
 	int FixedLayerDir = -1;
 	size_dist DirectionalWeight = 0.66; 
