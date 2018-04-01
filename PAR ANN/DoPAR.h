@@ -75,7 +75,7 @@ private:
 
 
 	bool testNoDiscrete = false;
-	size_dist factorIndex = 1.0f;//0; // 0.5;				//!! change to factor * (MULTIRES-level)
+	size_dist factorIndex = 0.0f;//0; // 0.5;				//!! change to factor * (MULTIRES-level)
 	size_dist factorPos = 1.0f;//0; // 0.5;
 	size_dist IndexHisManualControl = 1.0f, PosHisManualControl = 1.0f;
 
@@ -188,7 +188,6 @@ private:
 
 	//void equalizeHistogram(vector<size_color>& exemplar, unsigned short max_val);
 	void equalizeHistogram(int level, vector<size_color>& exemplarX, vector<size_color>& exemplarY, vector<size_color>& exemplarZ);
-	size_color _Solid_Upper, _Pore_Lower;
 
 	//=============== Pattern entropy analysis ====
 	void patternentropyanalysis(int templatesize, Mat &exemplar, double &entropy);
