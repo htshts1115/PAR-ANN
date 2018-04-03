@@ -83,7 +83,7 @@ private:
 	size_dist DirectionalWeight = 0.66; 
 
 	bool ColorHis_ON = true;
-	size_dist factorC = 200;
+	size_dist factorC = 1;
 	size_hiscount poretotal_synthesis, poretotal_required;
 	size_dist porosityX, porosityY, porosityZ;
 	vector<size_dist> porosity_required;
@@ -188,6 +188,8 @@ private:
 
 	//void equalizeHistogram(vector<size_color>& exemplar, unsigned short max_val);
 	void equalizeHistogram(int level, vector<size_color>& exemplarX, vector<size_color>& exemplarY, vector<size_color>& exemplarZ);
+	int Solid_Upper_noeq, Pore_Lower_noeq;
+
 
 	//=============== Pattern entropy analysis ====
 	void patternentropyanalysis(int templatesize, Mat &exemplar, double &entropy);
@@ -197,6 +199,7 @@ private:
 	vector<size_color> Solid_Upper, Pore_Upper, Pore_Lower;						//Redistribute DMap. Use same Solid_Upper,Pore_Lower for 3TIs and loaded model
 	void binaryChar(vector<short>& DMap, vector<char>& Binarised, short threshold);
 	void binaryUchar(vector<short>& DMap, vector<uchar>& Binarised, short threshold);
+	void binaryUchar(vector<uchar>& model, short threshold);
 	vector<unsigned short> BarDMap(short tSx, short tSy, short tSz, vector<char>& OImg);
 	vector<short> GetDMap(short Sx, short Sy, short Sz, vector<char>& OImg, char DM_Type, bool DisValYN);		//calculate Distance Map
 	//redistribute TI based on DM, no need to resize to 0-255
@@ -210,6 +213,8 @@ private:
 	bool loadVolume();
 	vector<vector<size_color>> m_volume;		// synthesized volume				//[level][idx3d] = color	//can be short, others can also use unsignedint_16
 	void outputmodel(int level);
+
+	void cropmodel(int level, int cropl, vector<uchar>&model);
 
 	void InitRandomVolume(int level);
 
@@ -235,7 +240,7 @@ private:
 
 	//=========== phase 1: search ================================
 	size_dist TotalDis;
-	bool searchVolume(int level);
+	bool searchVolume(int level, int loop);
 
 	size_dist getFullDistance(int level, vector<size_color>& exemplar, size_idx idx2d, CvMat* dataMat);
 	size_dist getFullDistance(int level, vector<size_color>& exemplar, size_idx idx2d, CvMat * dataMat, bool shrinkYN);
@@ -246,7 +251,7 @@ private:
 	size_idx DoPAR::getRandomNearestIndex(int level, vector<size_hiscount>& IndexHis);	//for bad points
 
 	//========== phase 2: optimization ===========================
-	void optimizeVolume(int level);
+	void optimizeVolume(int level, int loop);
 
 	bool FIRSTRUN = true;
 	
