@@ -5,6 +5,7 @@
 
 #pragma once
 
+
 #include <windows.h>
 #include <stdlib.h> //for encode/decode base64, random number
 #include <fstream> //File read write
@@ -28,6 +29,7 @@
 #include <set>
 #include <functional>	//bind1st
 #include <numeric>
+
 
 //#include <opencv2/core/core.hpp>
 //#include <opencv2/imgcodecs.hpp>

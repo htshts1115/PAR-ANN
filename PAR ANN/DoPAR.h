@@ -30,24 +30,16 @@ public:
 	void GetStarted(string CurWorkExeFile, int TIseries);
 private:
 
-	bool ReadTxtFiles(const string PFName, vector<string>& ResLines);
-	bool GetNextRowParameters(short Cno, vector<string>& ValidParStr, vector<string>& ParV);
-	long FileLength(const string& FName);
-	bool Write(const string FPathName, vector<uchar> Data);
-	bool iFileExistYN(const string& PFileName);		
-	void ReadRunPar(string CurExeFile); //Read running parameters
 	void ReadRunPar_series(string CurExeFile, int TIseries);
+
 	//=============================================================
-	string FNameXY, FNameXZ, FNameYZ;
+	vector<string> FNameXY, FNameXZ, FNameYZ;
 	string workpath, outputpath, outputfilename, parameterstring;
-	vector<string> FNameAddition;  //file path names of the training images
-	//double PorosityX, PorosityY, PorosityZ, PorosityM; //Original porosities from 3 training images
 	
 	random_device randomseed;
 	mt19937 mersennetwistergenerator;
 	uniform_real_distribution<double> probabilitydistribution;
 
-	void showMat(const cv::String& winname, const cv::Mat& mat);
 	///========================== optimization based =====================
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -60,11 +52,14 @@ private:
 	vector<int> MAXITERATION;							// max iteration time	//tested: fine level does not need many iterations
 	int NumRealization;
 	
+	bool MultipleTIsYN;									//! if true, will try to use TIs with same prefix filename
+	int MultipleTIsNum=1;								// how many TIs found(use)
+
 	int COHERENCENUM = 9;								// K-coherence 11
 	vector<double> ANNerror;
 	bool useRandomSeed;									// Use random seed or fixed (0) for test (false)
 	
-	const int GRID = 2;							// sparse grid
+	const int GRID = 2;									// sparse grid
 	const size_dist min_dist = 0.1f;	
 	
 	bool HisEqYN = false;								// apply histogram equalization
@@ -75,15 +70,15 @@ private:
 
 
 	bool testNoDiscrete = false;
-	size_dist factorIndex = 0.0f;//0; // 0.5;				//!! change to factor * (MULTIRES-level)
-	size_dist factorPos = 1.0f;//0; // 0.5;
+	size_dist factorIndex = 0.1f;//0; // 0.5;				//!! change to factor * (MULTIRES-level)
+	size_dist factorPos = 0.1f;//0; // 0.5;
 	size_dist IndexHisManualControl = 1.0f, PosHisManualControl = 1.0f;
 
 	int FixedLayerDir = -1;
 	size_dist DirectionalWeight = 0.66; 
 
 	bool ColorHis_ON = true;
-	size_dist factorC = 1;
+	size_dist factorC = 0.1;
 	size_hiscount poretotal_synthesis, poretotal_required;
 	size_dist porosityX, porosityY, porosityZ;
 	vector<size_dist> porosity_required;
@@ -146,28 +141,6 @@ private:
 		j = (index % height) / GRID;
 		return (i*sheight + j);
 	}
-	static const size_dist inv_sqrt_2pi;
-	inline size_dist gaussian_pdf(size_dist x, size_dist dev){		
-		if (x == 0.0f) return 1.0f;
-		return exp(-0.5f * (x * x / dev / dev));
-		//return max(FLT_MIN, exp(-0.5f * (x * x / dev / dev)));
-	}
-	//const size_dist	gwdev = 1.0f / 6.0f;
-	//inline size_dist normal_cdf(size_dist x, size_dist stddev, size_dist mean = 0.0f){
-	//	if (x == 0.0f) return 1.0f;
-	//	size_dist tx = (x - mean) / (stddev * sqrt(2.0f));
-	//	size_dist y = 1.0f / (1.0f + 0.3275911f * tx);
-	//	size_dist erf = 1.0f - (((((
-	//		+1.061405429f  * y
-	//		- 1.453152027f) * y
-	//		+ 1.421413741f) * y
-	//		- 0.284496736f) * y
-	//		+ 0.254829592f) * y)
-	//		* exp(-tx * tx);
-	//	size_dist cdf = (1.0f - 0.5f * (1.0f + erf)) * 2.0f;	// =/0.5f
-	//	if (cdf < FLT_MIN) cdf = FLT_MIN;
-	//	return cdf;
-	//}
 
 
 	void DoANNOptimization(int TIseries);
@@ -186,7 +159,6 @@ private:
 
 	void testPCA();		//compare PCA TI
 
-	//void equalizeHistogram(vector<size_color>& exemplar, unsigned short max_val);
 	void equalizeHistogram(int level, vector<size_color>& exemplarX, vector<size_color>& exemplarY, vector<size_color>& exemplarZ);
 	int Solid_Upper_noeq, Pore_Lower_noeq;
 
@@ -243,7 +215,6 @@ private:
 	bool searchVolume(int level, int loop);
 
 	size_dist getFullDistance(int level, vector<size_color>& exemplar, size_idx idx2d, CvMat* dataMat);
-	size_dist getFullDistance(int level, vector<size_color>& exemplar, size_idx idx2d, CvMat * dataMat, bool shrinkYN);
 
 	vector<vector<bool>> isUnchanged_x, isUnchanged_y, isUnchanged_z;				//[level][idx3d]=isUnchanged	bool
 	bool isUnchangedBlock(int level, int direction, size_idx i, size_idx j, size_idx k);
@@ -278,7 +249,6 @@ private:
 	vector<vector<size_hiscount>> ColorHis_exemplar;								//[level][BinNum], BinNum is the same for all level
 	vector<vector<size_hiscount>> ColorHis_synthesis;
 
-	void initColorHis_exemplar();
 	void initColorHis_synthesis(int level);
 };
 

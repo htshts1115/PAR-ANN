@@ -11,11 +11,7 @@ int main(int argc, const char* argv[])
 	
 	string CurWorkExeFile = argv[0];
 	
-	//for (int series = 0; series < 30; series++) {
-	//	DoPAR DoItNow;	
-	//	DoItNow.GetStarted(CurWorkExeFile, series);			
-	//	printf("series %d done", series);
-	//}
+
 	
 	if (argc == 1) {
 		DoPAR DoItNow;
@@ -26,13 +22,10 @@ int main(int argc, const char* argv[])
 		DoItNow.GetStarted(CurWorkExeFile, stoi(argv[1]));
 	}
 
-
-
 	//cout << endl << "Finally: Press any key to quit...";
 	//_getch();
 
-	exit(0);
-	//return 0;
+	return 0;
 }
 
 //string parv = "soilcrack_PCTOSIM_histeq.raw";
@@ -293,7 +286,7 @@ int main(int argc, const char* argv[])
 ////			dataStream.open(argv[++i], ios::in);// open data file
 ////			if (!dataStream) {
 ////				cerr << "Cannot open data file\n";
-////				exit(1);
+////				exit(0);
 ////			}
 ////			dataIn = &dataStream;				// make this the data stream
 ////		}
@@ -301,18 +294,18 @@ int main(int argc, const char* argv[])
 ////			queryStream.open(argv[++i], ios::in);// open query file
 ////			if (!queryStream) {
 ////				cerr << "Cannot open query file\n";
-////				exit(1);
+////				exit(0);
 ////			}
 ////			queryIn = &queryStream;			// make this query stream
 ////		}
 ////		else {									// illegal syntax
 ////			cerr << "Unrecognized option.\n";
-////			exit(1);
+////			exit(0);
 ////		}
 ////		i++;
 ////	}
 ////	if (dataIn == NULL || queryIn == NULL) {
 ////		cerr << "-df and -qf options must be specified\n";
-////		exit(1);
+////		exit(0);
 ////	}
 ////}

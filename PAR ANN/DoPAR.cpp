@@ -6,11 +6,10 @@
 DoPAR::DoPAR(){	
 
 }
-
 DoPAR::~DoPAR(){
 }
 
-long DoPAR::FileLength(const string& FName)
+long FileLength(const string& FName)
 {
 	ifstream InF(FName.c_str(), ios::in | ios::binary);
 	if (!InF) return 0;
@@ -23,70 +22,11 @@ long DoPAR::FileLength(const string& FName)
 
 	return Length;
 }
-
-//bool DoPAR::Read(const string FPathName, vector<uchar>& Data)
-//{
-//	Data.clear();
-//
-//	long Length = FileLength(FPathName.c_str());
-//	if (Length < 1) {
-//		//cout << endl << "File is empty!";
-//		return false;
-//	}
-//
-//	ifstream InF(FPathName.c_str(), ios::in | ios::binary);
-//	if (!InF) return false;
-//
-//	Data.reserve(Length);
-//
-//	long BlockNum = 1000000L; //~1M
-//
-//	long ActualBlkNum = floor(1.0*Length / BlockNum);
-//
-//	if (ActualBlkNum > 0) {//Read the file one block after another
-//		const long BlockSize = sizeof(char)*BlockNum;
-//
-//		char* Mblock = new char[BlockSize];
-//
-//		for (long RowNum = 0; RowNum < ActualBlkNum; ++RowNum) {
-//			if (!InF.read(reinterpret_cast<char *>(Mblock), BlockSize))
-//			{
-//				delete[] Mblock; InF.close(); return false;
-//			}
-//
-//			for (long idx = 0; idx<BlockNum; ++idx)
-//				Data.push_back(Mblock[idx]);
-//		}
-//
-//		delete[] Mblock;
-//	}//Read the file one block after another
-//
-//	BlockNum = Length - ActualBlkNum*BlockNum;
-//
-//	if (BlockNum > 0) {
-//		const long BlockSize = sizeof(char)*BlockNum;
-//		char* Mblock = new char[BlockSize];
-//
-//		if (!InF.read(reinterpret_cast<char *>(Mblock), BlockSize))
-//		{
-//			delete[] Mblock; InF.close(); return false;
-//		}
-//
-//		for (long idx = 0; idx<BlockNum; ++idx)
-//			Data.push_back(Mblock[idx]);
-//
-//		delete[] Mblock;
-//	}
-//
-//	InF.close();  return true;
-//}
-
-inline bool fileExists(const string& name) {
+bool fileExists(const string& name) {
 	struct stat buffer;
 	return (stat(name.c_str(), &buffer) == 0);
 }
-
-bool DoPAR::Write(const string FPathName, vector<uchar> Data)
+bool Write(const string FPathName, vector<uchar> Data)
 {
 	if (FPathName.size() == 0) return false;
 	if (Data.size() == 0) return false;
@@ -130,12 +70,11 @@ bool DoPAR::Write(const string FPathName, vector<uchar> Data)
 
 	return true;
 }
-
-bool DoPAR::GetNextRowParameters(short Cno, vector<string>& ValidParStr, vector<string>& ParV)
+bool GetNextRowParameters(short Cno, vector<string>& ValidParStr, vector<string>& ParV)
 {
 	if ((unsigned short)Cno >= ValidParStr.size()) {
 		cout << endl << "Wrong arguments!";
-		char ch; cin >> ch; exit(1);
+		char ch; cin >> ch; exit(0);
 	}
 
 	ParV.clear();
@@ -152,160 +91,103 @@ bool DoPAR::GetNextRowParameters(short Cno, vector<string>& ValidParStr, vector<
 
 	return true;
 }
-
-bool DoPAR::iFileExistYN(const string& PFileName)
+bool iFileExistYN(const string& PFileName)
 {
 	struct stat stFileInfo;
 	int intStat = stat(PFileName.c_str(), &stFileInfo);
 	if (intStat != 0) return false;
 	return true;
 }
+bool ReadTxtFiles(const string PFName, vector<string>& ResLines)
+{
+	{ vector<string> LineLst; ResLines.swap(LineLst); }
 
-//void DoPAR::ReadRunPar(string CurExeFile)
-//{
-//	cout << endl << "===========================================";
-//	cout << endl << "Set up your running parameters...    ";
-//	cout << endl << "===========================================";
-//
-//	string tempoutputfilename;
-//	string tempoutputformat;
-//	string parametername;
-//
-//	string Path;
-//	vector<string> ResLines;
-//	{//Read setup file
-//		string tmpstr, name;
-//		iCGetDirFileName(CurExeFile, Path, name);
-//		//string PFName = Path + "PAR-GO_Setup_series.DAT";//!changed to series 
-//		string PFName = Path + "PAR-GO_Setup.DAT";
-//		vector<string> TmpLines;
-//		if (!ReadTxtFiles(PFName, TmpLines)) {
-//			cout << endl;
-//			cout << endl << " @@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@";
-//			cout << endl << " Failed to open file '" << PFName.c_str() << "' !";
-//			cout << endl << " @@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@";
-//			cout << endl;
-//			cout << endl << "Press any key to quit ...";
-//			_getch(); exit(1);
-//		}
-//
-//		for (unsigned long Row = 0; Row < TmpLines.size(); Row++) {
-//			string::size_type Posidx = TmpLines[Row].find("//");
-//			if (Posidx != string::npos) {
-//				continue;
-//			}
-//			else {
-//				Posidx = TmpLines[Row].find("/*");
-//				if (Posidx != string::npos) continue;
-//			}
-//			ResLines.push_back(TmpLines[Row]);
-//		} //for(int Row=0; Row < LineLst.size(); Row++)
-//
-//		if (ResLines.size() == 0) {
-//			cout << endl << " ============================================================";
-//			cout << endl << " Failed to open PAR-GO_Setup.DAT in current working directory !";
-//			cout << endl << " ============================================================";
-//			cout << endl << " Press any key to quit....";
-//			_getch(); exit(1);
-//		}
-//	}//Read setup file
-//	short Row(0);
-//	
-//	///////////////////////// check random seed
-//	vector<string> ParV;
-//	GetNextRowParameters(Row, ResLines, ParV);
-//	if (ParV.size() > 0) {
-//		useRandomSeed = true;		
-//
-//		//if (ParV.size() > 1) { if (atoi(ParV[1].c_str()) == 0) DMtransformYN = false; else DMtransformYN = true; }
-//		if (ParV.size() > 0) FixedLayerDir = atoi(ParV[0].c_str()) - 1;
-//		if (ParV.size() > 1) { if (atoi(ParV[1].c_str()) == 0) HisEqYN = false; else HisEqYN = true; }
-//		if (ParV.size() > 2) { if (atoi(ParV[2].c_str()) == 0) GenerateTI = false; else GenerateTI = true; }
-//		if (ParV.size() > 3) { if (atoi(ParV[3].c_str()) == 0) PatternEntropyAnalysisYN = false; else PatternEntropyAnalysisYN = true; }
-//		if (ParV.size() > 4) { if (atoi(ParV[4].c_str()) == 0) PrintHisYN = false; else PrintHisYN = true; }	
-//		if (ParV.size() > 5) factorPos = atof(ParV[5].c_str());
-//		if (ParV.size() > 6) factorC = atof(ParV[6].c_str())*100;
-//	}
-//
-//	if (useRandomSeed) {
-//		cout << endl << "use Random Seed";
-//		srand((unsigned)time(NULL));
-//		mersennetwistergenerator = mt19937(randomseed());
-//	}
-//	else {
-//		cout << endl << "use Fixed Seed = 0";
-//		srand(0);
-//		mersennetwistergenerator = mt19937(0);
-//	}
-//	probabilitydistribution = uniform_real_distribution<double>(0.0, 1.0);
-//
-//	///////////////////////// Number of realizations
-//	GetNextRowParameters(++Row, ResLines, ParV);
-//	if (ParV.size() > 0) {
-//		if (ParV.size() > 0) NumRealization = atoi(ParV[0].c_str());
-//	}
-//
-//	///////////////////////// Working directory
-//	workpath = ResLines[++Row];
-//	if (workpath.back() != '\\') workpath += '\\';
-//	
-//
-//	///////////////////////// Specify training images in XY, XZ and YZ-plane
-//	cout << endl << "Workpath:" << workpath;
-//	if (ResLines.size() > ++Row) {
-//		vector<string> ParV;
-//		GetNextRowParameters(Row, ResLines, ParV);
-//		if (ParV.size() > 0) {
-//			if (ParV.size() > 0) { FNameXY = workpath + ParV[0]; if (!fileExists(FNameXY)) { cout << endl << "Cannot find: " << endl << FNameXY; _getch(); exit(1); } else cout << endl << ParV[0]; }
-//			if (ParV.size() > 1) {
-//				FNameXZ = workpath + ParV[1];
-//				if (!fileExists(FNameXZ)) { cout << endl << "Cannot find: " << endl << FNameXZ; _getch(); exit(1); }
-//				else cout << endl << ParV[1];
-//			}
-//			if (ParV.size() > 2) { 
-//				FNameYZ = workpath + ParV[2];
-//				if (!fileExists(FNameYZ)) { cout << endl << "Cannot find: " << endl << FNameYZ; _getch(); exit(1); }
-//				else cout << endl << ParV[2];
-//			}
-//		}
-//	}
-//
-//	///////////////////////// read 3D model name
-//	outputpath = "";
-//	if (ResLines.size() > ++Row) {
-//		vector<string> ParV;
-//		GetNextRowParameters(Row, ResLines, ParV);
-//		if (ParV.size() > 0) {
-//			if (ParV.size() > 0) modelFilename3D = outputpath + ParV[0];
-//		}
-//		//////seperate filename and format
-//		auto idx = ParV[0].rfind('.');
-//		if (idx != std::string::npos) tempoutputformat = ParV[0].substr(idx);
-//		
-//		/////2d simulation
-//		if (tempoutputformat == ".png") {
-//			cout << endl << "2D simulation ON, just use the first TI.";
-//			SIM2D_YN = true;
-//			COHERENCENUM = 21;			// to approximate ANN search
-//		}
-//		
-//		tempoutputfilename = ParV[0].substr(0, ParV[0].rfind('.') == string::npos ? ParV[0].length() : ParV[0].rfind('.'));
-//	}
-//	outputfilename = tempoutputfilename;
-//
-//	if (SIM2D_YN) FixedLayerDir = -1;
-//	if (FixedLayerDir >= 0 && FixedLayerDir < 3) {
-//		cout << endl << "enable fixed layer, modify directional weight: " << "1.0-->" << DirectionalWeight;
-//	}
-//
-//	if (DMtransformYN && HisEqYN) parameterstring += "_Eq" + to_string((int)HisEqYN);
-//	parameterstring += "DM" + to_string((int)DMtransformYN) ;
-//	parameterstring += "Phis" + to_string((int)(10*factorPos));
-//	if (FixedLayerDir > -1 && FixedLayerDir < 3)  parameterstring += "Fix" + to_string(FixedLayerDir) + "W" + to_string((int)(100 * DirectionalWeight));
-//	
-//	if (SIM2D_YN) parameterstring = "";
-//	outputfilename += parameterstring;
-//}
+	ifstream FIn(PFName.c_str());
+	if (!FIn) {
+		//cout << endl;
+		//cout << endl <<" @@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@";
+		//cout << endl<< " Failed to open file '" << PFName.c_str() << "' !";
+		//cout << endl << " @@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@";
+		//cout << endl;
+		//cout << endl << "Press any key to quit ...";
+		return false;
+	}
+
+	string Sline;
+	while (getline(FIn, Sline))
+		ResLines.push_back(Sline);
+
+	FIn.close();
+
+	return true;
+};
+void showMat(const cv::String& winname, const cv::Mat& mat)
+{// Show a Mat object quickly. For testing purposes only.
+	assert(!mat.empty());
+	cv::namedWindow(winname);
+	cv::imshow(winname, mat);
+	cv::waitKey(0);
+	cv::destroyWindow(winname);
+}
+
+const float inv_sqrt_2pi = 0.398942280401433f;
+
+
+//!read multiple TIs
+bool ReadMultipleTIs(vector<string> &filelist, string inputfilename, string key) {
+	string prefix, filename;
+	int inputnum;
+	
+	if (inputfilename.rfind(key) != string::npos) {
+		prefix = inputfilename.substr(0, inputfilename.rfind(key) + 2);
+		inputnum = atoi(inputfilename.substr(inputfilename.rfind(key) + 2, inputfilename.rfind('.')).c_str());
+
+		for (int num = 0; num < 100; num++) {
+			filename = prefix + to_string(num) + ".png";
+			if (fileExists(filename) && num!=inputnum) {
+				filelist.push_back(filename);
+				cout << endl << filename;
+			}
+			else if (!fileExists(filename) && num < inputnum) {
+				cout << endl << filename <<" not found, quit"; _getch();
+				return false;
+			}
+		}
+	}
+
+	return true;
+}
+void LoadtoMat(vector<Mat> &Matlist, vector<string> FNlist, bool cropYN = true) {
+	//Load address to Mat; crop if not square; 
+	Matlist.reserve(FNlist.size());
+	Mat tempmat;
+	for (int i = 0; i < FNlist.size(); i++) {
+		tempmat = cv::imread(FNlist[i], CV_LOAD_IMAGE_ANYDEPTH);
+		if (tempmat.cols != tempmat.rows) {
+			cout << endl << "cols != rows, crop to square";
+			int mindim = min(tempmat.cols, tempmat.rows);
+			Mat cropedMat = tempmat(Rect(0, 0, mindim, mindim));
+			cropedMat.copyTo(tempmat);
+		}
+		if (i > 0 && !(Matlist[i - 1].cols == tempmat.cols && Matlist[i - 1].rows == tempmat.rows)) {
+			cout << endl << "Multiple TIs size not equal, quit"; _getch(); exit(0);
+		}
+		Matlist.push_back(tempmat);		
+	}
+}
+bool checkTIbinary(vector<Mat> Matlist) {
+	//check TI is grayscale or binary
+	Mat maskMat;
+	bool allbinary = true;
+	for (int i = 0; i < Matlist.size(); i++) {
+		inRange(Matlist[i], 255, 255, maskMat);
+		if (countNonZero(maskMat) != countNonZero(Matlist[i])) {
+			allbinary = false;
+			break;
+		}
+	}
+	return allbinary;
+}
 
 void DoPAR::ReadRunPar_series(string CurExeFile, int TIseries)
 {
@@ -331,7 +213,7 @@ void DoPAR::ReadRunPar_series(string CurExeFile, int TIseries)
 			cout << endl << " @@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@";
 			cout << endl;
 			cout << endl << "Press any key to quit ...";
-			_getch(); exit(1);
+			_getch(); exit(0);
 		}
 
 		for (unsigned long Row = 0; Row < TmpLines.size(); Row++) {
@@ -351,7 +233,7 @@ void DoPAR::ReadRunPar_series(string CurExeFile, int TIseries)
 			cout << endl << " Failed to open PAR-GO_Setup.DAT in current working directory !";
 			cout << endl << " ============================================================";
 			cout << endl << " Press any key to quit....";
-			_getch(); exit(1);
+			_getch(); exit(0);
 		}
 	}//Read setup file
 	short Row(0);
@@ -364,6 +246,7 @@ void DoPAR::ReadRunPar_series(string CurExeFile, int TIseries)
 		int c = 0;
 		//if (ParV.size() > c) { if (atoi(ParV[c].c_str()) == 0) DMtransformYN = false; else DMtransformYN = true; c++;}
 		//if (ParV.size() > c) {FixedLayerDir = atoi(ParV[c].c_str()) - 1; c++;}
+		if (ParV.size() > c) { if (atoi(ParV[c].c_str()) == 0) MultipleTIsYN = false; else MultipleTIsYN = true; c++; }
 		if (ParV.size() > c) { if (atoi(ParV[c].c_str()) == 0) HisEqYN = false; else HisEqYN = true; c++; }
 		if (ParV.size() > c) { if (atoi(ParV[c].c_str()) == 0) GenerateTI = false; else GenerateTI = true;  c++; }
 		if (ParV.size() > c) { if (atoi(ParV[c].c_str()) == 0) PatternEntropyAnalysisYN = false; else PatternEntropyAnalysisYN = true; c++;	}
@@ -408,21 +291,35 @@ void DoPAR::ReadRunPar_series(string CurExeFile, int TIseries)
 
 
 	///////////////////////// Specify training images in XY, XZ and YZ-plane	
-	cout << endl << "Workpath:" << workpath;
 	if (ResLines.size() > ++Row) {
 		vector<string> ParV;
 		GetNextRowParameters(Row, ResLines, ParV);
 		if (ParV.size() > 0) {
-			if (ParV.size() > 0) { FNameXY = workpath + ParV[0]; if (!fileExists(FNameXY)) { cout << endl << "Cannot find: " << endl << FNameXY; _getch(); exit(1); } else cout << endl << ParV[0]; }
+			if (ParV.size() > 0) { 
+				FNameXY.push_back(workpath + ParV[0]); 
+				if (!fileExists(FNameXY[0])) { cout << endl << "Cannot find: " << endl << FNameXY[0]; _getch(); exit(0); } 
+				else cout << endl <<"XY"<< endl << FNameXY[0];
+				if (MultipleTIsYN) ReadMultipleTIs(FNameXY, FNameXY[0], "XY");
+			}
 			if (ParV.size() > 1) {
-				FNameXZ = workpath + ParV[1];
-				if (!fileExists(FNameXZ)) { cout << endl << "Cannot find: " << endl << FNameXZ; _getch(); exit(1); }
-				else cout << endl << ParV[1];
+				FNameXZ.push_back(workpath + ParV[1]);
+				if (!fileExists(FNameXZ[0])) { cout << endl << "Cannot find: " << endl << FNameXZ[0]; _getch(); exit(0); }
+				else cout << endl << "XZ" << endl << FNameXZ[0];
+				if (MultipleTIsYN) ReadMultipleTIs(FNameXZ, FNameXZ[0], "XZ");
 			}
 			if (ParV.size() > 2) {
-				FNameYZ = workpath + ParV[2];
-				if (!fileExists(FNameYZ)) { cout << endl << "Cannot find: " << endl << FNameYZ; _getch(); exit(1); }
-				else cout << endl << ParV[2];
+				FNameYZ.push_back(workpath + ParV[2]);
+				if (!fileExists(FNameYZ[0])) { cout << endl << "Cannot find: " << endl << FNameYZ[0]; _getch(); exit(0); }
+				else cout << endl << "YZ" << endl << FNameYZ[0];
+				if (MultipleTIsYN) ReadMultipleTIs(FNameYZ, FNameYZ[0], "YZ");
+			}
+
+			if (FNameXY.size() != FNameYZ.size() || FNameXY.size() != FNameXZ.size()) {
+				cout << endl << "Multiple TIs num not the same" << endl << FNameYZ[0]; _getch(); exit(0);
+			}
+			else if (MultipleTIsYN && FNameXY.size()>1) {
+				MultipleTIsNum = FNameXY.size();
+				cout << endl << "Multiple TIs num=" << MultipleTIsNum;
 			}
 		}
 	}
@@ -441,11 +338,10 @@ void DoPAR::ReadRunPar_series(string CurExeFile, int TIseries)
 
 		/////2d simulation
 		if (tempoutputformat == ".png") {
-			cout << endl << "2D simulation ON, just use the first TI.";
+			cout << endl << "2D simulation ON, just use the first (set of) TI.";
 			SIM2D_YN = true;
-			COHERENCENUM = 11;			// to approximate ANN search
 		}
-
+		//no extension
 		tempoutputfilename = ParV[0].substr(0, ParV[0].rfind('.') == string::npos ? ParV[0].length() : ParV[0].rfind('.'));
 
 		if (ParV.size() > 1) { outputsizeatlastlevel = atoi(ParV[1].c_str()); }
@@ -457,6 +353,7 @@ void DoPAR::ReadRunPar_series(string CurExeFile, int TIseries)
 		cout << endl << "enable fixed layer, modify directional weight: " << "1.0-->" << DirectionalWeight;
 	}
 
+	if (MultipleTIsNum > 1 && MultipleTIsYN) parameterstring += "_TI" + to_string(MultipleTIsNum);
 	if (DMtransformYN && HisEqYN) parameterstring += "_Eq" + to_string((int)HisEqYN);
 	//parameterstring += "DM" + to_string((int)DMtransformYN);
 	parameterstring += "WeightI" + to_string((int)(100 * factorIndex)) + "P" + to_string((int)(100 * factorPos)) + "C" + to_string((int)(factorC));
@@ -467,29 +364,6 @@ void DoPAR::ReadRunPar_series(string CurExeFile, int TIseries)
 }
 
 
-bool DoPAR::ReadTxtFiles(const string PFName, vector<string>& ResLines)
-{
-	{ vector<string> LineLst; ResLines.swap(LineLst); }
-
-	ifstream FIn(PFName.c_str());
-	if (!FIn) {
-		//cout << endl;
-		//cout << endl <<" @@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@";
-		//cout << endl<< " Failed to open file '" << PFName.c_str() << "' !";
-		//cout << endl << " @@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@";
-		//cout << endl;
-		//cout << endl << "Press any key to quit ...";
-		return false;
-	}
-
-	string Sline;
-	while (getline(FIn, Sline))
-		ResLines.push_back(Sline);
-
-	FIn.close();
-
-	return true;
-};
 
 //vector<uchar> DoPAR::load3Dmodel(const char* filename)
 //{//load 3D model raw file
@@ -508,137 +382,12 @@ bool DoPAR::ReadTxtFiles(const string PFName, vector<string>& ResLines)
 //
 //	if (fileData.size() != TEXSIZE[0] * TEXSIZE[0] * TEXSIZE[0]) {
 //		cout << endl << "Error: Model size = " << fileData.size() << " SHOULD BE:" << TEXSIZE[0] * TEXSIZE[0] * TEXSIZE[0];
-//		_getch(); exit(1);
+//		_getch(); exit(0);
 //	}
 //
 //	return fileData;
 //}
 
-//void DoPAR::ReadPBMImage(string FName, char DirID, double UpPro)
-//{
-//	//DirID: '1' - XY plane, '2' - XZ plane, '3' - YZ plane
-//	//       otherwise a single image for three direction
-//
-//	vector<string> ResLines;
-//	ReadTxtFiles(FName, ResLines);
-//
-//	if (ResLines.size() == 0) {
-//		cout << endl << "===================================";
-//		cout << endl << "Fail to read the pbm file !!";
-//		cout << endl << FName;
-//		cout << endl << "===================================";
-//		_getch(); exit(1);
-//	}
-//
-//	vector<uchar> OImg2D;
-//
-//	long S1, S2;
-//	long PoreNum(0);
-//	//!!deal with pbm file header!
-//	bool FormatYN(false);
-//	bool finddimension(false);
-//
-//	if (ResLines[0][0] == 'P') FormatYN = true;
-//	if (FormatYN == false) {
-//		cout << endl << "Fail to read the pbm file !!";
-//		_getch(); exit(1);
-//	}
-//
-//	for (long Line = 1; Line < ResLines.size(); ++Line) {
-//		if (ResLines[Line][0] == '#') continue;
-//		if (Line <= 2) {
-//			if (finddimension == false){
-//				vector<long> Dim;
-//				string OneItem("");
-//				for (long idx = 0; idx < ResLines[Line].size(); ++idx) {
-//					if (ResLines[Line][idx] < '0' || ResLines[Line][idx] > '9') {
-//						if (OneItem != "") {
-//							short Val = atoi(OneItem.c_str());
-//							Dim.push_back(Val);
-//						}
-//						OneItem = "";
-//					}
-//					else {
-//						OneItem += ResLines[Line][idx];
-//					}
-//				}
-//
-//				if (OneItem != "") {
-//					short Val = atoi(OneItem.c_str());
-//					Dim.push_back(Val);
-//				}
-//
-//				S1 = Dim[0]; S2 = Dim[1];
-//				OImg2D.reserve(S1*S2);
-//				finddimension = true;
-//				continue;
-//			}
-//		}//(Line <= 2)
-//
-//		string OneItem("");
-//		for (long idx = 0; idx < ResLines[Line].size(); ++idx) {
-//			if (ResLines[Line][idx] >= '0' && ResLines[Line][idx] <= '9') {
-//				OneItem += ResLines[Line][idx];
-//				unsigned short Val = atoi(OneItem.c_str());
-//				if (Val == 1) PoreNum++; //1 - pore
-//				OImg2D.push_back(Val);
-//				OneItem = "";
-//			}
-//
-//		}
-//	}
-//
-//	double Porosity = 1.0*PoreNum / OImg2D.size();
-//
-//	if (UpPro < 0.5) UpPro = 0.5;
-//	if (Porosity > UpPro) {
-//		for (long idx = 0; idx < OImg2D.size(); ++idx)
-//			OImg2D[idx] = 1 - OImg2D[idx];
-//		// 1 - pore, 0 - grain
-//		Porosity = 1 - Porosity;
-//	}
-//
-//	cout << endl << "Porosity: " << Porosity;
-//
-//	switch (DirID) {
-//	case '1': {//DirID: '1' - XY plane, '2' - XZ plane, '3' - YZ plane
-//				  XYSx = S1; XYSy = S2;
-//				  XY2DImg.swap(OImg2D);
-//				  PorosityXY = Porosity;
-//				  break;
-//	}
-//	case '2': {//XZ
-//				  XZSx = S1; XZSz = S2;
-//				  XZ2DImg.swap(OImg2D);
-//				  PorosityXZ = Porosity;
-//				  break;
-//	}
-//	case '3': {//YZ
-//				  YZSy = S1; YZSz = S2;
-//				  YZ2DImg.swap(OImg2D);
-//				  PorosityYZ = Porosity;
-//				  break;
-//	}
-//	default: {
-//				 XYSx = XZSx = YZSy = S1;
-//				 XYSy = XZSz = YZSz = S2;
-//				 XY2DImg.resize(OImg2D.size(), 0);
-//				 XZ2DImg.resize(OImg2D.size(), 0);
-//				 YZ2DImg.resize(OImg2D.size(), 0);
-//				 for (long idx = 0; idx < OImg2D.size(); ++idx) {
-//					 XY2DImg[idx] = OImg2D[idx];
-//					 XZ2DImg[idx] = OImg2D[idx];
-//					 YZ2DImg[idx] = OImg2D[idx];
-//				 }
-//				 PorosityXY = PorosityXZ = PorosityYZ = Porosity;
-//	}
-//	}
-//
-//	cout << endl << FName;
-//	cout << endl << "Dimensions of this training image: (" << S1 << "  " << S2 << ")";
-//
-//	TIx = S1; TIy = S2;
-//}
 
 void DoPAR::GetStarted(string CurExeFile, int TIseries)
 {
@@ -659,50 +408,33 @@ void DoPAR::GetStarted(string CurExeFile, int TIseries)
 	//ReadRunPar(CurExeFile);
 	ReadRunPar_series(CurExeFile, TIseries);
 
+	int tempcore, tempthread;
+	MaxThread = omp_get_num_procs();
+	if (!SIM2D_YN) {
+		if (TIseries == 0) {
+			cout << endl << "Select maximum cores for CPU parallelization, no more than " << MaxThread / 2 << endl;
+			cin >> tempcore;
+			tempthread = max(1, tempcore * 2);
+		}
+
+		if (tempthread <= MaxThread && TIseries == 0) {
+			omp_set_dynamic(0);     // Explicitly disable dynamic teams
+			MaxThread = tempthread;
+			omp_set_num_threads(MaxThread);
+		}
+		else {
+			omp_set_dynamic(0);
+			omp_set_num_threads(MaxThread);
+		}
+	}
+	else {
+		omp_set_dynamic(0);     // Explicitly disable dynamic teams
+		omp_set_num_threads(MaxThread);
+	}
+
 	DoANNOptimization(TIseries);
 }
 
-//void VectorShortToMat(const vector<short>& in, Mat& out)
-//{
-//	vector<short>::const_iterator it = in.begin();
-//	MatIterator_<int> jt, end;
-//	jt = out.begin<int>();
-//	for (; it != in.end(); ++it) { *jt++ = (int)(*it); }
-//}
-//void VectorDoubleToMat(const vector<double>& in, Mat& out){
-//	vector<double>::const_iterator it = in.begin();
-//	MatIterator_<double> jt, end;
-//	jt = out.begin<double>();
-//	for (; it != in.end(); ++it) { *jt++ = (double)(*it); }
-//}
-//void VectorFloatToMat(const vector<float>& in, Mat& out){
-//	vector<float>::const_iterator it = in.begin();
-//	MatIterator_<float> jt, end;
-//	jt = out.begin<float>();
-//	for (; it != in.end(); ++it) { *jt++ = (float)(*it); }
-//}
-void calcstddev(int level, vector<float>& floatvector) {
-	float sum = accumulate(floatvector.begin(), floatvector.end(), 0.0);
-	float mean = sum / floatvector.size();
-
-	vector<size_color> diff(floatvector.size());
-	transform(floatvector.begin(), floatvector.end(), diff.begin(), [mean](float x) { return x - mean; });
-	float sq_sum = inner_product(diff.begin(), diff.end(), diff.begin(), 0.0);
-	float stdev = sqrt(sq_sum / floatvector.size());
-
-	cout << endl << "mean=" << mean << " stdev=" << stdev << " size=" << floatvector.size();
-}
-
-void DoPAR::showMat(const cv::String& winname, const cv::Mat& mat)
-{// Show a Mat object quickly. For testing purposes only.
-	assert(!mat.empty());
-	cv::namedWindow(winname);
-	cv::imshow(winname, mat);
-	cv::waitKey(0);
-	cv::destroyWindow(winname);
-}
-
-const float DoPAR::inv_sqrt_2pi = 0.398942280401433f;
 
 /////////////////////////////////////////////////////////////
 //exemplar_x --> YZ, exemplar_y --> ZX, exemplar_z --> XY
@@ -814,35 +546,9 @@ void DoPAR::allocateVectors() {
 	}
 }
 
-void DoPAR::init(int TIseries) {
-	int tempcore, tempthread;
-	MaxThread = omp_get_num_procs();
-	if (!SIM2D_YN) {
-		if (TIseries == 0) {
-			cout << endl << "Select maximum cores for CPU parallelization, no more than " << MaxThread / 2 << endl;
-			cin >> tempcore;
-			tempthread = max(1, tempcore * 2);
-		}	
-
-		if (tempthread <= MaxThread && TIseries == 0) {
-			omp_set_dynamic(0);     // Explicitly disable dynamic teams
-			MaxThread = tempthread;
-			omp_set_num_threads(MaxThread);
-		}
-		else {
-			omp_set_dynamic(0);
-			omp_set_num_threads(MaxThread);
-		}
-	}
-	else {
-		omp_set_dynamic(0);     // Explicitly disable dynamic teams
-		omp_set_num_threads(MaxThread);
-	}
-	
+void DoPAR::init(int TIseries) {	
 	// load TI
 	if (!loadExemplar()) return;
-
-	//printf("\nOUTsize=%d", OUTsize[MULTIRES - 1]);
 
 	// allocate memory for all global vectors
 	allocateVectors();
@@ -858,14 +564,75 @@ void DoPAR::init(int TIseries) {
 		//~1/3 TI_
 		avgPosHis[i] = ceil((OUTsize[i] * OUTsize[i] * OUTsize[i]) / ((TIsize[i] - 2)*(TIsize[i] - 2)) / 3.0);	
 		if (SIM2D_YN) avgPosHis[i] = ceil((OUTsize[i] * OUTsize[i]) / ((TIsize[i] - 2)*(TIsize[i] - 2)));
-
 	}
-
 
 	//if (ColorHis_ON) initColorHis_exemplar();
 
 	// K-Coherence
 	computeKCoherence();
+}
+
+
+void DoPAR::initTIbasedparameters(vector<Mat>& XY, vector<Mat>& XZ, vector<Mat>& YZ) {
+	////based on TI dimension, choose multi-level parameters		
+	int dimension = XY[0].cols;//already checked X,Y,Z TIs same num,size
+	if (dimension < 40) { cout << endl << "TI size < 40, too small!"; _getch(); exit(0); }
+	else if (dimension > 800) { cout << endl << "TI size > 800, too big!"; _getch(); exit(0); }
+
+	MULTIRES = ceil(log2(dimension / 32.0));
+
+	if (dimension < 128) {
+		cout << endl << "for small TI, test just using one level";
+		MULTIRES = 1;	blockSize = { 8 };		MAXITERATION = { 25 };
+	}
+	if (PatternEntropyAnalysisYN) {
+		cout << endl << "Pattern Entropy Analysis, one level";
+		MULTIRES = 1;	blockSize = { 12 };		MAXITERATION = { 3 };
+	}
+	else {
+		ANNerror.resize(MULTIRES, 0.0);	blockSize.resize(MULTIRES);	MAXITERATION.resize(MULTIRES);	
+		switch (MULTIRES)
+		{
+		case(3):
+			blockSize = { 8, 8, 6 };
+			MAXITERATION = { 25, 5, 3 };
+			break;
+		case(4):
+			blockSize = { 8, 8, 6, 6 };		
+			MAXITERATION = { 25, 5, 3, 2 };
+			ANNerror = { 0.0, 0.0, 0.0, 0.5 };
+			break;
+		case(5):
+			blockSize = { 8, 8, 6, 6, 6 };		
+			MAXITERATION = { 25, 5, 3, 2, 2 };	
+			ANNerror = { 0.0, 0.0, 0.0, 0.5, 1.0 };
+			break;
+		default:
+			cout << endl << "MULTIRES not right"; _getch(); exit(0);
+			break;
+		}
+	}
+
+	//crop to fit multi-level
+	int multileveltimes = pow(2, MULTIRES - 1);
+	if (dimension % multileveltimes != 0) {
+		dimension = dimension / multileveltimes * multileveltimes;
+		cout << endl << "TIs are croped to " << dimension << " to fit multi-grid";
+		for (int n = 0; n < XY.size(); n++) {
+			Mat tempMat;
+			XY[n](Rect(0, 0, dimension, dimension)).copyTo(tempMat);
+			tempMat.copyTo(XY[n]);
+			XZ[n](Rect(0, 0, dimension, dimension)).copyTo(tempMat);
+			tempMat.copyTo(XZ[n]);
+			YZ[n](Rect(0, 0, dimension, dimension)).copyTo(tempMat);
+			tempMat.copyTo(YZ[n]);
+		}
+	}
+
+	//! add additional space, later will crop to original size, to deal with Toroidal problem
+	int tempoutputsize = dimension + pow(2, MULTIRES - 1) * blockSize[0];
+	outputsizeatlastlevel = max(outputsizeatlastlevel, tempoutputsize);
+
 }
 
 // load 2D Exemplar, initialize multi-level!
@@ -875,45 +642,70 @@ bool DoPAR::loadExemplar() {
 	//////using imagej, XY slice is XY, ememplar_z
 	//////ZX slice can be attained by: 1. reslice top + flip virtical 2. then rotate 90 degrees left
 	//////YZ slice is done by: reslice left
-	/////////////////////////////////////////////////////////////////
-
-	//!!in imagej:
+	//------in imagej:
 	//exemplar_x -> XY
 	//exemplar_y -> XZ
 	//exemplar_z -> YZ
 
-	//-------------- convert Mat to IplImage* --------------
-	Mat matyz = cv::imread(FNameXY, CV_LOAD_IMAGE_ANYDEPTH);		 // ti grayscale, could be 16 bit!
-	Mat matzx = cv::imread(FNameXZ, CV_LOAD_IMAGE_ANYDEPTH);
-	Mat matxy = cv::imread(FNameYZ, CV_LOAD_IMAGE_ANYDEPTH);
-	if (FNameXY == FNameXZ && FNameXY == FNameYZ) {
-		cout << endl << "Only one TI, flip 2nd TI by switching X,Y";
-		flip(matzx, matzx, 0);
-		flip(matzx, matzx, 1);
+	//------------ Load Mat ---------------------
+	vector<Mat> MatlistXY, MatlistXZ, MatlistYZ;
+	LoadtoMat(MatlistXY, FNameXY);
+	LoadtoMat(MatlistXZ, FNameXZ);
+	LoadtoMat(MatlistYZ, FNameYZ);
+	for (int s = 0; s < FNameXY.size(); s++) {
+		//check X,Y,Z TI dimension equal
+		if (!(MatlistXY[s].rows == MatlistXZ[s].rows && MatlistXY[s].rows == MatlistYZ[s].rows
+			&& MatlistXY[s].cols == MatlistXZ[s].cols && MatlistXY[s].cols == MatlistYZ[s].cols)) {
+			cout << endl << "X,Y,Z TIs dimension not equal, quit"; _getch(); exit(0);
+		}
+		//check X,Y,Z TI the same or not, if yes need to switch row,col
+		if (FNameXY[s] == FNameXZ[s] && FNameXY[s] == FNameYZ[s]) {
+			cout << endl << "Same TI for XYZ, flip 2nd TI by switching X,Y: "<< FNameXY[s];
+			flip(MatlistXZ[s], MatlistXZ[s], 0);
+			flip(MatlistXZ[s], MatlistXZ[s], 1);
+		}
 	}
+	//check TI is grayscale or binary
+	if (checkTIbinary(MatlistXY) && checkTIbinary(MatlistXZ) && checkTIbinary(MatlistYZ)) {
+		cout << endl << "TI(s) binary, enable distance map transformation";
+		DMtransformYN = true;
+	}
+	else {
+		cout << endl << "TI(s) not binary, disable distance map transformation & colorhis";
+		DMtransformYN = false; 		ColorHis_ON = false; 		HisEqYN = false;
+	}
+	
+	//initial parameters based on TI dimension
+	initTIbasedparameters(MatlistXY, MatlistXZ, MatlistYZ);
 
+
+	Mat matyz = cv::imread(FNameXY[0], CV_LOAD_IMAGE_ANYDEPTH);		 // ti grayscale, could be 16 bit!
+	Mat matzx = cv::imread(FNameXZ[0], CV_LOAD_IMAGE_ANYDEPTH);
+	Mat matxy = cv::imread(FNameYZ[0], CV_LOAD_IMAGE_ANYDEPTH);
 	if (matyz.cols != matyz.rows) {
-		//cout << endl << "matyz.cols != matyz.rows"; _getch(); exit(0); 
 		cout << endl << "matyz.cols != matyz.rows, crop to square";
 		int mindim = min(matyz.cols, matyz.rows);
 		Mat cropedMatyz = matyz(Rect(0, 0, mindim, mindim));
 		cropedMatyz.copyTo(matyz);
 	}
 	if (matzx.cols != matzx.rows) {
-		//cout << endl << "matzx.cols != matzx.rows"; _getch(); exit(0); 
 		cout << endl << "matzx.cols != matzx.rows, crop to square";
 		int mindim = min(matzx.cols, matzx.rows);
 		Mat cropedMatzx = matzx(Rect(0, 0, mindim, mindim));
 		cropedMatzx.copyTo(matzx);
 	}
 	if (matxy.cols != matxy.rows) {
-		//cout << endl << "matxy.cols != matxy.rows"; _getch(); exit(0);
 		cout << endl << "matxy.cols != matxy.rows, crop to square";
 		int mindim = min(matxy.cols, matxy.rows);
 		Mat cropedMatxy = matxy(Rect(0, 0, mindim, mindim));
 		cropedMatxy.copyTo(matxy);
 	}
 
+	if (FNameXY[0] == FNameXZ[0] && FNameXY[0] == FNameYZ[0]) {
+		cout << endl << "Only one TI, flip 2nd TI by switching X,Y";
+		flip(matzx, matzx, 0);
+		flip(matzx, matzx, 1);
+	}
 	////check TI is grayscale or binary, if grayscale disable DM, if binary enable DM
 	Mat tempMatyz, tempMatzx, tempMatxy;
 	Mat maskyz, maskzx, maskxy;
@@ -957,8 +749,8 @@ bool DoPAR::loadExemplar() {
 		}
 		MULTIRES = 6;
 
-		blockSize = { 10, 8, 8, 6, 6, 6 };
-		MAXITERATION = { 30, 5, 3, 2, 2, 2 };
+		blockSize = { 8, 8, 8, 6, 6, 6 };
+		MAXITERATION = { 25, 4, 2, 2, 2, 2 };
 
 		ANNerror = { 0, 0, 0, 0.5, 1.0, 1.0 };		//for big model use ANN
 	}
@@ -988,8 +780,8 @@ bool DoPAR::loadExemplar() {
 			//ANNerror = { 0, 0, 0, 0.5, 0.5 };
 			
 			MULTIRES = 5;
-			blockSize = { 6, 6, 6, 6, 6 };
-			MAXITERATION = { 20, 4, 2, 2, 2};
+			blockSize = { 8, 8, 6, 6, 6 };
+			MAXITERATION = { 25, 4, 2, 2, 2};
 			ANNerror = { 0, 0, 0, 0, 0.5 };
 
 		}
@@ -1017,7 +809,7 @@ bool DoPAR::loadExemplar() {
 			//MAXITERATION = { 20, 4, 2, 1 };
 			MULTIRES = 4;
 			blockSize = { 8, 8, 6, 6};			//for smallest level [32,50], 6 is enough. unless the feature size is big,use8
-			MAXITERATION = { 30, 4, 2, 2 };
+			MAXITERATION = { 25, 4, 2, 2 };
 			
 			//blockSize = { 12, 10, 8, 8 };
 			//MAXITERATION = { 40, 5, 3, 2 };
@@ -1038,16 +830,16 @@ bool DoPAR::loadExemplar() {
 		//blockSize = { 4, 4, 4};
 		//MAXITERATION = { 2, 2, 2 };
 		
-		MULTIRES = 2;
-		blockSize = { 6, 6 };		//tested: coarse level big for quality, fine level small for speed
-		MAXITERATION = { 20, 4 };	//tested: fine level does not need many iterations
+		MULTIRES = 3;
+		blockSize = { 8, 8, 6 };		//tested: coarse level big for quality, fine level small for speed
+		MAXITERATION = { 25, 4, 2 };	//tested: fine level does not need many iterations
 
 	}
 	else if (tempSize < 128) {
 		cout << endl << "for small TI, test just using one level";
 		MULTIRES = 1;
-		blockSize = { 6 };
-		MAXITERATION = { 20 };
+		blockSize = { 8 };
+		MAXITERATION = { 25 };
 		//MULTIRES = 2;
 		//blockSize = { 16, 12 };
 		//MAXITERATION = { 16, 8 };
@@ -1153,15 +945,6 @@ bool DoPAR::loadExemplar() {
 
 	///////--------------Processing TI----------------------------------
 
-	////Gaussian filter resizing better than opencv interpolation resize(inter_area)
-	//if (MULTIRES > 1) {										
-	//	cout << endl << "use Gaussian filter to resize.";
-	//	for (int l = MULTIRES - 1; l > 0; --l) {
-	//		gaussImage(l, m_exemplar_x);
-	//		gaussImage(l, m_exemplar_y);
-	//		gaussImage(l, m_exemplar_z);
-	//	}
-	//}
 	
 	if (MULTIRES > 1) {
 		cout << endl << "use Lancoz filter to resize.";		//tested: better than Gaussian and INTER_AREA
@@ -1712,81 +1495,6 @@ void DoPAR::equalizeHistogram(int level, vector<size_color>& exemplarX, vector<s
 	//cout << endl << "level " << level << ":   max before=" << maxv << "   actual bins=" << actualbin + 1;
 }
 
-//void DoPAR::mergeHistorgram(int level, vector<size_color>& exemplarX, vector<size_color>& exemplarY, vector<size_color>& exemplarZ)
-//{
-//	bool normalizeYN = false;
-//	bool enhanceYN = true;
-//	bool ispressed = false;
-//
-//	long total = exemplarX.size();
-//	auto maxv = *max_element(exemplarX.begin(), exemplarX.end());
-//	if (!SIM2D_YN) {
-//		total += exemplarY.size() + exemplarZ.size();
-//		maxv = max(maxv, max(*max_element(exemplarY.begin(), exemplarY.end()), *max_element(exemplarZ.begin(), exemplarZ.end())));
-//	}
-//	int n_bins = maxv + 1;
-//
-//	// Compute histogram
-//	vector<long> hist(n_bins, 0);
-//	for (long i = 0; i < exemplarX.size(); ++i)
-//		hist[exemplarX[i]]++;
-//	if (!SIM2D_YN) {
-//		for (long j = 0; j < exemplarY.size(); ++j)
-//			hist[exemplarY[j]]++;
-//		for (long k = 0; k < exemplarZ.size(); ++k)
-//			hist[exemplarZ[k]]++;
-//	}
-//
-//
-//	// Compute scale
-//	double scale;
-//	if (normalizeYN) {
-//		scale = 255.0 / total;
-//		Pore_Upper[level] = 255;
-//	}
-//	else {
-//		scale = min(255.0, n_bins - 1.0) / total;	//limit bins up to 256
-//		Pore_Upper[level] = min(255, n_bins - 1);
-//	}
-//
-//	// Build LUT from cumulative histrogram
-//	vector<int> lut(n_bins, 0);
-//	long sum = 0;
-//	int lastv = -1, actualbin = -1, pressedSolid_Upper = 0, pressedPore_Lower = 0;
-//	vector<unsigned short> actuallist(n_bins, 0);
-//	for (unsigned short i = 0; i < hist.size(); ++i) {
-//		sum += hist[i];
-//		//round((sum - hist[0])/(total-hist[0])*(bins-1));	//here hist[0]=0		
-//		lut[i] = round(sum * scale);
-//		if (normalizeYN) lut[i] = min(255, lut[i]);
-//		else lut[i] = min((int)maxv, lut[i]);// the value is saturated in range [0, max_val]
-//
-//		if (lut[i] != lastv) {
-//			lastv = lut[i];
-//			actualbin++;
-//		}
-//		actuallist[i] = actualbin;
-//		if (i == Solid_Upper[MULTIRES - 1]) pressedSolid_Upper = actualbin;
-//		if (i == Pore_Lower[MULTIRES - 1]) pressedPore_Lower = actualbin;
-//	}
-//
-//
-//	if (!ispressed) {
-//		// equalization without press
-//		for (long k = 0; k < exemplarX.size(); ++k)
-//			exemplarX[k] = lut[exemplarX[k]];
-//		if (!SIM2D_YN) {
-//			for (long k = 0; k < exemplarY.size(); ++k)
-//				exemplarY[k] = lut[exemplarY[k]];
-//			for (long k = 0; k < exemplarZ.size(); ++k)
-//				exemplarZ[k] = lut[exemplarZ[k]];
-//		}
-//
-//		Solid_Upper[level] = lut[Solid_Upper[MULTIRES - 1]];
-//		Pore_Lower[level] = lut[Pore_Lower[MULTIRES - 1]];
-//	}
-//
-//}
 
 
 void DoPAR::initPermutation(int level) {// random permutation (precomputed)
@@ -3414,37 +3122,6 @@ size_dist DoPAR::getFullDistance(int level, vector<size_color>& exemplar, size_i
 
 }
 
-//size_dist DoPAR::getFullDistance(int level, vector<size_color>& exemplar, size_idx idx2d, CvMat * dataMat, bool shrinkYN) {
-//	//2d square distance, if shrinkYN==true, then R = R/2
-//	size_dist sum = 0.0f;
-//	size_idx R = static_cast<size_idx>(blockSize[level] * 0.5);
-//	if (shrinkYN) R = ceil(R*0.5);
-//	size_idx n = 0;
-//	size_idx Sx = TEXSIZE[level];
-//	size_idx tempIdx;
-//	size_dist dif;
-//	size_idx x = idx2d / Sx, y = idx2d % Sx;
-//
-//	if (x< R || x > Sx - R - 1 || y< R || y> Sx - R - 1) {//near boundary
-//		for (size_idx i = -R; i < R; ++i) {
-//			tempIdx = trimIndex(level, x + i)*Sx;
-//			for (size_idx j = -R; j < R; ++j) {
-//				dif = exemplar[tempIdx + trimIndex(level, y + j)] - cvmGet(dataMat, 0, n++);
-//				sum += (dif * dif);
-//			}
-//		}
-//		return (sum < min_dist) ? min_dist : sum;
-//	}
-//
-//	for (size_idx i = -R; i < R; ++i) {
-//		tempIdx = idx2d + i*Sx;
-//		for (size_idx j = -R; j < R; ++j) {
-//			dif = exemplar[tempIdx + j] - cvmGet(dataMat, 0, n++);
-//			sum += (dif * dif);
-//		}
-//	}
-//	return (sum < min_dist) ? min_dist : sum;
-//}
 
 bool DoPAR::isUnchangedBlock(int level, int direction, size_idx i, size_idx j, size_idx k) {
 	// look up all neighbourhood in m_volume[i][j][k], check if all is unchanged (if anyone has changed (isUnchanged_==false), return false)
