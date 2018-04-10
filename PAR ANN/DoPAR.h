@@ -95,7 +95,7 @@ private:
 	void initTIbasedparameters(vector<Mat>& XY, vector<Mat>& XZ, vector<Mat>& YZ);
 	bool loadExemplar();
 
-	vector<vector<vector<unsigned char> > > TIs_XY, TIs_XZ, TIs_YZ;					//[level][TInum][idx2d] = 0-255 
+	vector<vector<vector<size_color> > > TIs_XY, TIs_XZ, TIs_YZ;					//[level][TInum][idx2d] = 0-255 
 	
 	//vector<vector<size_color> >  m_exemplar_x;								
 	//vector<vector<size_color> >  m_exemplar_y;
@@ -110,7 +110,7 @@ private:
 	string modelFilename3D;
 	bool loadVolume();
 	void InitRandomVolume(int level);
-	vector<vector<uchar>> m_volume;		// synthesized volume						//[level][idx3d] = uchar
+	vector<vector<size_color>> m_volume;		// synthesized volume						//[level][idx3d] = uchar
 	
 	//vector<uchar> load3Dmodel(const char* filename);
 
@@ -120,12 +120,11 @@ private:
 // =============== distance map ===============
 	vector<uchar> Solid_Upper, Pore_Upper, Pore_Lower;						//Redistribute DMap. Use same Solid_Upper,Pore_Lower for 3TIs and loaded model
 	//redistribute TI based on DM, no need to resize to 0-255
-	void transformDMs(vector<vector<unsigned char> >& listXY, vector<vector<unsigned char> >& listXZ, vector<vector<unsigned char> >& listYZ);
+	void transformDMs(vector<vector<size_color> >& listXY, vector<vector<size_color> >& listXZ, vector<vector<size_color> >& listYZ);
 
-	void invertpaddingDMtransform(vector<Mat>& XY, vector<Mat>& XZ, vector<Mat>& YZ, vector<vector<unsigned char> >& TIsXY, vector<vector<unsigned char> >& TIsXZ, vector<vector<unsigned char> >& TIsYZ);
+	void invertpaddingDMtransform(vector<Mat>& XY, vector<Mat>& XZ, vector<Mat>& YZ, vector<vector<size_color> >& TIsXY, vector<vector<size_color> >& TIsXZ, vector<vector<size_color> >& TIsYZ);
 
-	void equalizeHistograms(int level, vector<vector<unsigned char>>& TIsXY, vector<vector<unsigned char>>& TIsXZ, vector<vector<unsigned char>>& TIsYZ);
-	void equalizeHistogram(int level, vector<size_color>& exemplarX, vector<size_color>& exemplarY, vector<size_color>& exemplarZ);
+	void equalizeHistograms(int level, vector<vector<size_color>>& TIsXY, vector<vector<size_color>>& TIsXZ, vector<vector<size_color>>& TIsYZ);
 	uchar Solid_Upper_noeq, Pore_Lower_noeq;
 
 // ================ analysis ===========
