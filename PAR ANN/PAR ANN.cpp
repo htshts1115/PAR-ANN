@@ -4,8 +4,14 @@
 #include "stdafx.h"
 #include "DoPAR.h"
 
+
 int main(int argc, const char* argv[])
-{	
+{
+	//int x(-1), y(1), z(3);
+	//vector<int> aa(0); aa.reserve(2);
+	//vector<int> *b = &aa;
+	//(*b).push_back(1); (*b).push_back(2); (*b).push_back(3); (*b).push_back(4);
+	//printf("%d, %d, %d", aa[0], aa[2], (*b)[3]); _getch();
 
 	SetErrorMode(SEM_FAILCRITICALERRORS | SEM_NOGPFAULTERRORBOX);	//!ignore error!!
 	

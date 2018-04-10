@@ -37,62 +37,8 @@ private:
 	vector<string> FNameXY, FNameXZ, FNameYZ;
 	string workpath, outputpath, outputfilename, parameterstring;
 	
-	random_device randomseed;
 	mt19937 mersennetwistergenerator;
-	uniform_real_distribution<double> probabilitydistribution;
 	///===============================================
-
-	inline size_idx trimIndex(int level, size_idx index) {
-		//!!for 3d output
-
-		//if (isToroidal) {
-		if (index < 0) index += OUTsize[level];
-		return index % OUTsize[level];
-		//}
-		//else {//mirror
-		//	while (true) {
-		//		if (index < 0) index = -index;
-		//		if (TEXSIZE[level] <= index) {
-		//			index = 2 * (TEXSIZE[level] - 1) - index;
-		//			continue;
-		//		}
-		//		break;
-		//	}
-		//	return index;
-		//}
-		//if (index < 0) return -index;
-		//if (TEXSIZE[level] <= index) return 2 * (TEXSIZE[level] - 1) - index;
-		//return index;
-	}
-	inline size_idx trim(size_idx SIZE, size_idx index) {
-		//Toroidal
-		if (index < 0) index += SIZE;
-		return index % SIZE;
-
-		//if (index < 0) return -index;
-		//if (index >= SIZE) return 2 * (SIZE - 1) - index;
-		//return index;
-	}
-
-	inline size_idx convertIndexANN(int level, size_idx index) {
-		//convert ANNSearch_nearest_x_index to TI index
-		size_idx i, j, height, bias;
-		height = TIsize[level] - blockSize[level] + 1;
-		bias = static_cast<size_idx>(blockSize[level] * 0.5);
-		i = index / height + bias;
-		j = index % height + bias;
-		return (i*TIsize[level] + j);
-	}
-	inline size_idx sparseIdx(int level, size_idx index) {
-		//index is 2d. IndexHis
-		//convert idx to sparsed grid --> width/2!
-		size_idx i, j, height, sheight;
-		height = TIsize[level];
-		sheight = height / GRID;
-		i = (index / height) / GRID;
-		j = (index % height) / GRID;
-		return (i*sheight + j);
-	}
 
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -106,14 +52,15 @@ private:
 	int NumRealization;
 	
 	bool MultipleTIsYN;									//! if true, will try to use TIs with same prefix filename
-	int MultipleTIsNum=1;								// how many TIs found(use)
+	int MultiTIsNum=1;									// how many TIs found(use)
 
 	int COHERENCENUM = 11;								// K-coherence 11
 	vector<double> ANNerror;
 	bool useRandomSeed;									// Use random seed or fixed (0) for test (false)
 	
 	const int GRID = 2;									// sparse grid
-	const size_dist min_dist = 0.1f;	
+	const size_dist min_dist = 1e-3f;	
+	const size_dist max_dist = 10e7f;
 	bool SIM2D_YN = false;								//2d reconstruction
 
 	bool HisEqYN = false;								// apply histogram equalization
@@ -137,8 +84,8 @@ private:
 	size_dist porosityX, porosityY, porosityZ;
 	vector<size_dist> porosity_required;
 
-	vector<size_dist> avgIndexHis;						// default average value of IndexHis
-	vector<size_dist> avgPosHis;						// default average value of PosHis
+	vector<size_hiscount> avgIndexHis;						// default average value of IndexHis
+	vector<size_hiscount> avgPosHis;						// default average value of PosHis
 	
 	int MaxThread = 1;
 
@@ -150,9 +97,9 @@ private:
 
 	vector<vector<vector<unsigned char> > > TIs_XY, TIs_XZ, TIs_YZ;					//[level][TInum][idx2d] = 0-255 
 	
-	vector<vector<size_color> >  m_exemplar_x;								
-	vector<vector<size_color> >  m_exemplar_y;
-	vector<vector<size_color> >  m_exemplar_z;
+	//vector<vector<size_color> >  m_exemplar_x;								
+	//vector<vector<size_color> >  m_exemplar_y;
+	//vector<vector<size_color> >  m_exemplar_z;
 
 	//!!control maps
 
@@ -163,7 +110,7 @@ private:
 	string modelFilename3D;
 	bool loadVolume();
 	void InitRandomVolume(int level);
-	vector<vector<size_color>> m_volume;		// synthesized volume				//[level][idx3d] = color	//can be short, others can also use unsignedint_16
+	vector<vector<uchar>> m_volume;		// synthesized volume						//[level][idx3d] = uchar
 	
 	//vector<uchar> load3Dmodel(const char* filename);
 
@@ -171,7 +118,7 @@ private:
 	//void AssignFixedLayer(int level, int dir);
 
 // =============== distance map ===============
-	vector<size_color> Solid_Upper, Pore_Upper, Pore_Lower;						//Redistribute DMap. Use same Solid_Upper,Pore_Lower for 3TIs and loaded model
+	vector<uchar> Solid_Upper, Pore_Upper, Pore_Lower;						//Redistribute DMap. Use same Solid_Upper,Pore_Lower for 3TIs and loaded model
 	//redistribute TI based on DM, no need to resize to 0-255
 	void transformDMs(vector<vector<unsigned char> >& listXY, vector<vector<unsigned char> >& listXZ, vector<vector<unsigned char> >& listYZ);
 
@@ -179,7 +126,7 @@ private:
 
 	void equalizeHistograms(int level, vector<vector<unsigned char>>& TIsXY, vector<vector<unsigned char>>& TIsXZ, vector<vector<unsigned char>>& TIsYZ);
 	void equalizeHistogram(int level, vector<size_color>& exemplarX, vector<size_color>& exemplarY, vector<size_color>& exemplarZ);
-	int Solid_Upper_noeq, Pore_Lower_noeq;
+	uchar Solid_Upper_noeq, Pore_Lower_noeq;
 
 // ================ analysis ===========
 	void analyze();
@@ -191,21 +138,33 @@ private:
 // =========== main procedures =============
 	vector<size_idx>	 m_permutation;// random permutation (precomputed)			//[idx3d] = idx3d
 
-	void init(int TIseries);
+	void init();
 
 	void DoANNOptimization(int TIseries);
 	
 	void upsampleVolume(int level);
 
 // =========== K-coherence search =============
-	vector<vector<vector<size_idx>>> KCoherence_x, KCoherence_y, KCoherence_z;		//[level][idx2d][k] = TIindex2d
-	void computeKCoherence();
+	vector<vector<vector<size_idx>>> KCoherence_x, KCoherence_y, KCoherence_z;		//[level][idx2d_TIs][k] = idx2d_TIs
+	void computeKCoherence_MultipleTIs();
+
+	//size_idx convertIndexANN(int level, size_idx index) {
+	//	//convert ANNSearch_nearest_x_index to TI index
+	//	size_idx i, j, height, bias;
+	//	height = TIsize[level] - blockSize[level] + 1;
+	//	bias = static_cast<size_idx>(blockSize[level] * 0.5);
+	//	i = index / height + bias;
+	//	j = index % height + bias;
+	//	return (i*TIsize[level] + j);
+	//}
 
 // =========== phase 1: search ================================
-	size_dist TotalDis;
 	bool searchVolume(int level, int loop);
 
-	size_dist getFullDistance(int level, vector<size_color>& exemplar, size_idx idx2d, CvMat* dataMat);
+	template<typename T>
+	size_dist getFullDistance_TIs(int level, vector<vector<T>>& TIs, size_idx idx2d_TIs, vector<T>& pattern);
+	template<typename T>
+	size_dist getFullDistance(int level, vector<T>& TI, size_idx idx2d, vector<T>& pattern);
 
 	vector<vector<bool>> isUnchanged_x, isUnchanged_y, isUnchanged_z;				//[level][idx3d]=isUnchanged	bool
 	bool isUnchangedBlock(int level, int direction, size_idx i, size_idx j, size_idx k);
@@ -224,6 +183,17 @@ private:
 
 	bool setNearestIndex(int level, vector<size_idx>& nearestIdx, vector<size_dist>& nearestWeight, vector<size_hiscount>&IndexHis,
 		size_idx idx3d, size_idx newNearestIdx, size_dist dis);
+
+	size_idx sparseIdx(int level, size_idx index) {
+		//index is 2d. IndexHis
+		//convert idx to sparsed grid --> width/2!
+		size_idx i, j, height, sheight;
+		height = TIsize[level];
+		sheight = height / GRID;
+		i = (index / height) / GRID;
+		j = (index % height) / GRID;
+		return (i*sheight + j);
+	}
 
 // =========== position histogram =============
 	vector<vector<size_hiscount>> PosHis;											//[level][idx2d*3]=IndexHis		// no sparse grid
