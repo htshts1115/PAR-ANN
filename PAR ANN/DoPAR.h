@@ -43,9 +43,9 @@ private:
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////
 	int MULTIRES;										// # of multi-resolution (0 -> MULTIRES - 1 :: coarsest -> finest)
-	vector<int> blockSize;								// template size	//tested: coarse level big for quality, fine level small for speed
-	vector<int> TIsize;									// size of input exemplar
-	vector<int> OUTsize;								// size of output 
+	vector<size_idx> blockSize;								// template size	//tested: coarse level big for quality, fine level small for speed
+	vector<size_idx> TIsize;									// size of input exemplar
+	vector<size_idx> OUTsize;								// size of output 
 	int outputsizeatlastlevel = 0;
 
 	vector<int> MAXITERATION;							// max iteration time	//tested: fine level does not need many iterations
