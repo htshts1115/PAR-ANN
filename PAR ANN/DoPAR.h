@@ -102,7 +102,14 @@ private:
 	//vector<vector<size_color> >  m_exemplar_z;
 
 	//!!control maps
+	size_idx trimIndex(int level, size_idx index) {
+		//!!for 3d output
+		if (index < 0) index += OUTsize[level];
+		return index % OUTsize[level];
+	}
 
+	//template<typename T>
+	//void TIsToRegular(T idx_TIs, T TIsize2d_, T &idx_regular, T &TInum);
 
 // ================ allocation ===========
 	void allocateVectors();
@@ -160,18 +167,25 @@ private:
 // =========== phase 1: search ================================
 	bool searchVolume(int level, int loop);
 
+	bool searchVolume1(int level, int loop);
+
 	template<typename T>
 	size_dist getFullDistance_TIs(int level, vector<vector<T>>& TIs, size_idx idx2d_TIs, vector<T>& pattern);
 	template<typename T>
 	size_dist getFullDistance(int level, vector<T>& TI, size_idx idx2d, vector<T>& pattern);
+	size_dist getFullDistance(int level, vector<size_color>& exemplar, size_idx idx2d, CvMat * dataMat);
 
 	vector<vector<bool>> isUnchanged_x, isUnchanged_y, isUnchanged_z;				//[level][idx3d]=isUnchanged	bool
 	bool isUnchangedBlock(int level, int direction, size_idx i, size_idx j, size_idx k);
+
+	
 
 	size_idx DoPAR::getRandomNearestIndex(int level, vector<size_hiscount>& IndexHis);	//for bad points
 
 // ========== phase 2: optimization ===========================
 	void optimizeVolume(int level, int loop);
+
+	void optimizeVolume1(int level, int loop);
 
 	bool FIRSTRUN = true;
 
@@ -183,12 +197,14 @@ private:
 	bool setNearestIndex(int level, vector<size_idx>& nearestIdx, vector<size_dist>& nearestWeight, vector<size_hiscount>&IndexHis,
 		size_idx idx3d, size_idx newNearestIdx, size_dist dis);
 
-	size_idx sparseIdx(int level, size_idx index) {
+	size_idx sparseIdx_TIs(int level, size_idx index) {
 		//index is 2d. IndexHis
 		//convert idx to sparsed grid --> width/2!
 		size_idx i, j, height, sheight;
 		height = TIsize[level];
 		sheight = height / GRID;
+
+		index %= (height*height);	//for TIs
 		i = (index / height) / GRID;
 		j = (index % height) / GRID;
 		return (i*sheight + j);
