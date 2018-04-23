@@ -443,7 +443,7 @@ void DoPAR::ReadRunPar_series(string CurExeFile, int TIseries)
 		if (ParV.size() > 0) NumRealization = atoi(ParV[0].c_str());
 	}
 
-	//jump, according to series num
+	//!jump, according to series num
 	for (int i = 0; i < TIseries; i++)
 		Row+=3;
 
@@ -513,6 +513,7 @@ void DoPAR::ReadRunPar_series(string CurExeFile, int TIseries)
 		//no extension
 		tempoutputfilename = ParV[0].substr(0, ParV[0].rfind('.') == string::npos ? ParV[0].length() : ParV[0].rfind('.'));
 
+		//optional parameter: output size
 		if (ParV.size() > 1) { outputsizeatlastlevel = atoi(ParV[1].c_str()); }
 	}
 	outputfilename = tempoutputfilename;
@@ -595,8 +596,9 @@ void DoPAR::initTIbasedparameters(vector<Mat>& XY, vector<Mat>& XZ, vector<Mat>&
 	}
 
 	//! add additional space, later will crop to original size, to deal with Toroidal problem
-	int tempoutputsize = dimension + pow(2, MULTIRES - 1) * blockSize[0];
-	outputsizeatlastlevel = max(outputsizeatlastlevel, tempoutputsize);
+	if (outputsizeatlastlevel == 0) outputsizeatlastlevel = dimension;
+	outputsizeatlastlevel += pow(2, MULTIRES - 1) * blockSize[0];
+	
 	// allocate TIsize, OUTsize
 	TIsize.resize(MULTIRES);	TIsize[MULTIRES - 1] = XY[0].cols;
 	OUTsize.resize(MULTIRES);	OUTsize[MULTIRES - 1] = outputsizeatlastlevel;
@@ -2812,13 +2814,10 @@ bool DoPAR::searchVolume(int level, int loop) {
 		if (formerNearestIdx != bestIdx_TIs) {
 			nearestIdx_x[level][idx] = bestIdx_TIs;
 
-
-
-			if (bestIdx_TIs < 0 || bestIdx_TIs >= MultiTIsNum*TIsize2d_) {
-				printf("\nsearch: idx%d bestIdx_TIs%d", idx, bestIdx_TIs);
-				_getch();
-			}
-
+			//if (bestIdx_TIs < 0 || bestIdx_TIs >= MultiTIsNum*TIsize2d_) {
+			//	printf("\nsearch: idx%d bestIdx_TIs%d", idx, bestIdx_TIs);
+			//	_getch();
+			//}
 
 			// update indexhis
 			if (formerNearestIdx < MultiTIsNum * TIsize2d_ && formerNearestIdx >= 0) {
@@ -3659,7 +3658,6 @@ void DoPAR::optimizeVolume(int level, int loop) {
 		size_idx i, j, k;
 		idxToCoord(idx, OUTsize_, i, j, k);
 
-
 		size_idx iSyz = i*OUTsize2d_, jSz = j*OUTsize_;
 		size_dist weight_acc(FLT_MIN), minweight(max_dist);
 		size_color color_acc = 0.0f, color_avg = 0.0f;
@@ -3768,7 +3766,6 @@ void DoPAR::optimizeVolume(int level, int loop) {
 					if (deltaxori[ori] < s1 || deltaxori[ori] > e1 || deltayori[ori] < s1 || deltayori[ori] > e1)
 						continue;
 
-
 					tempidx3d = sumidx_tempx + trim(OUTsize_, tempy);
 					// get nearestidx_TIs
 					size_idx tempnearestidx_TIs = nearestIdx_y[level][tempidx3d];
@@ -3782,7 +3779,6 @@ void DoPAR::optimizeVolume(int level, int loop) {
 					if (coordx < 0 || coordy < 0 || coordx >= TIsize_ || coordy >= TIsize_) continue;
 					
 					allcontinue = false;
-
 
 					// get nearestidx2d, color
 					size_idx tempnearestidx_shifted = TIsize_ * coordx + coordy;
@@ -3850,7 +3846,6 @@ void DoPAR::optimizeVolume(int level, int loop) {
 					if (deltaxori[ori] < s1 || deltaxori[ori] > e1 || deltayori[ori] < s1 || deltayori[ori] > e1)
 						continue;
 
-
 					tempidx3d = sumidx_tempx + trim(OUTsize_, tempy)*OUTsize_;
 					// get nearestidx_TIs
 					size_idx tempnearestidx_TIs = nearestIdx_z[level][tempidx3d];
@@ -3915,8 +3910,6 @@ void DoPAR::optimizeVolume(int level, int loop) {
 		}//YZ
 
 
-
-
 		// least solver
 		color_avg = 1.0f * color_acc / weight_acc;	
 
@@ -3963,13 +3956,10 @@ void DoPAR::optimizeVolume(int level, int loop) {
 			}
 			else (*isunchanged[ori])[idx] = true;
 
-
-
-			if ((*origin[ori])[idx] >= MultiTIsNum*TIsize2d_) {
-				printf("\noptimize: origin[%d][%d]=%d, close[ti%d][idx%d] best[%d]", ori, idx, (*origin[ori])[idx], (*poscand_tinum[ori])[bestorder], (*poscand[ori])[bestorder], bestorder);
-				_getch();
-			}
-
+			//if ((*origin[ori])[idx] >= MultiTIsNum*TIsize2d_) {
+			//	printf("\noptimize: origin[%d][%d]=%d, close[ti%d][idx%d] best[%d]", ori, idx, (*origin[ori])[idx], (*poscand_tinum[ori])[bestorder], (*poscand[ori])[bestorder], bestorder);
+			//	_getch();
+			//}
 		}//for (int ori = 0; ori < 3; ori++)
 
 
