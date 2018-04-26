@@ -312,46 +312,32 @@ void DoPAR::cleardata() {
 
 void DoPAR::GetStarted(string CurExeFile, int TIseries)
 {
-	cout << endl << "===========================================";
-	cout << endl << "PAR-KC                     ";
-	cout << endl << "Tianshen Huang    th2@hw.ac.uk  ";
-	time_t CurTime, MaxTime;
-	time(&CurTime);
-	CurTime /= 86400L;
-	//cout << endl << CurTime; _getch(); exit(0);		//17598 = 08/03/2018
-	MaxTime = (time_t)(17598 + 180);				//add 30*6 days
-	if (CurTime > MaxTime) {
-		cout << endl << "Code expired. Please contact the author.";
-		_getch();
-		exit(0);
-	}
 
 	//ReadRunPar(CurExeFile);
 	ReadRunPar_series(CurExeFile, TIseries);
 
-	int tempcore, tempthread;
-	MaxThread = omp_get_num_procs();
-	if (!SIM2D_YN) {
-		if (TIseries == 0) {
-			cout << endl << "Select maximum cores for CPU parallelization, no more than " << MaxThread / 2 << endl;
-			cin >> tempcore;
-			tempthread = max(1, tempcore * 2);
-		}
-
-		if (tempthread <= MaxThread && TIseries == 0) {
-			omp_set_dynamic(0);     // Explicitly disable dynamic teams
-			MaxThread = tempthread;
-			omp_set_num_threads(MaxThread);
-		}
-		else {
-			omp_set_dynamic(0);
-			omp_set_num_threads(MaxThread);
-		}
-	}
-	else {
-		omp_set_dynamic(0);     // Explicitly disable dynamic teams
-		omp_set_num_threads(MaxThread);
-	}
+	//int tempcore, tempthread;
+	//int MaxThread = omp_get_num_procs();
+	//if (!SIM2D_YN) {
+	//	if (TIseries == 0) {
+	//		cout << endl << "Select maximum cores for CPU parallelization, no more than " << MaxThread / 2 << endl;
+	//		cin >> tempcore;
+	//		tempthread = max(1, tempcore * 2);
+	//	}
+	//	if (tempthread <= MaxThread && TIseries == 0) {
+	//		omp_set_dynamic(0);     // Explicitly disable dynamic teams
+	//		MaxThread = tempthread;
+	//		omp_set_num_threads(MaxThread);
+	//	}
+	//	else {
+	//		omp_set_dynamic(0);
+	//		omp_set_num_threads(MaxThread);
+	//	}
+	//}
+	//else {
+	//	omp_set_dynamic(0);     // Explicitly disable dynamic teams
+	//	omp_set_num_threads(MaxThread);
+	//}
 
 	DoANNOptimization(TIseries);
 }
@@ -372,7 +358,7 @@ void DoPAR::ReadRunPar_series(string CurExeFile, int TIseries)
 	{//Read setup file
 		string tmpstr, name;
 		iCGetDirFileName(CurExeFile, Path, name);
-		string PFName = Path + "PAR-GO_Setup_series.DAT";//!changed to series 
+		string PFName = Path + "PAR-GO_Setup.DAT";//!changed to series 
 		vector<string> TmpLines;
 		if (!ReadTxtFiles(PFName, TmpLines)) {
 			cout << endl;
@@ -404,25 +390,38 @@ void DoPAR::ReadRunPar_series(string CurExeFile, int TIseries)
 			_getch(); exit(0);
 		}
 	}//Read setup file
-	short Row(0);
+	short Row(-1);
 
 	///////////////////////// check random seed
 	vector<string> ParV;
-	GetNextRowParameters(Row, ResLines, ParV);
-	if (ParV.size() > 0) {
-		useRandomSeed = true;
-		int c = 0;
-		//if (ParV.size() > c) { if (atoi(ParV[c].c_str()) == 0) DMtransformYN = false; else DMtransformYN = true; c++;}
-		//if (ParV.size() > c) {FixedLayerDir = atoi(ParV[c].c_str()) - 1; c++;}
-		if (ParV.size() > c) { if (atoi(ParV[c].c_str()) == 0) MultipleTIsYN = false; else MultipleTIsYN = true; c++; }
-		if (ParV.size() > c) { if (atoi(ParV[c].c_str()) == 0) HisEqYN = false; else HisEqYN = true; c++; }
-		if (ParV.size() > c) { if (atoi(ParV[c].c_str()) == 0) GenerateTI = false; else GenerateTI = true;  c++; }
-		if (ParV.size() > c) { if (atoi(ParV[c].c_str()) == 0) PatternEntropyAnalysisYN = false; else PatternEntropyAnalysisYN = true; c++;	}
-		if (ParV.size() > c) { if (atoi(ParV[c].c_str()) == 0) PrintHisYN = false; else PrintHisYN = true; c++;}
-		if (ParV.size() > c) { factorIndex = atof(ParV[c].c_str()); c++; }
-		if (ParV.size() > c) { factorPos = atof(ParV[c].c_str()); c++; }
-		if (ParV.size() > c) { factorC = atof(ParV[c].c_str()); c++; factorC *= 100;	if (factorC == 0) ColorHis_ON = false; }
-	}
+	// for release version, set parameters fixed
+	HisEqYN = true;
+	GenerateTI = false;
+	PatternEntropyAnalysisYN = false;
+	PrintHisYN = false;
+	factorIndex = 0.1f;
+	factorPos = 0.5f;
+	factorC = 0.1f * 100;	
+	ColorHis_ON = true;
+	//GetNextRowParameters(++Row, ResLines, ParV);
+	//if (ParV.size() > 0) {
+	//	useRandomSeed = true;
+	//	int c = 0;
+	//	//if (ParV.size() > c) { if (atoi(ParV[c].c_str()) == 0) DMtransformYN = false; else DMtransformYN = true; c++;}
+	//	//if (ParV.size() > c) {FixedLayerDir = atoi(ParV[c].c_str()) - 1; c++;}
+	//	
+	//	//if (ParV.size() > c) { if (atoi(ParV[c].c_str()) == 0) MultipleTIsYN = false; else MultipleTIsYN = true; c++; }
+	//	
+	//	if (ParV.size() > c) { if (atoi(ParV[c].c_str()) == 0) HisEqYN = false; else HisEqYN = true; c++; }
+	//	if (ParV.size() > c) { if (atoi(ParV[c].c_str()) == 0) GenerateTI = false; else GenerateTI = true;  c++; }
+	//	if (ParV.size() > c) { if (atoi(ParV[c].c_str()) == 0) PatternEntropyAnalysisYN = false; else PatternEntropyAnalysisYN = true; c++;	}
+	//	if (ParV.size() > c) { if (atoi(ParV[c].c_str()) == 0) PrintHisYN = false; else PrintHisYN = true; c++;}
+	//	if (ParV.size() > c) { factorIndex = atof(ParV[c].c_str()); c++; }
+	//	if (ParV.size() > c) { factorPos = atof(ParV[c].c_str()); c++; }
+	//	if (ParV.size() > c) { factorC = atof(ParV[c].c_str()); c++; factorC *= 100;	if (factorC == 0) ColorHis_ON = false; }
+	//}
+
+
 
 	if (useRandomSeed) {
 		cout << endl << "use Random Seed";
@@ -443,13 +442,16 @@ void DoPAR::ReadRunPar_series(string CurExeFile, int TIseries)
 		if (ParV.size() > 0) NumRealization = atoi(ParV[0].c_str());
 	}
 
+	if (Row >= ResLines.size() - 1) {
+		printf("\nFinish series, quit.");
+		_getch();
+		exit(0);
+	}
 	//!jump, according to series num
 	for (int i = 0; i < TIseries; i++)
 		Row+=3;
-
-
 	///////////////////////// Working directory
-	if (Row == ResLines.size()-1) {
+	if (Row >= ResLines.size()-1) {
 		printf("\nFinish series, quit.");
 		_getch();
 		exit(0);
@@ -535,13 +537,16 @@ void DoPAR::ReadRunPar_series(string CurExeFile, int TIseries)
 
 // ================ load 2D TIs ==========
 void DoPAR::initTIbasedparameters(vector<Mat>& XY, vector<Mat>& XZ, vector<Mat>& YZ) {
-	////based on TI dimension, choose multi-level parameters		
-	int dimension = XY[0].cols;//already checked X,Y,Z TIs same num,size
-	if (dimension < 40) { cout << endl << "TI size < 40, too small!"; _getch(); exit(0); }
-	else if (dimension > 800) { cout << endl << "TI size > 800, too big!"; _getch(); exit(0); }
+	//already checked X,Y,Z TIs same num,size
+	int dimension = XY[0].cols;
+	////based on Output dimension (not TI), choose multi-level parameters
+	if (outputsizeatlastlevel == 0) outputsizeatlastlevel = dimension;
+	MULTIRES = ceil(1e-5 + log2(outputsizeatlastlevel / 32.0));
 
-	MULTIRES = ceil(1e-5 + log2(dimension / 32.0));
-	//cout << endl << "TI dimension=" << dimension << " MULTIRES=" << MULTIRES;
+	if (outputsizeatlastlevel < 40) { cout << endl << "Output size < 40, too small!"; _getch(); exit(0); }
+	else if (outputsizeatlastlevel > 600) { cout << endl << "Output size > 600, too big!"; _getch(); exit(0); }
+
+	cout << endl << "TI dimension=" << dimension <<" Output dimension="<< outputsizeatlastlevel << " MULTIRES=" << MULTIRES;
 
 	if (dimension < 128) {
 		cout << endl << "for small TI, test just using one level";
@@ -596,7 +601,6 @@ void DoPAR::initTIbasedparameters(vector<Mat>& XY, vector<Mat>& XZ, vector<Mat>&
 	}
 
 	//! add additional space, later will crop to original size, to deal with Toroidal problem
-	if (outputsizeatlastlevel == 0) outputsizeatlastlevel = dimension;
 	outputsizeatlastlevel += pow(2, MULTIRES - 1) * blockSize[0];
 	
 	// allocate TIsize, OUTsize
@@ -639,7 +643,9 @@ bool DoPAR::loadExemplar() {
 		DMtransformYN = true;
 	}
 	else {
-		cout << endl << "TI(s) not binary, disable distance map transformation & colorhis";
+		cout << endl << "TI(s) NOT binary, disable distance map transformation & colorhis";
+		cout << endl << "Not recommended to use greyscale TI, continue??";
+		_getch();
 		DMtransformYN = false; 		ColorHis_ON = false; 		HisEqYN = false;
 	}
 	
@@ -679,6 +685,9 @@ bool DoPAR::loadExemplar() {
 		for (int l = MULTIRES - 1; l >= 0; --l) {
 			equalizeHistograms(l, TIs_XY[l], TIs_XZ[l], TIs_YZ[l]);
 		}
+	}
+	if (DMtransformYN) {
+		computeporosityrequired();
 	}
 
 	//------------ Analyze PCA,Pattern entropy,Generate DM TI -----------------	
@@ -1382,6 +1391,26 @@ void DoPAR::equalizeHistograms(int level, vector<vector<size_color>>& TIsXY, vec
 }
 
 // ================ analysis ===========
+void DoPAR::computeporosityrequired() {
+	for (int l = MULTIRES - 1; l >= 0; --l) {
+		long porecount(0);
+		uchar solidup = Solid_Upper[MULTIRES - 1];
+		
+		for (int n = 0; n < MultiTIsNum; n++) {
+			porecount += count_if(TIs_XY[l][n].begin(), TIs_XY[l][n].end(), [solidup](uchar i) {return i> solidup; });
+			if (!SIM2D_YN) {
+				porecount += count_if(TIs_XZ[l][n].begin(), TIs_XZ[l][n].end(), [solidup](uchar i) {return i> solidup; });
+				porecount += count_if(TIs_YZ[l][n].begin(), TIs_YZ[l][n].end(), [solidup](uchar i) {return i> solidup; });
+			}
+		}
+
+		if (SIM2D_YN) 	porosity_required[l] = porecount*1.0f / (TIs_XY[l][0].size());
+		else porosity_required[l] = porecount*1.0f / (3 * TIs_XY[l][0].size());
+		
+		if (HisEqYN || l == MULTIRES - 1) cout << endl << "level" << l << " Solid_Upper=" << (int)Solid_Upper[l] << " Pore_Lower=" << (int)Pore_Lower[l] << " porosity=" << porosity_required[l];
+	}
+}
+
 void DoPAR::analyze() {
 	//if (GenerateTI) testPCA();
 
@@ -2186,15 +2215,17 @@ void DoPAR::computeKCoherence_MultipleTIs() {
 		annDeallocPts(p_source_x);		annDeallocPts(p_source_y);		annDeallocPts(p_source_z);
 
 		// check KC multiTIs usage is uniform or not
-		vector<double> KCusageratio_TIs_x(MultiTIsNum), KCusageratio_TIs_y(MultiTIsNum), KCusageratio_TIs_z(MultiTIsNum);
-		long total = accumulate(KCusage_TIs_x[level].begin(), KCusage_TIs_x[level].end(), 0);
-		cout << fixed;
-		for (int s = 0; s < MultiTIsNum; s++) {
-			KCusageratio_TIs_x[s] = 100.0 * KCusage_TIs_x[level][s] / total;
-			KCusageratio_TIs_y[s] = 100.0 * KCusage_TIs_y[level][s] / total;
-			KCusageratio_TIs_z[s] = 100.0 * KCusage_TIs_z[level][s] / total;
-			cout << endl << setprecision(1) << "KC usage TI(" << s << "):  X "
-				<< KCusageratio_TIs_x[s] << "   Y " << KCusageratio_TIs_y[s] << "   Z " << KCusageratio_TIs_z[s];
+		if (MultiTIsNum > 1) {
+			vector<double> KCusageratio_TIs_x(MultiTIsNum), KCusageratio_TIs_y(MultiTIsNum), KCusageratio_TIs_z(MultiTIsNum);
+			long total = accumulate(KCusage_TIs_x[level].begin(), KCusage_TIs_x[level].end(), 0);
+			cout << fixed;
+			for (int s = 0; s < MultiTIsNum; s++) {
+				KCusageratio_TIs_x[s] = 100.0 * KCusage_TIs_x[level][s] / total;
+				KCusageratio_TIs_y[s] = 100.0 * KCusage_TIs_y[level][s] / total;
+				KCusageratio_TIs_z[s] = 100.0 * KCusage_TIs_z[level][s] / total;
+				cout << endl << setprecision(1) << "KC usage TI(" << s << "):  X "
+					<< KCusageratio_TIs_x[s] << "   Y " << KCusageratio_TIs_y[s] << "   Z " << KCusageratio_TIs_z[s];
+			}
 		}
 	}
 
@@ -4038,8 +4069,8 @@ void DoPAR::optimizeVolume(int level, int loop) {
 	}//for (size_idx i2 = 0; i2 < Size; ++i2) 
 
 
-	if (!FIRSTRUN && ColorHis_ON && (HisEqYN || level == MULTIRES-1))
-		printf("poroloss=%d ", 100*(poretotal_synthesis - poretotal_required) / poretotal_required);
+	if (!FIRSTRUN && ColorHis_ON && (HisEqYN || level == MULTIRES-1) && poretotal_required>0)
+		printf("loss=%d ", 100*(poretotal_synthesis - poretotal_required) / poretotal_required);
 
 	if (FIRSTRUN) {
 		if (ColorHis_ON) initColorHis_synthesis(level);
