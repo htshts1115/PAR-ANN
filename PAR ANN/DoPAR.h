@@ -51,7 +51,7 @@ private:
 	vector<int> MAXITERATION;							// max iteration time	//tested: fine level does not need many iterations
 	int NumRealization;
 	
-	bool MultipleTIsYN;									//! if true, will try to use TIs with same prefix filename
+	bool MultipleTIsYN = false;									//! if true, will try to use TIs with same prefix filename
 	int MultiTIsNum=1;									// how many TIs found(use)
 
 	int COHERENCENUM = 11;								// K-coherence 11
@@ -87,7 +87,6 @@ private:
 	vector<size_hiscount> avgIndexHis;						// default average value of IndexHis
 	vector<size_hiscount> avgPosHis;						// default average value of PosHis
 	
-	int MaxThread = 1;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -137,6 +136,7 @@ private:
 // ================ analysis ===========
 	void analyze();
 
+	void DoPAR::computeporosityrequired();
 	void patternentropyanalysis(int templatesize, Mat &exemplar, double &entropy);
 	void testPCA();		//compare PCA TI
 

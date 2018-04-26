@@ -1,0 +1,24 @@
+/*&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&
+/*Software:	(PAR-GO) Pore Architecture Reconstruction using Global Optimization
+/*Institution:	Heriot-Watt University, 2018
+/*Authors:	T. Huang, Z. Jiang*, M. I. J. van Dijke, S. Geiger
+/*Contact*:	Zeyun.Jiang@hw.ac.uk
+/*&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&
+/*
+/* Number of realizations (e.g. 2 means for each set of TIs it will generate 2 realizations)
+/*=============================================
+1
+/*=============================================
+/* Row 1 : directory of TIs used, accept relative address (e.g. d:\test\TIs\, TIs\ both OK)
+/* Row 2 : training images filenames (*.png) in XY, XZ and YZ-plane (imagej) Note: 
+/*	   Note: TI has to be binary & 8-bit, *.png format
+/* Row 3 : (1) output filename: 3D output format: *.raw; 2D output format: *.png, 2D output just use XY TI
+/*	   (2) output size (default size = TI dimension), but can be set optionally (e.g. Out.raw, 200)
+/* Accept batch process, simply add the three-row-parameters for different data sets
+/*=============================================
+TIs
+F1922H_A2_03998nm_x0y0z0_400_his106_XY2.png, F1922H_A2_03998nm_x0y0z0_400_his106_XZ2.png, F1922H_A2_03998nm_x0y0z0_400_his106_YZ2.png
+F1922H_A2_03998nm_x0y0z0_TI2.raw, 200
+//Z:\Tianshen\image\ICCR_FTP\ECodes\PAR\TIs
+//F1922H_A2_03998nm_1024_Nm4MEDn_XY2.png, F1922H_A2_03998nm_1024_Nm4MEDn_XZ2.png, F1922H_A2_03998nm_1024_Nm4MEDn_YZ2.png
+//F1922H_A2_03998nm_1024.raw, 400

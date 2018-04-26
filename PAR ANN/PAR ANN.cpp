@@ -7,29 +7,55 @@
 
 int main(int argc, const char* argv[])
 {
-	//int x(-1), y(1), z(3);
-	//vector<int> aa(0); aa.reserve(2);
-	//vector<int> *b = &aa;
-	//(*b).push_back(1); (*b).push_back(2); (*b).push_back(3); (*b).push_back(4);
-	//printf("%d, %d, %d", aa[0], aa[2], (*b)[3]); _getch();
-
-	SetErrorMode(SEM_FAILCRITICALERRORS | SEM_NOGPFAULTERRORBOX);	//!ignore error!!
-	
+	//SetErrorMode(SEM_FAILCRITICALERRORS | SEM_NOGPFAULTERRORBOX);	//!ignore error!!
 	string CurWorkExeFile = argv[0];
+
+	cout		 << "=============================================================================";
+	cout << endl << "Software:	(PAR-GO) Pore Architecture Reconstruction using Global Optimization";
+	cout << endl << "Institution:	Heriot-Watt University, 2018";
+	cout << endl << "Authors:	T. Huang, Z. Jiang*, M. I. J. van Dijke, S. Geiger";
+	cout << endl << "Contact:	Zeyun.Jiang@hw.ac.uk";
+	cout << endl << "=============================================================================";
+
+	//check time
+	time_t CurTime, MaxTime;
+	time(&CurTime);
+	CurTime /= 86400L;
+	//cout << endl << CurTime; _getch(); exit(0);		//17646 = 25/04/2018
+	MaxTime = (time_t)(17646 + 220);				//add 30*6 days
+	if (CurTime > MaxTime) {
+		cout << endl << "Code expired. Please contact the author.";
+		_getch();
+		exit(0);
+	}
+
+	// set global OPENMP CPU
+	int tempcore, tempthread;
+	int MaxThread = omp_get_num_procs();
+	cout << endl<< endl << "Select maximum cores for CPU parallelization, no more than " << MaxThread / 2 << endl;
+	cin >> tempcore;
+	tempthread = max(1, tempcore * 2);
+	omp_set_dynamic(0); // Explicitly disable dynamic teams
+	if (tempthread <= MaxThread) 	   
+		omp_set_num_threads(tempthread);
+	else 
+		omp_set_num_threads(MaxThread);
 	
 
-	
-	if (argc == 1) {
+
+	for (int i = 0; i < 30; i++){
 		DoPAR DoItNow;
-		DoItNow.GetStarted(CurWorkExeFile, 0);
-	}
-	else if (argc==2){
-		DoPAR DoItNow;
-		DoItNow.GetStarted(CurWorkExeFile, stoi(argv[1]));
+		DoItNow.GetStarted(CurWorkExeFile, i);
 	}
 
-	//cout << endl << "Finally: Press any key to quit...";
-	//_getch();
+	//if (argc == 1) {
+	//	DoPAR DoItNow;
+	//	DoItNow.GetStarted(CurWorkExeFile, 0);
+	//}
+	//else if (argc==2){
+	//	DoPAR DoItNow;
+	//	DoItNow.GetStarted(CurWorkExeFile, stoi(argv[1]));
+	//}
 
 	return 0;
 }
