@@ -94,6 +94,10 @@ private:
 	void initTIbasedparameters(vector<Mat>& XY, vector<Mat>& XZ, vector<Mat>& YZ);
 	bool loadExemplar();
 
+	bool batchYN = false;
+	int batchsequenceNo, batchsequenceMax;
+	vector<string> batchFileList_XY, batchFileList_XZ, batchFileList_YZ;
+
 	vector<vector<vector<size_color> > > TIs_XY, TIs_XZ, TIs_YZ;					//[level][TInum][idx2d] = 0-255 
 	
 	//vector<vector<size_color> >  m_exemplar_x;								

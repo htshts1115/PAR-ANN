@@ -312,34 +312,15 @@ void DoPAR::cleardata() {
 
 void DoPAR::GetStarted(string CurExeFile, int TIseries)
 {
-
-	//ReadRunPar(CurExeFile);
 	ReadRunPar_series(CurExeFile, TIseries);
 
-	//int tempcore, tempthread;
-	//int MaxThread = omp_get_num_procs();
-	//if (!SIM2D_YN) {
-	//	if (TIseries == 0) {
-	//		cout << endl << "Select maximum cores for CPU parallelization, no more than " << MaxThread / 2 << endl;
-	//		cin >> tempcore;
-	//		tempthread = max(1, tempcore * 2);
-	//	}
-	//	if (tempthread <= MaxThread && TIseries == 0) {
-	//		omp_set_dynamic(0);     // Explicitly disable dynamic teams
-	//		MaxThread = tempthread;
-	//		omp_set_num_threads(MaxThread);
-	//	}
-	//	else {
-	//		omp_set_dynamic(0);
-	//		omp_set_num_threads(MaxThread);
-	//	}
-	//}
-	//else {
-	//	omp_set_dynamic(0);     // Explicitly disable dynamic teams
-	//	omp_set_num_threads(MaxThread);
-	//}
-
 	DoANNOptimization(TIseries);
+	
+	if (batchYN)
+		for (batchsequenceNo = 1; batchsequenceNo < batchsequenceMax; batchsequenceNo++){
+			ReadRunPar_series(CurExeFile, TIseries);
+			DoANNOptimization(TIseries);
+		}
 }
 
 // ================ read parameters ==========
@@ -358,7 +339,7 @@ void DoPAR::ReadRunPar_series(string CurExeFile, int TIseries)
 	{//Read setup file
 		string tmpstr, name;
 		iCGetDirFileName(CurExeFile, Path, name);
-		string PFName = Path + "PAR-GO_Setup.DAT";//!changed to series 
+		string PFName = Path + "PAR_Setup.DAT";//!changed to series 
 		vector<string> TmpLines;
 		if (!ReadTxtFiles(PFName, TmpLines)) {
 			cout << endl;
@@ -465,25 +446,83 @@ void DoPAR::ReadRunPar_series(string CurExeFile, int TIseries)
 	if (ResLines.size() > ++Row) {
 		vector<string> ParV;
 		GetNextRowParameters(Row, ResLines, ParV);
+		if (MultipleTIsYN == false) { FNameXY.clear(); FNameXZ.clear(); FNameYZ.clear(); }
+
 		if (ParV.size() > 0) {
-			if (ParV.size() > 0) { 
-				FNameXY.push_back(workpath + ParV[0]); 
-				if (!fileExists(FNameXY[0])) { cout << endl << "Cannot find: " << endl << FNameXY[0]; _getch(); exit(0); } 
-				else cout << endl <<"XY"<< endl << FNameXY[0];
-				if (MultipleTIsYN) ReadMultipleTIs(FNameXY, FNameXY[0], "XY");
+			if (ParV.size() > 0) {
+				if (batchYN == false && ParV[0].back() == '*') {
+					batchYN = true; MultipleTIsYN = false;
+					batchFileList_XY.clear(); //batchFileList_XZ.clear(); batchFileList_YZ.clear();
+					batchsequenceNo = 0;
+
+					//std::string strSearch = "C:\\Users\\dell\\Downloads\\FractureZone_8x\\FractureZone*";
+					std::string strSearch = workpath + ParV[0];
+					WIN32_FIND_DATAA ffd;
+					HANDLE hFind = FindFirstFileA(strSearch.c_str(), &ffd);
+					do{
+						batchFileList_XY.push_back(ffd.cFileName);
+					} while (FindNextFileA(hFind, &ffd) != 0);
+
+					batchsequenceMax = batchFileList_XY.size();
+				}
+
+				if (batchYN) ParV[0] = batchFileList_XY[batchsequenceNo]; //FNameXY.push_back(workpath + batchFileList_XY[batchsequenceNo]);
+				FNameXY.push_back(workpath + ParV[0]);
+				if (!fileExists(FNameXY[0])) { cout << endl << "Cannot find: " << endl << FNameXY[0]; _getch(); exit(0); }
+				else cout << endl << "XY" << endl << FNameXY[0]; 
+				if (MultipleTIsYN) ReadMultipleTIs(FNameXY, FNameXY[0], "XY");		
 			}
+
+
 			if (ParV.size() > 1) {
+				if (batchYN && ParV[1].back() == '*') {
+					batchFileList_XZ.clear(); 
+
+					std::string strSearch = workpath + ParV[1];
+					WIN32_FIND_DATAA ffd;
+					HANDLE hFind = FindFirstFileA(strSearch.c_str(), &ffd);
+					do{
+						batchFileList_XZ.push_back(ffd.cFileName);
+					} while (FindNextFileA(hFind, &ffd) != 0);
+
+					if (batchsequenceMax != batchFileList_XZ.size()){
+						cout << endl << "batch size XY != XZ, quit";
+						_getch(); exit(0);
+					}
+				}
+
+				if (batchYN) ParV[1] = batchFileList_XZ[batchsequenceNo];
 				FNameXZ.push_back(workpath + ParV[1]);
 				if (!fileExists(FNameXZ[0])) { cout << endl << "Cannot find: " << endl << FNameXZ[0]; _getch(); exit(0); }
 				else cout << endl << "XZ" << endl << FNameXZ[0];
 				if (MultipleTIsYN) ReadMultipleTIs(FNameXZ, FNameXZ[0], "XZ");
 			}
+
+
 			if (ParV.size() > 2) {
+				if (batchYN && ParV[2].back() == '*') {
+					batchFileList_YZ.clear();
+
+					std::string strSearch = workpath + ParV[2];
+					WIN32_FIND_DATAA ffd;
+					HANDLE hFind = FindFirstFileA(strSearch.c_str(), &ffd);
+					do{
+						batchFileList_YZ.push_back(ffd.cFileName);
+					} while (FindNextFileA(hFind, &ffd) != 0);
+
+					if (batchsequenceMax != batchFileList_YZ.size()){
+						cout << endl << "batch size XY/XZ != YZ, quit";
+						_getch(); exit(0);
+					}
+				}
+
+				if (batchYN) ParV[2] = batchFileList_YZ[batchsequenceNo];
 				FNameYZ.push_back(workpath + ParV[2]);
 				if (!fileExists(FNameYZ[0])) { cout << endl << "Cannot find: " << endl << FNameYZ[0]; _getch(); exit(0); }
 				else cout << endl << "YZ" << endl << FNameYZ[0];
 				if (MultipleTIsYN) ReadMultipleTIs(FNameYZ, FNameYZ[0], "YZ");
 			}
+
 
 			if (FNameXY.size() != FNameYZ.size() || FNameXY.size() != FNameXZ.size()) {
 				cout << endl << "Multiple TIs num not the same" << endl << FNameYZ[0]; _getch(); exit(0);
@@ -491,7 +530,8 @@ void DoPAR::ReadRunPar_series(string CurExeFile, int TIseries)
 			else if (MultipleTIsYN && FNameXY.size()>1) {
 				MultiTIsNum = FNameXY.size();
 				cout << endl << "Multiple TIs num=" << MultiTIsNum;
-			}
+			}			
+
 		}
 	}
 
@@ -512,6 +552,10 @@ void DoPAR::ReadRunPar_series(string CurExeFile, int TIseries)
 			cout << endl << "2D simulation ON, just use the first (set of) TI.";
 			SIM2D_YN = true;
 		}
+
+		if (batchYN) {
+			ParV[0] = batchFileList_XY[batchsequenceNo];
+		}
 		//no extension
 		tempoutputfilename = ParV[0].substr(0, ParV[0].rfind('.') == string::npos ? ParV[0].length() : ParV[0].rfind('.'));
 
@@ -519,6 +563,7 @@ void DoPAR::ReadRunPar_series(string CurExeFile, int TIseries)
 		if (ParV.size() > 1) { outputsizeatlastlevel = atoi(ParV[1].c_str()); }
 	}
 	outputfilename = tempoutputfilename;
+
 
 	if (SIM2D_YN) FixedLayerDir = -1;
 	if (FixedLayerDir >= 0 && FixedLayerDir < 3) {
@@ -532,7 +577,9 @@ void DoPAR::ReadRunPar_series(string CurExeFile, int TIseries)
 	if (FixedLayerDir > -1 && FixedLayerDir < 3)  parameterstring += "Fix" + to_string(FixedLayerDir) + "W" + to_string((int)(100 * DirectionalWeight));
 
 	if (SIM2D_YN) parameterstring = "";
-	outputfilename += parameterstring;
+	
+	//outputfilename += parameterstring;
+	// Note: For release version, delete parameter names
 }
 
 // ================ load 2D TIs ==========
@@ -4385,7 +4432,8 @@ void DoPAR::outputmodel(int level) {
 			//binaryUchar(tempshort, tempUchar, (Solid_Upper[MULTIRES - 1] + Pore_Lower[MULTIRES - 1]) / 2);
 
 		}
-		tempoutputfilename = outputfilename + "_Size" + to_string(OUTsize_) + ".RAW";
+		if (level == MULTIRES - 1) tempoutputfilename = outputfilename + ".RAW";
+		else tempoutputfilename = outputfilename + "_Size" + to_string(OUTsize_) + ".RAW";
 		Write(outputpath + tempoutputfilename, tempUchar);
 	}
 
