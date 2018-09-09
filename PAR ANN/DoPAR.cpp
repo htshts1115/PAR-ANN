@@ -373,37 +373,8 @@ void DoPAR::ReadRunPar_series(string CurExeFile, int TIseries)
 	}//Read setup file
 	short Row(-1);
 
-	///////////////////////// check random seed
 	vector<string> ParV;
-	// for release version, set parameters fixed
-	HisEqYN = true;
-	GenerateTI = false;
-	PatternEntropyAnalysisYN = false;
-	PrintHisYN = false;
-	factorIndex = 0.1f;
-	factorPos = 0.5f;
-	factorC = 0.1f * 100;	
-	ColorHis_ON = true;
-	//GetNextRowParameters(++Row, ResLines, ParV);
-	//if (ParV.size() > 0) {
-	//	useRandomSeed = true;
-	//	int c = 0;
-	//	//if (ParV.size() > c) { if (atoi(ParV[c].c_str()) == 0) DMtransformYN = false; else DMtransformYN = true; c++;}
-	//	//if (ParV.size() > c) {FixedLayerDir = atoi(ParV[c].c_str()) - 1; c++;}
-	//	
-	//	//if (ParV.size() > c) { if (atoi(ParV[c].c_str()) == 0) MultipleTIsYN = false; else MultipleTIsYN = true; c++; }
-	//	
-	//	if (ParV.size() > c) { if (atoi(ParV[c].c_str()) == 0) HisEqYN = false; else HisEqYN = true; c++; }
-	//	if (ParV.size() > c) { if (atoi(ParV[c].c_str()) == 0) GenerateTI = false; else GenerateTI = true;  c++; }
-	//	if (ParV.size() > c) { if (atoi(ParV[c].c_str()) == 0) PatternEntropyAnalysisYN = false; else PatternEntropyAnalysisYN = true; c++;	}
-	//	if (ParV.size() > c) { if (atoi(ParV[c].c_str()) == 0) PrintHisYN = false; else PrintHisYN = true; c++;}
-	//	if (ParV.size() > c) { factorIndex = atof(ParV[c].c_str()); c++; }
-	//	if (ParV.size() > c) { factorPos = atof(ParV[c].c_str()); c++; }
-	//	if (ParV.size() > c) { factorC = atof(ParV[c].c_str()); c++; factorC *= 100;	if (factorC == 0) ColorHis_ON = false; }
-	//}
-
-
-
+	///////////////////////// check random seed
 	if (useRandomSeed) {
 		cout << endl << "use Random Seed";
 		srand((unsigned)time(NULL));
@@ -422,6 +393,56 @@ void DoPAR::ReadRunPar_series(string CurExeFile, int TIseries)
 	if (ParV.size() > 0) {
 		if (ParV.size() > 0) NumRealization = atoi(ParV[0].c_str());
 	}
+
+
+	// for release version, set parameters fixed
+	HisEqYN = true;
+	GenerateTI = false;
+	PatternEntropyAnalysisYN = false;
+	PrintHisYN = false;
+	factorIndex = 0.1f;
+	factorPos = 0.5f;
+	factorC = 0.1f * 100;
+	ColorHis_ON = true;
+	//GetNextRowParameters(++Row, ResLines, ParV);
+	//if (ParV.size() > 0) {
+	//	useRandomSeed = true;
+	//	int c = 0;
+	//	//if (ParV.size() > c) { if (atoi(ParV[c].c_str()) == 0) DMtransformYN = false; else DMtransformYN = true; c++;}
+	//	//if (ParV.size() > c) {FixedLayerDir = atoi(ParV[c].c_str()) - 1; c++;}
+	//	
+	//	//if (ParV.size() > c) { if (atoi(ParV[c].c_str()) == 0) MultipleTIsYN = false; else MultipleTIsYN = true; c++; }
+	//	
+	//	if (ParV.size() > c) { if (atoi(ParV[c].c_str()) == 0) HisEqYN = false; else HisEqYN = true; c++; }
+	//	if (ParV.size() > c) { if (atoi(ParV[c].c_str()) == 0) GenerateTI = false; else GenerateTI = true;  c++; }
+	//	if (ParV.size() > c) { if (atoi(ParV[c].c_str()) == 0) PatternEntropyAnalysisYN = false; else PatternEntropyAnalysisYN = true; c++;	}
+	//	if (ParV.size() > c) { if (atoi(ParV[c].c_str()) == 0) PrintHisYN = false; else PrintHisYN = true; c++;}
+	//	if (ParV.size() > c) { factorIndex = atof(ParV[c].c_str()); c++; }
+	//	if (ParV.size() > c) { factorPos = atof(ParV[c].c_str()); c++; }
+	//	if (ParV.size() > c) { factorC = atof(ParV[c].c_str()); c++; factorC *= 100;	if (factorC == 0) ColorHis_ON = false; }
+	//}
+	
+	// read temp blockSize
+	GetNextRowParameters(++Row, ResLines, ParV);
+	tempblockSize.clear();
+	for (int c = 0; c < ParV.size(); c++){
+		if (atoi(ParV[c].c_str()) == -1){
+			blockSizeconfigYN = false;
+			break;
+		}
+		blockSizeconfigYN = true;
+		tempblockSize.push_back(atoi(ParV[c].c_str()));
+	}
+	//// read temp maxiteration
+	//GetNextRowParameters(++Row, ResLines, ParV);
+	//tempMAXITERATION.clear();
+	//for (int c = 0; c < ParV.size(); c++){
+	//	MAXITERATIONconfigYN = true;
+	//	tempMAXITERATION.push_back(atoi(ParV[c].c_str()));
+	//}
+	if (blockSizeconfigYN || MAXITERATIONconfigYN) outputmultilevel = true;
+
+
 
 	if (Row >= ResLines.size() - 1) {
 		printf("\nFinish series, quit.");
@@ -551,11 +572,16 @@ void DoPAR::ReadRunPar_series(string CurExeFile, int TIseries)
 		if (tempoutputformat == ".png") {
 			cout << endl << "2D simulation ON, just use the first (set of) TI.";
 			SIM2D_YN = true;
+			outputmultilevel = true;
 		}
 
-		if (batchYN) {
+		if (ParV[0].back() == '*'){
+			if (batchYN != true) {
+				cout << endl << "inconsistant with batchYN, quit"; _getch(); exit(0);
+			}
 			ParV[0] = batchFileList_XY[batchsequenceNo];
 		}
+
 		//no extension
 		tempoutputfilename = ParV[0].substr(0, ParV[0].rfind('.') == string::npos ? ParV[0].length() : ParV[0].rfind('.'));
 
@@ -605,29 +631,22 @@ void DoPAR::initTIbasedparameters(vector<Mat>& XY, vector<Mat>& XZ, vector<Mat>&
 	}
 	else {
 		ANNerror.resize(MULTIRES, 0.0);	blockSize.resize(MULTIRES);	MAXITERATION.resize(MULTIRES);	
-		switch (MULTIRES)
-		{
-		//case(2) ://128
-		//	blockSize = { 8, 6 };
-		//	MAXITERATION = { 25, 3 };
-		//	break;
-		case(3)://128~255
-			blockSize = { 8, 8, 6 };
-			MAXITERATION = { 25, 5, 3 };
-			break;
-		case(4)://256~511
-			blockSize = { 8, 8, 6, 6 };		
-			MAXITERATION = { 25, 5, 3, 2 };
-			ANNerror = { 0.0, 0.0, 0.0, 0.5 };
-			break;
-		case(5)://512~800
-			blockSize = { 8, 8, 6, 6, 6 };		
-			MAXITERATION = { 25, 5, 3, 2, 2 };	
-			ANNerror = { 0.0, 0.0, 0.0, 0.5, 1.0 };
-			break;
-		default:
+		vector<int> defaultblockSize = {8 ,8, 6, 6, 6};
+		vector<int> defaultMAXITERATION = {25, 9, 3, 2, 2};
+		vector<double> defaultANNerror = {0.0, 0.0, 0.0, 0.5, 1.0};
+
+		if (MULTIRES < 3 || MULTIRES>5) {
 			cout << endl << "MULTIRES not right, quit"; _getch(); exit(0);
-			break;
+		}
+
+		for (int l = 0; l < MULTIRES; l++){
+			if (blockSizeconfigYN) blockSize[l] = tempblockSize[l];
+			else blockSize[l] = defaultblockSize[l];
+
+			if (MAXITERATIONconfigYN) MAXITERATION[l] = tempMAXITERATION[l];
+			else MAXITERATION[l] = defaultMAXITERATION[l];
+
+			ANNerror[l] = defaultANNerror[l];
 		}
 	}
 
@@ -1872,7 +1891,7 @@ void DoPAR::DoANNOptimization(int TIseries) {
 				//}
 			}
 
-			if (curlevel == MULTIRES - 1 || SIM2D_YN) {// ouput model & histogram
+			if (curlevel == MULTIRES - 1 || outputmultilevel) {// ouput model & histogram
 				outputmodel(curlevel);
 				if (PrintHisYN) writeHistogram(curlevel);
 			}
@@ -2134,7 +2153,7 @@ void DoPAR::computeKCoherence_MultipleTIs() {
 		size_idx maxSize2d = TIsize_ * height;
 		size_idx dim = blockSize_ * blockSize_;
 		size_idx bias = blockSize_ * 0.5;
-		cout << endl << "level: " << level << " Dimension=" << dim;
+		cout << endl << "level: " << level << " Template size="<< blockSize_ << " Dimension=" << dim;
 
 		size_idx numData = width * height * MultiTIsNum;
 		size_idx KCoherenceSize = TIsize2d_ * MultiTIsNum;

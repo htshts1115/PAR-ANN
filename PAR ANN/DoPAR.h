@@ -51,6 +51,13 @@ private:
 	vector<int> MAXITERATION;							// max iteration time	//tested: fine level does not need many iterations
 	int NumRealization;
 	
+	bool blockSizeconfigYN = false;
+	vector<int> tempblockSize;
+	bool MAXITERATIONconfigYN = false;
+	vector<int> tempMAXITERATION;
+
+	bool outputmultilevel = false;
+
 	bool MultipleTIsYN = false;									//! if true, will try to use TIs with same prefix filename
 	int MultiTIsNum=1;									// how many TIs found(use)
 
