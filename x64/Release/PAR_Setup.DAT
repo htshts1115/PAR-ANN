@@ -1,0 +1,30 @@
+/*&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&
+/*Software:	(PAR-GO) Pore Architecture Reconstruction using Global Optimization
+/*Institution:	Heriot-Watt University, 2018
+/*Authors:	T. Huang, Z. Jiang*, M. I. J. van Dijke, S. Geiger
+/*Contact*:	Zeyun.Jiang@hw.ac.uk
+/*&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&
+/*
+/* Number of realizations (e.g. 2 means for each set of TIs it will generate 2 realizations)
+/*=============================================
+1
+/*=============================================
+/* Template size at each level (coarse to fine level, will output result at each level
+/* 				set to -1 will use default template size and turns off multi-level output)
+/*=============================================
+6,8,10,12
+/*=============================================
+/* Row 1 : directory of TIs used, accept relative address (e.g. d:\test\TIs\, TIs\ both OK)
+/* Row 2 : training images filenames (*.png) in XY, XZ and YZ-plane (imagej) Note: 
+/*	   Note: TI has to be binary & 8-bit, *.png format
+/* Row 3 : (1) output filename: 3D output format: *.raw; 2D output format: *.png, 2D output just use XY TI
+/*	   (2) output size (default size = TI dimension), but can be set optionally (e.g. Out.raw, 200)
+/* Accept sequential process, simply add the three-row-parameters for different data sets
+/* Accept batch process with prefix filenames. e.g. FractureZone* reconstructsall the TIs starting with names "FractureZone"
+/*=============================================
+C:\Users\dell\Downloads\FractureZone_8x\
+FractureZone*, FractureZone*, FractureZone*
+*.png, 256
+C:\Users\dell\Downloads\FractureZone_4x\
+FractureZone*, FractureZone*, FractureZone*
+*.raw, 256
