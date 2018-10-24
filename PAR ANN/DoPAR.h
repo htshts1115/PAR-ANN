@@ -78,16 +78,22 @@ private:
 
 
 	bool testNoDiscrete = false;
-	size_dist factorIndex = 0.1f;//0; // 0.5;				//!! change to factor * (MULTIRES-level)
-	size_dist factorPos = 0.1f;//0; // 0.5;
-	size_dist IndexHisManualControl = 1.0f, PosHisManualControl = 1.0f;
+	size_dist factorIndex;
+	vector<size_dist> indexweight;
+	size_dist factorPos;
+	vector<size_dist> posweight;
+	//size_dist IndexHisManualControl = 1.0f, PosHisManualControl = 1.0f;
 
 	int FixedLayerDir = -1;
 	size_dist DirectionalWeight = 0.66; 
 
 	bool ColorHis_ON = true;
-	size_dist factorC = 0.1;
-	size_hiscount poretotal_synthesis, poretotal_required;
+	int ColorHis_BinNum = 64;	//max 256
+	float colorhis_compressratio = 1.0*ColorHis_BinNum / 256;
+	size_dist factorC;
+	vector<size_dist> colorweight;
+
+	//size_hiscount poretotal_synthesis, poretotal_required;
 	size_dist porosityX, porosityY, porosityZ;
 	vector<size_dist> porosity_required;
 
@@ -231,10 +237,11 @@ private:
 	void writeHistogram(int level);
 
 // ============ Color Histogram ===============
-	int ColorHis_BinNum = 256;
+
 	vector<vector<size_hiscount>> ColorHis_exemplar;								//[level][BinNum], BinNum is the same for all level
 	vector<vector<size_hiscount>> ColorHis_synthesis;
 
+	void initColorHis_exemplar();
 	void initColorHis_synthesis(int level);
 
 
