@@ -1278,12 +1278,11 @@ vector<short> GetDMap_Euclidean(vector<T>& vect, short dimension) {
 	binaryChar(vecshort, vecchar);
 	vecshort = GetDMap(dimension, dimension, 1, vecchar, 2, true);
 	
-	if (dimension > 256+2){
-		for (long idx = 0; idx < vecshort.size(); ++idx) {			//get Euclidean distance
-			vecshort[idx] = (vecshort[idx] / abs(vecshort[idx])) * round(sqrt(abs(vecshort[idx])));
-		}
-	}
-
+	//if (dimension > 512+2){
+	//	for (long idx = 0; idx < vecshort.size(); ++idx) {			//get Euclidean distance
+	//		vecshort[idx] = (vecshort[idx] / abs(vecshort[idx])) * round(sqrt(abs(vecshort[idx])));
+	//	}
+	//}
 
 	return vecshort;
 }
@@ -1298,6 +1297,7 @@ void DoPAR::transformDMs(vector<vector<size_color> >& listXY, vector<vector<size
 	
 	// get vector<short>DM
 	for (int i = 0; i < MultiTIsNum; i++) {
+		//!changed, not euclidean, still squared distance
 		DMlist_XY[i] = GetDMap_Euclidean(listXY[i], TIsize_);
 		DMlist_XZ[i] = GetDMap_Euclidean(listXZ[i], TIsize_);
 		DMlist_YZ[i] = GetDMap_Euclidean(listYZ[i], TIsize_);
@@ -1521,40 +1521,40 @@ void DoPAR::analyze() {
 	}
 
 	if (GenerateTI && DMtransformYN) {						//Generate DM TI
-		//ostringstream name;
-		//for (int lv = MULTIRES - 1; lv >= 0; --lv) {
-		//	int TEXSIZE_ = TIsize[lv];
-		//	Mat DM1, DM2, DM3;
+		ostringstream name;
+		for (int lv = MULTIRES - 1; lv >= 0; --lv) {
+			int TEXSIZE_ = TIsize[lv];
+			Mat DM1, DM2, DM3;
 
-		//	//if (HisEqYN) {
-		//	vector<uchar> tmpchar;
-		//	DM1 = Mat(TEXSIZE_, TEXSIZE_, CV_8UC1);
-		//	tmpchar = vector<uchar>(m_exemplar_x[lv].begin(), m_exemplar_x[lv].end());
-		//	DM1 = Mat(tmpchar, true).reshape(1, DM1.rows);// vector to mat, need the same data type!
-		//	name << "DM1_S" << (short)Solid_Upper[lv] << "_L" << to_string(lv) << ".png";
-		//	imwrite(name.str(), DM1);	name.str("");
+			//if (HisEqYN) {
+			vector<uchar> tmpchar;
+			DM1 = Mat(TEXSIZE_, TEXSIZE_, CV_8UC1);
+			tmpchar = vector<uchar>(m_exemplar_x[lv].begin(), m_exemplar_x[lv].end());
+			DM1 = Mat(tmpchar, true).reshape(1, DM1.rows);// vector to mat, need the same data type!
+			name << "DM1_S" << (short)Solid_Upper[lv] << "_L" << to_string(lv) << ".png";
+			imwrite(name.str(), DM1);	name.str("");
 
-		//	if (!SIM2D_YN) {
-		//		//if (HisEqYN) {
-		//		vector<uchar> tmpchar;
-		//		DM2 = Mat(TEXSIZE_, TEXSIZE_, CV_8UC1);
-		//		tmpchar = vector<uchar>(m_exemplar_y[lv].begin(), m_exemplar_y[lv].end());
-		//		DM2 = Mat(tmpchar, true).reshape(1, DM2.rows);
-		//		name << "DM2_S" << (short)Solid_Upper[lv] << "_L" << to_string(lv) << ".png";
-		//		if (!(FNameXY == FNameXZ && FNameXY == FNameYZ)) imwrite(name.str(), DM2);
-		//		name.str("");
+			if (!SIM2D_YN) {
+				//if (HisEqYN) {
+				vector<uchar> tmpchar;
+				DM2 = Mat(TEXSIZE_, TEXSIZE_, CV_8UC1);
+				tmpchar = vector<uchar>(m_exemplar_y[lv].begin(), m_exemplar_y[lv].end());
+				DM2 = Mat(tmpchar, true).reshape(1, DM2.rows);
+				name << "DM2_S" << (short)Solid_Upper[lv] << "_L" << to_string(lv) << ".png";
+				if (!(FNameXY == FNameXZ && FNameXY == FNameYZ)) imwrite(name.str(), DM2);
+				name.str("");
 
-		//		//if (HisEqYN) {
-		//		//vector<uchar> tmpchar;
-		//		DM3 = Mat(TEXSIZE_, TEXSIZE_, CV_8UC1);
-		//		tmpchar = vector<uchar>(m_exemplar_z[lv].begin(), m_exemplar_z[lv].end());
-		//		DM3 = Mat(tmpchar, true).reshape(1, DM3.rows);
-		//		name << "DM3_S" << (short)Solid_Upper[lv] << "_L" << to_string(lv) << ".png";
-		//		if (!(FNameXY == FNameXZ && FNameXY == FNameYZ)) imwrite(name.str(), DM3);
-		//		name.str("");
-		//	}
-		//}
-		//cout << endl << "output TI.";	
+				//if (HisEqYN) {
+				//vector<uchar> tmpchar;
+				DM3 = Mat(TEXSIZE_, TEXSIZE_, CV_8UC1);
+				tmpchar = vector<uchar>(m_exemplar_z[lv].begin(), m_exemplar_z[lv].end());
+				DM3 = Mat(tmpchar, true).reshape(1, DM3.rows);
+				name << "DM3_S" << (short)Solid_Upper[lv] << "_L" << to_string(lv) << ".png";
+				if (!(FNameXY == FNameXZ && FNameXY == FNameYZ)) imwrite(name.str(), DM3);
+				name.str("");
+			}
+		}
+		cout << endl << "output TI.";	
 	}
 }
 
