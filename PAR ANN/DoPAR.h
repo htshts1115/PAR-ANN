@@ -57,11 +57,12 @@ private:
 	vector<int> tempMAXITERATION;
 
 	bool outputmultilevel = false;
+	bool outputiteration = false;
 
 	bool MultipleTIsYN = false;									//! if true, will try to use TIs with same prefix filename
 	int MultiTIsNum=1;									// how many TIs found(use)
 
-	int COHERENCENUM = 11;								// K-coherence 11
+	int COHERENCENUM = 9;								// K-coherence 11
 	vector<double> ANNerror;
 	bool useRandomSeed;									// Use random seed or fixed (0) for test (false)
 	
@@ -141,14 +142,14 @@ private:
 	//void AssignFixedLayer(int level, int dir);
 
 // =============== distance map ===============
-	vector<uchar> Solid_Upper, Pore_Upper, Pore_Lower;						//Redistribute DMap. Use same Solid_Upper,Pore_Lower for 3TIs and loaded model
+	vector<short> Solid_Upper, Pore_Upper, Pore_Lower;						//Redistribute DMap. Use same Solid_Upper,Pore_Lower for 3TIs and loaded model
 	//redistribute TI based on DM, no need to resize to 0-255
 	void transformDMs(vector<vector<size_color> >& listXY, vector<vector<size_color> >& listXZ, vector<vector<size_color> >& listYZ);
 
 	void invertpaddingDMtransform(vector<Mat>& XY, vector<Mat>& XZ, vector<Mat>& YZ, vector<vector<size_color> >& TIsXY, vector<vector<size_color> >& TIsXZ, vector<vector<size_color> >& TIsYZ);
 
 	void equalizeHistograms(int level, vector<vector<size_color>>& TIsXY, vector<vector<size_color>>& TIsXZ, vector<vector<size_color>>& TIsYZ);
-	uchar Solid_Upper_noeq, Pore_Lower_noeq;
+	short Solid_Upper_noeq, Pore_Lower_noeq;
 
 // ================ analysis ===========
 	void analyze();
