@@ -242,7 +242,7 @@ bool ReadMultipleTIs(vector<string> &filelist, string inputfilename, string key)
 
 	return true;
 }
-void LoadtoMat(vector<Mat> &Matlist, vector<string> FNlist, bool cropYN = true) {
+void LoadtoMat(vector<Mat> &Matlist, vector<string> FNlist, bool croprectangleYN = true) {
 	//Load address to Mat; crop if not square; 
 	Matlist.reserve(FNlist.size());
 	Mat tempmat;
@@ -416,17 +416,17 @@ void DoPAR::ReadRunPar_series(string CurExeFile, int TIseries)
 
 	// for release version, set parameters fixed
 	HisEqYN = true;
-	GenerateTI = true;
 	PatternEntropyAnalysisYN = false;
 
 	GetNextRowParameters(++Row, ResLines, ParV);
 	if (ParV.size() > 0) {
 		useRandomSeed = true;
 		int c = 0;
-		if (ParV.size() > c) { if (atoi(ParV[c].c_str()) == 0) DMtransformYN = false; else DMtransformYN = true; c++;}
+		if (ParV.size() > c) { if (atoi(ParV[c].c_str()) == 0) KeepParameterNameYN = false; else KeepParameterNameYN = true; c++; }
+		if (ParV.size() > c) { if (atoi(ParV[c].c_str()) == 0) PrintDMYN = false; else PrintDMYN = true; c++;}
 		if (ParV.size() > c) { if (atoi(ParV[c].c_str()) == 0) PrintHisYN = false; else PrintHisYN = true; c++;}
-		if (ParV.size() > c) { if (atoi(ParV[c].c_str()) == 0) outputmultilevel = false; else outputmultilevel = true; c++; }
-		if (ParV.size() > c) { if (atoi(ParV[c].c_str()) == 0) outputiteration = false; else outputiteration = true; c++; }
+		if (ParV.size() > c) { if (atoi(ParV[c].c_str()) == 0) outputmultilevelYN = false; else outputmultilevelYN = true; c++; }
+		if (ParV.size() > c) { if (atoi(ParV[c].c_str()) == 0) outputiterationYN = false; else outputiterationYN = true; c++; }
 	}
 
 	GetNextRowParameters(++Row, ResLines, ParV);
@@ -436,11 +436,6 @@ void DoPAR::ReadRunPar_series(string CurExeFile, int TIseries)
 		//if (ParV.size() > c) {FixedLayerDir = atoi(ParV[c].c_str()) - 1; c++;}		
 		//if (ParV.size() > c) { if (atoi(ParV[c].c_str()) == 0) MultipleTIsYN = false; else MultipleTIsYN = true; c++; }		
 		
-		//if (ParV.size() > c) { if (atoi(ParV[c].c_str()) == 0) DMtransformYN = false; else DMtransformYN = true; c++;}
-		//if (ParV.size() > c) { if (atoi(ParV[c].c_str()) == 0) HisEqYN = false; else HisEqYN = true; c++; }
-		//if (ParV.size() > c) { if (atoi(ParV[c].c_str()) == 0) GenerateTI = false; else GenerateTI = true;  c++; }
-		//if (ParV.size() > c) { if (atoi(ParV[c].c_str()) == 0) PatternEntropyAnalysisYN = false; else PatternEntropyAnalysisYN = true; c++;	}
-		//if (ParV.size() > c) { if (atoi(ParV[c].c_str()) == 0) PrintHisYN = false; else PrintHisYN = true; c++;}
 		if (ParV.size() > c) { factorIndex = atof(ParV[c].c_str()); c++; }
 		if (ParV.size() > c) { factorPos = atof(ParV[c].c_str()); c++; }
 		if (ParV.size() > c) { factorC = atof(ParV[c].c_str()); c++; 	if (factorC < 0.001f) ColorHis_ON = false; }
@@ -595,7 +590,7 @@ void DoPAR::ReadRunPar_series(string CurExeFile, int TIseries)
 		if (tempoutputformat == ".png") {
 			cout << endl << "2D simulation ON, just use the first (set of) TI.";
 			SIM2D_YN = true;
-			outputmultilevel = true;
+			outputmultilevelYN = true;
 		}
 
 		if (ParV[0].back() == '*'){
@@ -623,9 +618,8 @@ void DoPAR::ReadRunPar_series(string CurExeFile, int TIseries)
 	if (MultiTIsNum > 1 && MultipleTIsYN) parameterstring += "_TI" + to_string(MultiTIsNum);
 	//if (DMtransformYN && HisEqYN) parameterstring += "Eq" + to_string((int)HisEqYN);
 	//parameterstring += "DM" + to_string((int)DMtransformYN);
-	parameterstring += "I" + to_string((int)factorIndex*10) + "P" + to_string((int)factorPos*10) + "C" + to_string((int)factorC);
+	if (KeepParameterNameYN) parameterstring += "I" + to_string((int)factorIndex*10) + "P" + to_string((int)factorPos*10) + "C" + to_string((int)factorC);
 	if (FixedLayerDir > -1 && FixedLayerDir < 3)  parameterstring += "Fix" + to_string(FixedLayerDir) + "W" + to_string((int)(100 * DirectionalWeight));
-
 }
 
 // ================ load 2D TIs ==========
@@ -670,7 +664,7 @@ void DoPAR::initTIbasedparameters(vector<Mat>& XY, vector<Mat>& XZ, vector<Mat>&
 
 			ANNerror[l] = defaultANNerror[l];
 		}
-		parameterstring += parameterstring_blocksize;
+		if (KeepParameterNameYN) parameterstring += parameterstring_blocksize;
 	}
 
 	//crop to fit multi-level
@@ -690,7 +684,7 @@ void DoPAR::initTIbasedparameters(vector<Mat>& XY, vector<Mat>& XZ, vector<Mat>&
 	}
 
 	//! add additional space, later will crop to original size, to deal with Toroidal problem
-	outputsizeatlastlevel += pow(2, MULTIRES - 1) * blockSize[0];
+	if (cropYN) outputsizeatlastlevel += pow(2, MULTIRES - 1) * blockSize[0];
 	
 	// allocate TIsize, OUTsize
 	TIsize.resize(MULTIRES);	TIsize[MULTIRES - 1] = XY[0].cols;
@@ -1175,8 +1169,8 @@ vector<short> GetDMap(short Sx, short Sy, short Sz, vector<char>& OImg, char DM_
 
 	return DMap;
 }
-template<typename T>
-vector<short> GetDMap_Euclidean(vector<T>& vect, short dimension) {
+
+vector<short> DoPAR::GetDMap_Euclidean(vector<float>& vect, short dimension) {
 	assert(vect.size() == dimension*dimension);
 
 	vector<short> vecshort(vect.begin(), vect.end());
@@ -1184,12 +1178,37 @@ vector<short> GetDMap_Euclidean(vector<T>& vect, short dimension) {
 	
 	binaryChar(vecshort, vecchar);
 	vecshort = GetDMap(dimension, dimension, 1, vecchar, 2, true);
-	
+
 	//if (dimension > 512+2){
 	//	for (long idx = 0; idx < vecshort.size(); ++idx) {			//get Euclidean distance
 	//		vecshort[idx] = (vecshort[idx] / abs(vecshort[idx])) * round(sqrt(abs(vecshort[idx])));
 	//	}
 	//}
+
+	if (PrintDMYN) {// Print DM_pore, DM_solid
+		vector<short> tempshort;
+		tempshort = GetDMap(dimension, dimension, 1, vecchar, 1, true);
+		vector<unsigned short> DM_p(tempshort.begin(), tempshort.end());
+		
+		tempshort = GetDMap(dimension, dimension, 1, vecchar, 0, true);
+		transform(tempshort.begin(), tempshort.end(), tempshort.begin(), std::bind2nd(std::multiplies<short>(), -1));
+		vector<unsigned short> DM_s(tempshort.begin(), tempshort.end());
+		
+		Mat Mat_DM_p, Mat_DM_s;
+		Mat_DM_p = Mat(dimension, dimension, CV_16UC1);
+		Mat_DM_s = Mat(dimension, dimension, CV_16UC1);
+		
+		Mat_DM_p = Mat(DM_p, true).reshape(1, Mat_DM_p.rows);	// vector to mat, need the same data type!
+		Mat_DM_s = Mat(DM_s, true).reshape(1, Mat_DM_s.rows);
+
+		string name_p = outputfilename+ "_DM_p.png", name_s = outputfilename+ "_DM_s.png";
+		while (fileExists(name_p) == false) {
+			imwrite(name_p, Mat_DM_p);
+		}
+		while (fileExists(name_s) == false) {
+			imwrite(name_s, Mat_DM_s);
+		}
+	}
 
 	return vecshort;
 }
@@ -1208,6 +1227,7 @@ void DoPAR::transformDMs(vector<vector<size_color> >& listXY, vector<vector<size
 		DMlist_XY[i] = GetDMap_Euclidean(listXY[i], TIsize_);
 		DMlist_XZ[i] = GetDMap_Euclidean(listXZ[i], TIsize_);
 		DMlist_YZ[i] = GetDMap_Euclidean(listYZ[i], TIsize_);
+
 		// get min, max
 		min_XY = min(min_XY, *min_element(DMlist_XY[i].begin(), DMlist_XY[i].end()));
 		max_XY = max(max_XY, *max_element(DMlist_XY[i].begin(), DMlist_XY[i].end()));
@@ -1252,12 +1272,24 @@ void DoPAR::transformDMs(vector<vector<size_color> >& listXY, vector<vector<size
 		listXZ[n] = vector<size_color>(DMlist_XZ[n].begin(), DMlist_XZ[n].end());
 		listYZ[n] = vector<size_color>(DMlist_YZ[n].begin(), DMlist_YZ[n].end());
 	}
+
 	// update
 	Solid_Upper[MULTIRES-1] = -minall * scale;
 	Pore_Upper[MULTIRES - 1] = (maxall - minall) * scale;	//total bins
 	Pore_Lower[MULTIRES - 1] = Solid_Upper[MULTIRES - 1] + 1;
 
 	printf("\nSolid_Upper= %d,Pore_Upper= %d,Pore_Lower= %d", Solid_Upper[MULTIRES - 1], Pore_Upper[MULTIRES - 1], Pore_Lower[MULTIRES - 1]);
+
+	// print DM_combined
+	if (PrintDMYN) {
+		vector<unsigned short> DM_c(DMlist_XY[0].begin(), DMlist_XY[0].end());
+		Mat Mat_DM_c = Mat(TIsize_, TIsize_, CV_16UC1);
+		Mat_DM_c = Mat(DM_c, true).reshape(1, Mat_DM_c.rows);
+		string name_c= outputfilename + "_DM_c.png";
+		while (fileExists(name_c) == false) {
+			imwrite(name_c, Mat_DM_c);
+		}
+	}
 }
 
 void DoPAR::invertpaddingDMtransform(vector<Mat>& XY, vector<Mat>& XZ, vector<Mat>& YZ, vector<vector<size_color> >& TIsXY, vector<vector<size_color> >& TIsXZ, vector<vector<size_color> >& TIsYZ) {
@@ -1379,6 +1411,18 @@ void DoPAR::equalizeHistograms(int level, vector<vector<size_color>>& TI_XY, vec
 	// update
 	Solid_Upper[level] = lut[Solid_Upper_noeq];
 	Pore_Lower[level] = lut[Pore_Lower_noeq];
+
+
+	// Print DM_equalized
+	if (PrintDMYN) {
+		vector<unsigned short> DM_eq(TI_XY[0].begin(), TI_XY[0].end());
+		Mat Mat_DM_eq = Mat(TIsize[level], TIsize[level], CV_16UC1);
+		Mat_DM_eq = Mat(DM_eq, true).reshape(1, Mat_DM_eq.rows);
+		string name_eq= outputfilename + "_DM_eq.png";
+		while (fileExists(name_eq) == false) {
+			imwrite(name_eq, Mat_DM_eq);
+		}
+	}
 }
 
 // ================ analysis ===========
@@ -1403,13 +1447,12 @@ void DoPAR::computeporosityrequired() {
 }
 
 void DoPAR::analyze() {
-	//if (GenerateTI) testPCA();
+	//if (PrintDMYN) testPCA();
 
 	if (PatternEntropyAnalysisYN) {
 		//double entropy;
 		//if (!DMtransformYN) cout << endl << "noDM:";
 		//else cout << endl << "DM:";
-
 		//for (int templatesize = 4; templatesize < 34; templatesize += 2) {
 		//	if (!DMtransformYN) {
 		//		patternentropyanalysis(templatesize, matyz, entropy);
@@ -1433,43 +1476,6 @@ void DoPAR::analyze() {
 		//}
 		//_getch();
 	}
-
-	//if (GenerateTI && DMtransformYN) {						//Generate DM TI
-	//	ostringstream name;
-	//	for (int lv = MULTIRES - 1; lv >= 0; --lv) {
-	//		int TEXSIZE_ = TIsize[lv];
-	//		Mat DM1, DM2, DM3;
-
-	//		//if (HisEqYN) {
-	//		vector<uchar> tmpchar;
-	//		DM1 = Mat(TEXSIZE_, TEXSIZE_, CV_8UC1);
-	//		tmpchar = vector<uchar>(m_exemplar_x[lv].begin(), m_exemplar_x[lv].end());
-	//		DM1 = Mat(tmpchar, true).reshape(1, DM1.rows);// vector to mat, need the same data type!
-	//		name << "DM1_S" << (short)Solid_Upper[lv] << "_L" << to_string(lv) << ".png";
-	//		imwrite(name.str(), DM1);	name.str("");
-
-	//		if (!SIM2D_YN) {
-	//			//if (HisEqYN) {
-	//			vector<uchar> tmpchar;
-	//			DM2 = Mat(TEXSIZE_, TEXSIZE_, CV_8UC1);
-	//			tmpchar = vector<uchar>(m_exemplar_y[lv].begin(), m_exemplar_y[lv].end());
-	//			DM2 = Mat(tmpchar, true).reshape(1, DM2.rows);
-	//			name << "DM2_S" << (short)Solid_Upper[lv] << "_L" << to_string(lv) << ".png";
-	//			if (!(FNameXY == FNameXZ && FNameXY == FNameYZ)) imwrite(name.str(), DM2);
-	//			name.str("");
-
-	//			//if (HisEqYN) {
-	//			//vector<uchar> tmpchar;
-	//			DM3 = Mat(TEXSIZE_, TEXSIZE_, CV_8UC1);
-	//			tmpchar = vector<uchar>(m_exemplar_z[lv].begin(), m_exemplar_z[lv].end());
-	//			DM3 = Mat(tmpchar, true).reshape(1, DM3.rows);
-	//			name << "DM3_S" << (short)Solid_Upper[lv] << "_L" << to_string(lv) << ".png";
-	//			if (!(FNameXY == FNameXZ && FNameXY == FNameYZ)) imwrite(name.str(), DM3);
-	//			name.str("");
-	//		}
-	//	}
-	//	cout << endl << "output TI.";	
-	//}
 }
 
 void DoPAR::patternentropyanalysis(int templatesize, Mat &exemplar, double &entropy) {
@@ -1823,15 +1829,14 @@ void DoPAR::DoANNOptimization(int TIseries) {
 
 				if (curlevel == MULTIRES - 1 && loop == MAXITERATION[curlevel] - 1) optimizeVolume(curlevel, loop);	//do one optimization after the last search
 
-				if (outputiteration && (loop % (int)ceil(MAXITERATION[curlevel]*0.2)==0)) {		// output for 2D tests
+				if ((curlevel == MULTIRES - 1 || outputmultilevelYN) 
+						&& outputiterationYN && (loop % (int)ceil(MAXITERATION[curlevel] * 0.25) == 0)) {
 					outputmodel(curlevel);
-					if (PrintHisYN) writeHistogram(curlevel);
 				}
 			}
 
-			if (curlevel == MULTIRES - 1 || outputmultilevel) {// ouput model & histogram
+			if (curlevel == MULTIRES - 1 || outputmultilevelYN) {// ouput model & histogram
 				outputmodel(curlevel);
-				if (PrintHisYN) writeHistogram(curlevel);
 			}
 
 			if (curlevel < MULTIRES - 1) {// level up
@@ -3304,66 +3309,51 @@ void DoPAR::crop3Dmodel(int level, int cropl, vector<uchar>&model) {
 
 void DoPAR::outputmodel(int level) {
 	
-	// Note: For release version, delete parameter names
-	//parameterstring = "";
+	// Print Histogram
+	if (PrintHisYN && level == MULTIRES - 1) writeHistogram(level);
 
+	//!! Crop model
 	vector<uchar> tempUchar(m_volume[level].begin(), m_volume[level].end());
 	string tempoutputfilename;
 	size_idx OUTsize_ = OUTsize[level];
-
-	bool cropYN = true;
 	if (cropYN && level == MULTIRES - 1) {
-		int cropl = pow(2, MULTIRES - 2)* blockSize[0];
+		int cropl = pow(2, level - 1)* blockSize[0];
 		crop3Dmodel(level, cropl, tempUchar);
 		OUTsize_ = OUTsize_ - 2 * cropl;
 	}
 
-
+	// Print model
 	if (SIM2D_YN) {
-		if (!DMtransformYN) {
-			tempoutputfilename = outputfilename + parameterstring + "_Size" + to_string(OUTsize_) + ".png";
-			int i(1);
-			string nonrepeatFPName = tempoutputfilename;
-			while (fileExists(nonrepeatFPName) == true) {
-				nonrepeatFPName = tempoutputfilename.substr(0, tempoutputfilename.find('.')) + "_" + to_string(i) + ".png";
-				i++;
-			}
-
-			Mat tempM = Mat(OUTsize_, OUTsize_, CV_8UC1);
-			tempM = Mat(tempUchar, true).reshape(1, tempM.rows);
-			imwrite(nonrepeatFPName, tempM);
-		}
-		else if (DMtransformYN) {
+		Mat tempM;
+		string nonrepeatFPName;
+		if (DMtransformYN) {
 			tempoutputfilename = outputfilename + parameterstring + "_Size" + to_string(OUTsize_) + "DM.png";
 			int i(1);
-			string nonrepeatFPName = tempoutputfilename;
-			while (fileExists(nonrepeatFPName) == true) {
-				nonrepeatFPName = tempoutputfilename.substr(0, tempoutputfilename.find('.')) + "_" + to_string(i) + ".png";
-				i++;
-			}
-			Mat tempM = Mat(OUTsize_, OUTsize_, CV_8UC1);
-			tempM = Mat(tempUchar, true).reshape(1, tempM.rows);
-			if (GenerateTI)	imwrite(nonrepeatFPName, tempM);
-
-			// binary model
-			binaryUchar(tempUchar, (Solid_Upper[level] + Pore_Lower[level]) / 2);
-			//vector<short> tempshort(m_volume[level].begin(), m_volume[level].end());					
-			//binaryUchar(tempshort, tempUchar, (Solid_Upper[MULTIRES-1] + Pore_Lower[MULTIRES - 1]) / 2);// binary thresholded to 0&255
-			tempM = Mat(tempUchar, true).reshape(1, tempM.rows);
-			i = 1;
-			tempoutputfilename = outputfilename + parameterstring + "_Size" + to_string(OUTsize_) + ".png";
 			nonrepeatFPName = tempoutputfilename;
 			while (fileExists(nonrepeatFPName) == true) {
 				nonrepeatFPName = tempoutputfilename.substr(0, tempoutputfilename.find('.')) + "_" + to_string(i) + ".png";
 				i++;
 			}
-			imwrite(nonrepeatFPName, tempM);
+			tempM = Mat(OUTsize_, OUTsize_, CV_8UC1);
+			tempM = Mat(tempUchar, true).reshape(1, tempM.rows);
+			if (PrintDMYN) imwrite(nonrepeatFPName, tempM);			
+			// binarization
+			binaryUchar(tempUchar, (Solid_Upper[level] + Pore_Lower[level]) / 2);
 		}
+		tempM = Mat(tempUchar, true).reshape(1, tempM.rows);
+		int i = 1;
+		tempoutputfilename = outputfilename + parameterstring + "_Size" + to_string(OUTsize_) + ".png";
+		nonrepeatFPName = tempoutputfilename;
+		while (fileExists(nonrepeatFPName) == true) {
+			nonrepeatFPName = tempoutputfilename.substr(0, tempoutputfilename.find('.')) + "_" + to_string(i) + ".png";
+			i++;
+		}
+		imwrite(nonrepeatFPName, tempM);	
 	}
 	else {//3D
 		if (DMtransformYN) {
 			tempoutputfilename = outputfilename + parameterstring + "_Size" + to_string(OUTsize_) + "DM.RAW";
-			Write(outputpath + tempoutputfilename, tempUchar);
+			if (PrintDMYN) Write(outputpath + tempoutputfilename, tempUchar);
 			// binarization
 			binaryUchar(tempUchar, (Solid_Upper[level] + Pore_Lower[level]) / 2);
 		}
@@ -3371,9 +3361,8 @@ void DoPAR::outputmodel(int level) {
 		else tempoutputfilename = outputfilename + parameterstring + "_Size" + to_string(OUTsize_) + ".RAW";
 		Write(outputpath + tempoutputfilename, tempUchar);
 	}
-
-
 	cout << endl << "output done. output size=" << OUTsize_;
+
 
 }
 
@@ -3383,8 +3372,8 @@ void DoPAR::writeHistogram(int level) {
 	size_idx blockSize_ = blockSize[level];
 	size_idx TIsize2d_ = TIsize_*TIsize_;
 	size_idx OUTsize2d_ = OUTsize_*OUTsize_;
-
 	size_idx Sx = OUTsize_; if (SIM2D_YN) Sx = 1;
+
 	int cropedIndexHisStartX = blockSize_ * 0.25;
 	int cropedIndexHisWidth = TIsize_ / 2 - blockSize_ / 2 + 1;
 	int cropedIndexHisStartY = blockSize_ * 0.25;
@@ -3393,6 +3382,17 @@ void DoPAR::writeHistogram(int level) {
 	int cropedPosHisWidth = TIsize_ - 2;
 	int cropedPosHisStartY = 1;
 	int cropedPosHisHeight = TIsize_ - 2;
+	if (true) {
+		cropedIndexHisStartX = 0;
+		cropedIndexHisWidth = TIsize_ / 2;
+		cropedIndexHisStartY = 0;
+		cropedIndexHisHeight = TIsize_ / 2;
+		cropedPosHisStartX = 0;
+		cropedPosHisWidth = TIsize_;
+		cropedPosHisStartY = 0;
+		cropedPosHisHeight = TIsize_;
+	}
+
 	size_idx idx_i, idx_j, idx3d, idx2d;
 	Mat tempMat;
 	ostringstream name;
@@ -3404,13 +3404,12 @@ void DoPAR::writeHistogram(int level) {
 	vector<unsigned short> pos_x, pos_y, pos_z;
 	pos_x.resize(TIsize2d_, 0);	pos_y.resize(TIsize2d_, 0);	pos_z.resize(TIsize2d_, 0);
 
+	// -----------indexhis
 	name.str("");
 	tempMat = Mat(TIsize_ * 0.5, TIsize_ * 0.5, CV_16UC1);
 	vector<unsigned short> tempIHx = vector<unsigned short>(IndexHis_x[level].begin(), IndexHis_x[level].end());
 	tempMat = Mat(tempIHx, true).reshape(1, tempMat.rows);
 	Mat cropedIndexHisMat_x = tempMat(Rect(cropedIndexHisStartX, cropedIndexHisStartY, cropedIndexHisWidth, cropedIndexHisHeight));
-	//Mat cropedIndexHisMat_x = tempMat;
-
 	name << outputMainFileName << "_x" << "_IndexHis_L" << level << ".png";
 	string tempname = name.str();
 	int i(1);
@@ -3418,21 +3417,21 @@ void DoPAR::writeHistogram(int level) {
 		tempname = tempname.substr(0, tempname.find('.')) + "_" + to_string(i) + ".png";
 		i++;
 	}
-	if (SIM2D_YN/* || (FNameXY == FNameXZ && FNameXY == FNameYZ)*/) imwrite(tempname, cropedIndexHisMat_x);	//must be unsigned [short]!		
+	if (SIM2D_YN) imwrite(tempname, cropedIndexHisMat_x);	//must be unsigned [short]!		
 
-	if (!SIM2D_YN/* && !(FNameXY == FNameXZ && FNameXY == FNameYZ)*/) {
+	if (!SIM2D_YN) {
 		name.str("");
 		tempMat = Mat(TIsize_ * 0.5, TIsize_ * 0.5, CV_16UC1);
 		vector<unsigned short> tempIHy = vector<unsigned short>(IndexHis_y[level].begin(), IndexHis_y[level].end());
 		tempMat = Mat(tempIHy, true).reshape(1, tempMat.rows);
 		Mat cropedIndexHisMat_y = tempMat(Rect(cropedIndexHisStartX, cropedIndexHisStartY, cropedIndexHisWidth, cropedIndexHisHeight));
-		name << outputMainFileName << "_y" << "_IndexHis_L" << level << ".png";
-		tempname = name.str();
-		i = 1;
-		while (fileExists(tempname) == true) {
-			tempname = tempname.substr(0, tempname.find('.')) + "_" + to_string(i) + ".png";
-			i++;
-		}
+		//name << outputMainFileName << "_y" << "_IndexHis_L" << level << ".png";
+		//tempname = name.str();
+		//i = 1;
+		//while (fileExists(tempname) == true) {
+		//	tempname = tempname.substr(0, tempname.find('.')) + "_" + to_string(i) + ".png";
+		//	i++;
+		//}
 		//imwrite(name.str(), cropedIndexHisMat_y);
 
 		name.str("");
@@ -3440,17 +3439,16 @@ void DoPAR::writeHistogram(int level) {
 		vector<unsigned short> tempIHz = vector<unsigned short>(IndexHis_z[level].begin(), IndexHis_z[level].end());
 		tempMat = Mat(tempIHz, true).reshape(1, tempMat.rows);
 		Mat cropedIndexHisMat_z = tempMat(Rect(cropedIndexHisStartX, cropedIndexHisStartY, cropedIndexHisWidth, cropedIndexHisHeight));
-		name << outputMainFileName << "_z" << "_IndexHis_L" << level << ".png";
-		tempname = name.str();
-		i = 1;
-		while (fileExists(tempname) == true) {
-			tempname = tempname.substr(0, tempname.find('.')) + "_" + to_string(i) + ".png";
-			i++;
-		}
+		//name << outputMainFileName << "_z" << "_IndexHis_L" << level << ".png";
+		//tempname = name.str();
+		//i = 1;
+		//while (fileExists(tempname) == true) {
+		//	tempname = tempname.substr(0, tempname.find('.')) + "_" + to_string(i) + ".png";
+		//	i++;
+		//}
 		//imwrite(name.str(), cropedIndexHisMat_z);
 
 		name.str("");
-		tempMat = cropedIndexHisMat_x + cropedIndexHisMat_y + cropedIndexHisMat_z;
 		name << outputMainFileName << parameterstring << "_L" << level << "_IndexHis_merged.png";
 		tempname = name.str();
 		i = 1;
@@ -3458,25 +3456,41 @@ void DoPAR::writeHistogram(int level) {
 			tempname = tempname.substr(0, tempname.find('.')) + "_" + to_string(i) + ".png";
 			i++;
 		}
+
+		tempMat = (cropedIndexHisMat_x + cropedIndexHisMat_y + cropedIndexHisMat_z) / 3;
+		//! crop enlarged output model!	
+		if (cropYN) {
+			int cropl = pow(2, level - 1)* blockSize[0];
+			int cropped = OUTsize_ - 2 * cropl;
+			tempMat *= 1.0*(cropped*cropped*cropped) / (OUTsize_*OUTsize_*OUTsize_);
+		}
+			
+
 		imwrite(name.str(), tempMat);
 	}
 
 
-	//if (SIM2D_YN) return;
+	// -----------poshis
+	int cropl = pow(2, level - 1)* blockSize[0];
 	for (size_idx i = 0; i < Sx; i += 1) {									//PosHis not sparsed
+		//! crop enlarged output model!
+		if (cropYN) if (i<cropl || i>OUTsize_ - cropl - 1) continue;
 		idx_i = i*OUTsize2d_;
 		for (size_idx j = 0; j < OUTsize_; j += 1) {
+			if (cropYN) if (j<cropl || j>OUTsize_ - cropl - 1) continue;
 			idx_j = j*OUTsize_;
 			for (size_idx k = 0; k < OUTsize_; k += 1) {
+				if (cropYN) if (k<cropl || k>OUTsize_ - cropl - 1) continue;
 				idx3d = idx_i + idx_j + k;
 				idx2d = SelectedPos[level][idx3d];
+
 				if (idx2d < TIsize2d_) {
-					pos_x[idx2d] += deltaPosCount;							//X	
+					pos_x[idx2d] += deltaPosCount;								//X	
 				}
 				else if (idx2d < 2 * TIsize2d_) {
 					pos_y[idx2d - TIsize2d_] += deltaPosCount;					//Y
 				}
-				else {
+				else if (idx2d < 3 * TIsize2d_) {
 					pos_z[idx2d - 2 * TIsize2d_] += deltaPosCount;				//Z
 				}
 			}
@@ -3486,7 +3500,6 @@ void DoPAR::writeHistogram(int level) {
 	tempMat = Mat(TIsize_, TIsize_, CV_16UC1);
 	tempMat = Mat(pos_x, true).reshape(1, tempMat.rows);
 	Mat cropedPosHisMat_x = tempMat(Rect(cropedPosHisStartX, cropedPosHisStartY, cropedPosHisWidth, cropedPosHisHeight));
-	//Mat cropedPosHisMat_x = tempMat;
 	name << outputMainFileName << "_x" << "_PosHis_L" << level << ".png";
 	tempname = name.str();
 	i = 1;
@@ -3501,31 +3514,31 @@ void DoPAR::writeHistogram(int level) {
 		tempMat = Mat(TIsize_, TIsize_, CV_16UC1);
 		tempMat = Mat(pos_y, true).reshape(1, tempMat.rows);
 		Mat cropedPosHisMat_y = tempMat(Rect(cropedPosHisStartX, cropedPosHisStartY, cropedPosHisWidth, cropedPosHisHeight));
-		name << outputMainFileName << "_y" << "_PosHis_L" << level << ".png";
-		tempname = name.str();
-		i = 1;
-		while (fileExists(tempname) == true) {
-			tempname = tempname.substr(0, tempname.find('.')) + "_" + to_string(i) + ".png";
-			i++;
-		}
+		//name << outputMainFileName << "_y" << "_PosHis_L" << level << ".png";
+		//tempname = name.str();
+		//i = 1;
+		//while (fileExists(tempname) == true) {
+		//	tempname = tempname.substr(0, tempname.find('.')) + "_" + to_string(i) + ".png";
+		//	i++;
+		//}
 		//imwrite(name.str(), cropedPosHisMat_y);
 
 		name.str("");
 		tempMat = Mat(TIsize_, TIsize_, CV_16UC1);
 		tempMat = Mat(pos_z, true).reshape(1, tempMat.rows);
 		Mat cropedPosHisMat_z = tempMat(Rect(cropedPosHisStartX, cropedPosHisStartY, cropedPosHisWidth, cropedPosHisHeight));
-		name << outputMainFileName << "_z" << "_PosHis_L" << level << ".png";
-		tempname = name.str();
-		i = 1;
-		while (fileExists(tempname) == true) {
-			tempname = tempname.substr(0, tempname.find('.')) + "_" + to_string(i) + ".png";
-			i++;
-		}
+		//name << outputMainFileName << "_z" << "_PosHis_L" << level << ".png";
+		//tempname = name.str();
+		//i = 1;
+		//while (fileExists(tempname) == true) {
+		//	tempname = tempname.substr(0, tempname.find('.')) + "_" + to_string(i) + ".png";
+		//	i++;
+		//}
 		//imwrite(name.str(), cropedPosHisMat_z);
 
 		name.str("");
-		tempMat = cropedPosHisMat_x + cropedPosHisMat_y + cropedPosHisMat_z;
-		name << outputMainFileName << parameterstring << "_L" << level << "_PosHis_merged_.png";
+		tempMat = (cropedPosHisMat_x + cropedPosHisMat_y + cropedPosHisMat_z);
+		name << outputMainFileName << parameterstring << "_L" << level << "_PosHis_merged.png";
 		tempname = name.str();
 		i = 1;
 		while (fileExists(tempname) == true) {

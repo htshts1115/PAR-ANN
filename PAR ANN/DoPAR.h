@@ -56,8 +56,8 @@ private:
 	bool MAXITERATIONconfigYN = false;
 	vector<int> tempMAXITERATION;
 
-	bool outputmultilevel = false;
-	bool outputiteration = false;
+	bool outputmultilevelYN = false;
+	bool outputiterationYN = false;
 
 	bool MultipleTIsYN = false;									//! if true, will try to use TIs with same prefix filename
 	int MultiTIsNum=1;									// how many TIs found(use)
@@ -71,12 +71,14 @@ private:
 	const size_dist max_dist = 10e7f;
 	bool SIM2D_YN = false;								//2d reconstruction
 
+	bool cropYN = true;									// first enlarge model to avoid toroidal, when output crop
+
 	bool HisEqYN = false;								// apply histogram equalization
 	bool DMtransformYN = true;							// use DM transformation
-	bool GenerateTI = false;							// generate DM transformed TI
+	bool PrintDMYN = false;							// generate DM transformed TI
 	bool PrintHisYN = false;							// generate Histogram
 	bool PatternEntropyAnalysisYN = true;				// analyse pattern size entropy
-
+	bool KeepParameterNameYN = true;
 
 	bool testNoDiscrete = false;
 	size_dist factorIndex;
@@ -145,6 +147,7 @@ private:
 	vector<short> Solid_Upper, Pore_Upper, Pore_Lower;						//Redistribute DMap. Use same Solid_Upper,Pore_Lower for 3TIs and loaded model
 	//redistribute TI based on DM, no need to resize to 0-255
 	void transformDMs(vector<vector<size_color> >& listXY, vector<vector<size_color> >& listXZ, vector<vector<size_color> >& listYZ);
+	vector<short> DoPAR::GetDMap_Euclidean(vector<float>& vect, short dimension);
 
 	void invertpaddingDMtransform(vector<Mat>& XY, vector<Mat>& XZ, vector<Mat>& YZ, vector<vector<size_color> >& TIsXY, vector<vector<size_color> >& TIsXZ, vector<vector<size_color> >& TIsYZ);
 
@@ -185,8 +188,6 @@ private:
 // =========== phase 1: search ================================
 	bool searchVolume(int level, int loop);
 
-	bool searchVolume1(int level, int loop);
-
 	template<typename T>
 	size_dist getFullDistance_TIs(int level, vector<vector<T>>& TIs, size_idx idx2d_TIs, vector<T>& pattern);
 	template<typename T>
@@ -202,8 +203,6 @@ private:
 
 // ========== phase 2: optimization ===========================
 	void optimizeVolume(int level, int loop);
-
-	void optimizeVolume1(int level, int loop);
 
 	bool FIRSTRUN = true;
 
