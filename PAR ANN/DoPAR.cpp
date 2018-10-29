@@ -590,7 +590,6 @@ void DoPAR::ReadRunPar_series(string CurExeFile, int TIseries)
 		if (tempoutputformat == ".png") {
 			cout << endl << "2D simulation ON, just use the first (set of) TI.";
 			SIM2D_YN = true;
-			outputmultilevelYN = true;
 		}
 
 		if (ParV[0].back() == '*'){
@@ -614,11 +613,11 @@ void DoPAR::ReadRunPar_series(string CurExeFile, int TIseries)
 		cout << endl << "enable fixed layer, modify directional weight: " << "1.0-->" << DirectionalWeight;
 	}
 
-	parameterstring = "_";
+	parameterstring = "";
 	if (MultiTIsNum > 1 && MultipleTIsYN) parameterstring += "_TI" + to_string(MultiTIsNum);
 	//if (DMtransformYN && HisEqYN) parameterstring += "Eq" + to_string((int)HisEqYN);
 	//parameterstring += "DM" + to_string((int)DMtransformYN);
-	if (KeepParameterNameYN) parameterstring += "I" + to_string((int)factorIndex*10) + "P" + to_string((int)factorPos*10) + "C" + to_string((int)factorC);
+	if (KeepParameterNameYN) parameterstring += "_I" + to_string((int)factorIndex*10) + "P" + to_string((int)factorPos*10) + "C" + to_string((int)factorC);
 	if (FixedLayerDir > -1 && FixedLayerDir < 3)  parameterstring += "Fix" + to_string(FixedLayerDir) + "W" + to_string((int)(100 * DirectionalWeight));
 }
 
@@ -646,7 +645,7 @@ void DoPAR::initTIbasedparameters(vector<Mat>& XY, vector<Mat>& XZ, vector<Mat>&
 	else {
 		ANNerror.resize(MULTIRES, 0.0);	blockSize.resize(MULTIRES);	MAXITERATION.resize(MULTIRES);	
 		vector<int> defaultblockSize = {8, 8, 6, 6, 6};
-		vector<int> defaultMAXITERATION = {28, 14, 6, 3, 2};
+		vector<int> defaultMAXITERATION = {32, 16, 8, 4, 2};
 		vector<double> defaultANNerror = {0.0, 0.0, 0.0, 0.5, 1.0};
 
 		if (MULTIRES < 3 || MULTIRES>5) {
@@ -726,12 +725,30 @@ bool DoPAR::loadExemplar() {
 		DMtransformYN = true;
 	}
 	else {
-		cout << endl << "TI(s) NOT binary, disable distance map transformation";
-		cout << endl << "Not recommended to use greyscale TI, continue??";
-		_getch();
-		DMtransformYN = false; 		
-		//ColorHis_ON = false; 		
+		cout << endl << "==== TI(s) NOT binary, disable distance map transformation====";
+		//cout << endl << "Not recommended to use greyscale TI, continue??";
+		//_getch();
+		DMtransformYN = false; 			
 		HisEqYN = false;
+		// change to 8-bit TI
+		for (int n = 0; n < MultiTIsNum; n++){
+			MatlistXY[n].convertTo(MatlistXY[n], CV_8U);
+			MatlistXZ[n].convertTo(MatlistXZ[n], CV_8U);
+			MatlistYZ[n].convertTo(MatlistYZ[n], CV_8U);
+		}
+		cout << endl << "==== Greyscale TI convert to 8-bit ====";
+		if (PrintDMYN) {
+			string tempfn = FNameXY[0].substr(0, FNameXY[0].rfind('.') == string::npos ? FNameXY[0].length() : FNameXY[0].rfind('.'));
+			imwrite(tempfn + "_8bit.png", MatlistXY[0]);
+			if (FNameXY[0] != FNameXZ[0]) {
+				tempfn = FNameXZ[0].substr(0, FNameXZ[0].rfind('.') == string::npos ? FNameXZ[0].length() : FNameXZ[0].rfind('.'));
+				imwrite(FNameXZ[0] + "_8bit.png", MatlistXZ[0]);
+			}
+			if (FNameXY[0] != FNameYZ[0]) {
+				tempfn = FNameYZ[0].substr(0, FNameYZ[0].rfind('.') == string::npos ? FNameYZ[0].length() : FNameYZ[0].rfind('.'));
+				imwrite(FNameYZ[0] + "_8bit.png", MatlistYZ[0]);
+			}
+		}
 	}
 	
 	//------------ decide parameters based on TI dimension
@@ -740,7 +757,7 @@ bool DoPAR::loadExemplar() {
 	//------------ Assign vectors ---------------------
 	allocateVectors();
 
-	//------------ DM transform ---------------------
+	//------------ DM transform, Mat to vector!---------------------
 	invertpaddingDMtransform(MatlistXY, MatlistXZ, MatlistYZ, TIs_XY[MULTIRES-1], TIs_XZ[MULTIRES - 1], TIs_YZ[MULTIRES - 1]);
 	//cout << endl << " max_element= " << *max_element(TIs_XY[MULTIRES - 1][0].begin(), TIs_XY[MULTIRES - 1][0].end()); _getch();
 
@@ -1166,6 +1183,14 @@ vector<short> GetDMap(short Sx, short Sy, short Sz, vector<char>& OImg, char DM_
 			}
 		}
 	}//DM_Type == 1 || DM_Type == 2
+	
+	
+	//if (true){//get Euclidean distance instead of squared distance
+	//	for (long idx = 0; idx < DMap.size(); ++idx) {			
+	//		DMap[idx] = (DMap[idx] / abs(DMap[idx])) * round(sqrt(abs(DMap[idx])));
+	//	}
+	//}
+
 
 	return DMap;
 }
@@ -1179,11 +1204,7 @@ vector<short> DoPAR::GetDMap_Euclidean(vector<float>& vect, short dimension) {
 	binaryChar(vecshort, vecchar);
 	vecshort = GetDMap(dimension, dimension, 1, vecchar, 2, true);
 
-	//if (dimension > 512+2){
-	//	for (long idx = 0; idx < vecshort.size(); ++idx) {			//get Euclidean distance
-	//		vecshort[idx] = (vecshort[idx] / abs(vecshort[idx])) * round(sqrt(abs(vecshort[idx])));
-	//	}
-	//}
+
 
 	if (PrintDMYN) {// Print DM_pore, DM_solid
 		vector<short> tempshort;
@@ -1294,7 +1315,6 @@ void DoPAR::transformDMs(vector<vector<size_color> >& listXY, vector<vector<size
 
 void DoPAR::invertpaddingDMtransform(vector<Mat>& XY, vector<Mat>& XZ, vector<Mat>& YZ, vector<vector<size_color> >& TIsXY, vector<vector<size_color> >& TIsXZ, vector<vector<size_color> >& TIsYZ) {
 	// input Mat lists; output invert padded DM transformed vector lists
-	if (!DMtransformYN) return;
 
 	vector<vector<size_color> > paddedTIs_x(MultiTIsNum), paddedTIs_y(MultiTIsNum), paddedTIs_z(MultiTIsNum);
 	int dimension = XY[0].cols;
@@ -1328,8 +1348,7 @@ void DoPAR::invertpaddingDMtransform(vector<Mat>& XY, vector<Mat>& XZ, vector<Ma
 	}
 
 	//---------- Distance map transformation
-
-	transformDMs(paddedTIs_x, paddedTIs_y, paddedTIs_z);
+	if (DMtransformYN)	transformDMs(paddedTIs_x, paddedTIs_y, paddedTIs_z);
 	//cout << endl << " max_element= " << *max_element(paddedTIs_x[0].begin(), paddedTIs_x[0].end()); _getch();
 
 	//---------- vector to Mat, then crop, then Mat to vector again
@@ -3324,7 +3343,7 @@ void DoPAR::outputmodel(int level) {
 
 	// Print model
 	if (SIM2D_YN) {
-		Mat tempM;
+		Mat tempM = Mat(OUTsize_, OUTsize_, CV_8UC1);
 		string nonrepeatFPName;
 		if (DMtransformYN) {
 			tempoutputfilename = outputfilename + parameterstring + "_Size" + to_string(OUTsize_) + "DM.png";
@@ -3333,10 +3352,9 @@ void DoPAR::outputmodel(int level) {
 			while (fileExists(nonrepeatFPName) == true) {
 				nonrepeatFPName = tempoutputfilename.substr(0, tempoutputfilename.find('.')) + "_" + to_string(i) + ".png";
 				i++;
-			}
-			tempM = Mat(OUTsize_, OUTsize_, CV_8UC1);
+			}			
 			tempM = Mat(tempUchar, true).reshape(1, tempM.rows);
-			if (PrintDMYN) imwrite(nonrepeatFPName, tempM);			
+			if (KeepParameterNameYN) imwrite(nonrepeatFPName, tempM);			
 			// binarization
 			binaryUchar(tempUchar, (Solid_Upper[level] + Pore_Lower[level]) / 2);
 		}
@@ -3353,7 +3371,7 @@ void DoPAR::outputmodel(int level) {
 	else {//3D
 		if (DMtransformYN) {
 			tempoutputfilename = outputfilename + parameterstring + "_Size" + to_string(OUTsize_) + "DM.RAW";
-			if (PrintDMYN) Write(outputpath + tempoutputfilename, tempUchar);
+			if (KeepParameterNameYN) Write(outputpath + tempoutputfilename, tempUchar);
 			// binarization
 			binaryUchar(tempUchar, (Solid_Upper[level] + Pore_Lower[level]) / 2);
 		}
