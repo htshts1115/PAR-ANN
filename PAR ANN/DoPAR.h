@@ -91,7 +91,7 @@ private:
 	size_dist DirectionalWeight = 0.66; 
 
 	bool ColorHis_ON = true;
-	int ColorHis_BinNum = 64;	//max 256
+	int ColorHis_BinNum = 128;	//max 256
 	float colorhis_compressratio = 1.0*ColorHis_BinNum / 256;
 	size_dist factorC;
 	vector<size_dist> colorweight;

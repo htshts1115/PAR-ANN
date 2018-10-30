@@ -617,7 +617,7 @@ void DoPAR::ReadRunPar_series(string CurExeFile, int TIseries)
 	if (MultiTIsNum > 1 && MultipleTIsYN) parameterstring += "_TI" + to_string(MultiTIsNum);
 	//if (DMtransformYN && HisEqYN) parameterstring += "Eq" + to_string((int)HisEqYN);
 	//parameterstring += "DM" + to_string((int)DMtransformYN);
-	if (KeepParameterNameYN) parameterstring += "_I" + to_string((int)factorIndex*10) + "P" + to_string((int)factorPos*10) + "C" + to_string((int)factorC);
+	if (KeepParameterNameYN) parameterstring += "_I" + to_string((int)factorIndex) + "P" + to_string((int)factorPos) + "C" + to_string((int)factorC);
 	if (FixedLayerDir > -1 && FixedLayerDir < 3)  parameterstring += "Fix" + to_string(FixedLayerDir) + "W" + to_string((int)(100 * DirectionalWeight));
 }
 
@@ -1222,7 +1222,8 @@ vector<short> DoPAR::GetDMap_Euclidean(vector<float>& vect, short dimension) {
 		Mat_DM_p = Mat(DM_p, true).reshape(1, Mat_DM_p.rows);	// vector to mat, need the same data type!
 		Mat_DM_s = Mat(DM_s, true).reshape(1, Mat_DM_s.rows);
 
-		string name_p = outputfilename+ "_DM_p.png", name_s = outputfilename+ "_DM_s.png";
+		string tempfn = FNameXY[0].substr(0, FNameXY[0].rfind('.') == string::npos ? FNameXY[0].length() : FNameXY[0].rfind('.'));
+		string name_p = tempfn + "_DM_p.png", name_s = tempfn + "_DM_s.png";
 		while (fileExists(name_p) == false) {
 			imwrite(name_p, Mat_DM_p);
 		}
@@ -1306,7 +1307,8 @@ void DoPAR::transformDMs(vector<vector<size_color> >& listXY, vector<vector<size
 		vector<unsigned short> DM_c(DMlist_XY[0].begin(), DMlist_XY[0].end());
 		Mat Mat_DM_c = Mat(TIsize_, TIsize_, CV_16UC1);
 		Mat_DM_c = Mat(DM_c, true).reshape(1, Mat_DM_c.rows);
-		string name_c= outputfilename + "_DM_c.png";
+		string tempfn = FNameXY[0].substr(0, FNameXY[0].rfind('.') == string::npos ? FNameXY[0].length() : FNameXY[0].rfind('.'));
+		string name_c = tempfn + "_DM_c.png";
 		while (fileExists(name_c) == false) {
 			imwrite(name_c, Mat_DM_c);
 		}
@@ -1437,7 +1439,8 @@ void DoPAR::equalizeHistograms(int level, vector<vector<size_color>>& TI_XY, vec
 		vector<unsigned short> DM_eq(TI_XY[0].begin(), TI_XY[0].end());
 		Mat Mat_DM_eq = Mat(TIsize[level], TIsize[level], CV_16UC1);
 		Mat_DM_eq = Mat(DM_eq, true).reshape(1, Mat_DM_eq.rows);
-		string name_eq= outputfilename + "_DM_eq.png";
+		string tempfn = FNameXY[0].substr(0, FNameXY[0].rfind('.') == string::npos ? FNameXY[0].length() : FNameXY[0].rfind('.'));
+		string name_eq = tempfn + "_DM_eq.png";
 		while (fileExists(name_eq) == false) {
 			imwrite(name_eq, Mat_DM_eq);
 		}
@@ -1779,8 +1782,8 @@ void DoPAR::init() {
 	posweight.resize(MULTIRES);
 	for (int i = 0; i < MULTIRES; i++) {
 		// colorweight
-		//colorweight[i] = factorC / (OUTsize[i] * OUTsize[i] * OUTsize[i] / ColorHis_BinNum);
-		colorweight[i] = factorC * 1.0f;
+		colorweight[i] = factorC / (OUTsize[i] * OUTsize[i] * OUTsize[i] / ColorHis_BinNum);
+		//colorweight[i] = factorC * 1.0f;
 
 		// indexweight, posweight
 		//~TI_
