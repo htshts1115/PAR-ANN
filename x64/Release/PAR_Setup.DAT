@@ -12,7 +12,9 @@
 /* Template size at each level (coarse to fine level, will output result at each level
 /* 				set to -1 will use default template size and turns off multi-level output)
 /*=============================================
-6,8,10,12
+0,0,0,0,0
+10,10,0,0
+-1
 /*=============================================
 /* Row 1 : directory of TIs used, accept relative address (e.g. d:\test\TIs\, TIs\ both OK)
 /* Row 2 : training images filenames (*.png) in XY, XZ and YZ-plane (imagej) Note: 
@@ -22,9 +24,11 @@
 /* Accept sequential process, simply add the three-row-parameters for different data sets
 /* Accept batch process with prefix filenames. e.g. FractureZone* reconstructsall the TIs starting with names "FractureZone"
 /*=============================================
-C:\Users\dell\Downloads\FractureZone_8x\
-FractureZone*, FractureZone*, FractureZone*
-*.png, 256
-C:\Users\dell\Downloads\FractureZone_4x\
-FractureZone*, FractureZone*, FractureZone*
-*.raw, 256
+/* you can use star* for batch processing, to read multiple TIs, e.g.
+C:\Users\dell\PAR_ICCR\x64\Release\TIs
+test*, test*, test*
+.raw, 256
+/* you can also specify output directory, but it must not be the same with TI directory, e.g.
+// C:\Results\*.raw, 128
+/* you can add star * or not, specify size or not e.g.
+// .raw
