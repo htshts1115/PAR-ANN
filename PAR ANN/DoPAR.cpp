@@ -395,7 +395,7 @@ void DoPAR::ReadRunPar_series(string CurExeFile, int TIseries)
 	vector<string> ParV;
 	///////////////////////// check random seed
 	if (useRandomSeed) {
-		cout << endl << "use Random Seed";
+		//cout << endl << "use Random Seed";
 		srand((unsigned)time(NULL));
 		std::random_device rd;  
 		std::mt19937 mersennetwistergenerator(rd());
@@ -576,6 +576,7 @@ void DoPAR::ReadRunPar_series(string CurExeFile, int TIseries)
 
 	///////////////////////// read 3D model name
 	outputpath = "";
+
 	if (ResLines.size() > ++Row) {
 		vector<string> ParV;
 		GetNextRowParameters(Row, ResLines, ParV);
@@ -585,6 +586,9 @@ void DoPAR::ReadRunPar_series(string CurExeFile, int TIseries)
 		//////seperate filename and format
 		auto idx = ParV[0].rfind('.');
 		if (idx != std::string::npos) tempoutputformat = ParV[0].substr(idx);
+		//no extension
+		tempoutputfilename = ParV[0].substr(0, ParV[0].rfind('.') == string::npos ? ParV[0].length() : ParV[0].rfind('.'));
+		cout << endl << "1 tempoutputfilename=" << tempoutputfilename;
 
 		/////2d simulation
 		if (tempoutputformat == ".png") {
@@ -592,15 +596,15 @@ void DoPAR::ReadRunPar_series(string CurExeFile, int TIseries)
 			SIM2D_YN = true;
 		}
 
-		if (ParV[0].back() == '*'){
-			if (batchYN != true) {
-				cout << endl << "inconsistant with batchYN, quit"; _getch(); exit(0);
-			}
-			ParV[0] = batchFileList_XY[batchsequenceNo];
+		if (batchYN){
+			if (tempoutputfilename.back() == '*') tempoutputfilename = tempoutputfilename.substr(0, tempoutputfilename.find('*'));
+			cout << endl << "Enable batch processing";
+			//ParV[0] = batchFileList_XY[batchsequenceNo];
+			cout << endl << "batchFileList_XY[batchsequenceNo]=" << batchFileList_XY[batchsequenceNo]; 
+			tempoutputfilename += batchFileList_XY[batchsequenceNo].substr(0, batchFileList_XY[batchsequenceNo].find('.'));
+			cout << endl << "2 tempoutputfilename=" << tempoutputfilename; 
 		}
 
-		//no extension
-		tempoutputfilename = ParV[0].substr(0, ParV[0].rfind('.') == string::npos ? ParV[0].length() : ParV[0].rfind('.'));
 
 		//optional parameter: output size
 		if (ParV.size() > 1) { outputsizeatlastlevel = atoi(ParV[1].c_str()); }
@@ -646,7 +650,7 @@ void DoPAR::initTIbasedparameters(vector<Mat>& XY, vector<Mat>& XZ, vector<Mat>&
 		ANNerror.resize(MULTIRES, 0.0);	blockSize.resize(MULTIRES);	MAXITERATION.resize(MULTIRES);	
 		vector<int> defaultblockSize = {8, 8, 6, 6, 6};
 		vector<int> defaultMAXITERATION = {32, 16, 8, 4, 2};
-		vector<double> defaultANNerror = {0.0, 0.0, 0.0, 0.5, 1.0};
+		vector<double> defaultANNerror = {0.0, 0.0, 0.5, 1.0, 2.0};
 
 		if (MULTIRES < 3 || MULTIRES>5) {
 			cout << endl << "MULTIRES not right, quit"; _getch(); exit(0);
@@ -1835,6 +1839,8 @@ void DoPAR::DoANNOptimization(int TIseries) {
 				//the first run on level0 should be started by search	
 				if (curlevel == 0 && loop == 0) searchVolume(curlevel, loop);
 
+				//if (true) continue;
+
 				t1 = GetTickCount();
 				optimizeVolume(curlevel, loop);
 				t2 = GetTickCount();
@@ -1851,11 +1857,12 @@ void DoPAR::DoANNOptimization(int TIseries) {
 
 				if (curlevel == MULTIRES - 1 && loop == MAXITERATION[curlevel] - 1) optimizeVolume(curlevel, loop);	//do one optimization after the last search
 
-				if ((curlevel == MULTIRES - 1 || outputmultilevelYN) 
-						&& outputiterationYN && (loop % (int)ceil(MAXITERATION[curlevel] * 0.25) == 0)) {
+				if ((curlevel == MULTIRES - 1 || outputmultilevelYN)
+					&& outputiterationYN && (loop % (int)ceil(MAXITERATION[curlevel] * 0.25) == 0)) {
 					outputmodel(curlevel);
 				}
 			}
+			
 
 			if (curlevel == MULTIRES - 1 || outputmultilevelYN) {// ouput model & histogram
 				outputmodel(curlevel);
@@ -3357,7 +3364,7 @@ void DoPAR::outputmodel(int level) {
 				i++;
 			}			
 			tempM = Mat(tempUchar, true).reshape(1, tempM.rows);
-			if (KeepParameterNameYN) imwrite(nonrepeatFPName, tempM);			
+			if (KeepParameterNameYN) imwrite(outputpath + nonrepeatFPName, tempM);
 			// binarization
 			binaryUchar(tempUchar, (Solid_Upper[level] + Pore_Lower[level]) / 2);
 		}
@@ -3369,7 +3376,7 @@ void DoPAR::outputmodel(int level) {
 			nonrepeatFPName = tempoutputfilename.substr(0, tempoutputfilename.find('.')) + "_" + to_string(i) + ".png";
 			i++;
 		}
-		imwrite(nonrepeatFPName, tempM);	
+		imwrite(outputpath + nonrepeatFPName, tempM);
 	}
 	else {//3D
 		if (DMtransformYN) {
@@ -3382,7 +3389,7 @@ void DoPAR::outputmodel(int level) {
 		else tempoutputfilename = outputfilename + parameterstring + "_Size" + to_string(OUTsize_) + ".RAW";
 		Write(outputpath + tempoutputfilename, tempUchar);
 	}
-	cout << endl << "output done. output size=" << OUTsize_;
+	cout << endl << "Output@" << outputpath + tempoutputfilename << " size=" << OUTsize_;
 
 
 }

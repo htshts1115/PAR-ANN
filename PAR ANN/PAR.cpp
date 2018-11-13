@@ -23,8 +23,8 @@ int main(int argc, const char* argv[])
 	time_t CurTime, MaxTime;
 	time(&CurTime);
 	CurTime /= 86400L;
-	//cout << endl << CurTime; _getch(); exit(0);		//17745 = 02/08/2018
-	MaxTime = (time_t)(17745 + 150);				//add 30*6 days
+	//cout << endl << CurTime; _getch(); exit(0);		//17848 = 13/11/2018
+	MaxTime = (time_t)(17848 + 100);				//add 30*6 days
 	if (CurTime > MaxTime) {
 		cout << endl << "Code expired. Please contact the author.";
 		_getch();
